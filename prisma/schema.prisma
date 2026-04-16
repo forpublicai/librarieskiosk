@@ -1,0 +1,122 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  PATRON
+  GUEST
+}
+
+enum UserStatus {
+  PENDING
+  APPROVED
+  BANNED
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  DECLINED
+}
+
+model User {
+  id             String          @id @default(cuid())
+  username       String          @unique
+  passwordHash   String
+  library        String          @default("Unknown")
+  role           Role            @default(PATRON)
+  status         UserStatus      @default(PENDING)
+  credits        Int             @default(100)
+  creditsResetAt DateTime        @default(now())
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  usageLogs      UsageLog[]
+  conversations  Conversation[]
+  mediaSessions  MediaSession[]
+  creditRequests CreditRequest[]
+}
+
+model Library {
+  id            String   @id @default(cuid())
+  name          String   @unique
+  weeklyPool    Int      @default(1750)
+  poolRemaining Int      @default(1750)
+  poolResetAt   DateTime @default(now())
+  createdAt     DateTime @default(now())
+}
+
+model Conversation {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  mode      String   // chat, code
+  title     String   @default("New Chat")
+  messages  Json     @default("[]") // [{role,content}]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([updatedAt])
+}
+
+model UsageLog {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  mode        String   // chat, image, video, music, code
+  model       String
+  prompt      String   @db.Text
+  creditsUsed Int      @default(1)
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model MediaSession {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  mode      String   // image, video, music
+  prompt    String   @db.Text
+  resultUrl String?  @db.Text // legacy; remove after R2 migration + backfill
+
+  // Durable storage (Cloudflare R2)
+  storageProvider   String  @default("R2")
+  storageStatus     String  @default("PENDING") // PENDING | UPLOADING | UPLOADED | FAILED
+  objectKey         String? @db.Text
+  mimeType          String?
+  byteSize          Int?
+  checksum          String?
+  sourceProviderUrl String? @db.Text
+  providerRunId     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([mode])
+  @@index([storageStatus])
+  @@index([providerRunId])
+}
+
+model CreditRequest {
+  id        String        @id @default(cuid())
+  userId    String
+  user      User          @relation(fields: [userId], references: [id])
+  amount    Int
+  reason    String?       @db.Text
+  status    RequestStatus @default(PENDING)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@index([userId])
+}

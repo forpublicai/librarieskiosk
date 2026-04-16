@@ -1,0 +1,34 @@
+{
+  "chat": {
+    "model": "zai-org/glm-5",
+    "label": "GLM-5 Chat",
+    "description": "Conversational AI assistant",
+    "endpoint": "chat"
+  },
+  "coding": {
+    "model": "zai-org/glm-5",
+    "label": "GLM-5 Coder",
+    "description": "AI coding assistant with tools",
+    "endpoint": "chat",
+    "systemPrompt": "You are an expert coding assistant. When the user asks you to write code, always respond with well-structured, commented code. Use markdown code blocks with language tags. Explain your approach briefly before writing code. If the user asks you to fix or debug code, analyze the issue and provide the corrected version."
+  },
+  "image": {
+    "model": "chroma",
+    "label": "Chroma",
+    "description": "AI image generation",
+    "endpoint": "image"
+  },
+  "video": {
+    "model": "kling-v30-std",
+    "label": "Kling 3.0 Standard",
+    
+    "description": "AI video generation",
+    "endpoint": "video"
+  },
+  "music": {
+    "model": "Elevenlabs-Music-V1",
+    "label": "Elevenlabs Music",
+    "description": "AI music generation",
+    "endpoint": "music"
+  }
+}
