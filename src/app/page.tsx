@@ -112,6 +112,9 @@ export default function LoginPage() {
             <p className="landing-create-account">
               <a href="/signup">CREATE AN ACCOUNT</a>
             </p>
+            <p className="landing-create-account" style={{ marginTop: '8px' }}>
+              <a href="/forgot-password">FORGOT PASSWORD?</a>
+            </p>
 
             <div className="landing-guest-divider" />
 

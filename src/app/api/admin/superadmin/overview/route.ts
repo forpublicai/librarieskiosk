@@ -59,6 +59,7 @@ export async function GET(request: NextRequest) {
                 credits: true,
                 library: true,
                 createdAt: true,
+                loginCount: true,
                 _count: { select: { usageLogs: true } },
             },
             orderBy: { createdAt: 'desc' },

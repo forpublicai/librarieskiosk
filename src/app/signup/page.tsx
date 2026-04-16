@@ -3,6 +3,7 @@
 import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
+import { SECURITY_QUESTIONS } from '@/lib/security';
 
 const LIBRARIES = [
     'Pottsboro, TX',
@@ -14,6 +15,8 @@ export default function SignupPage() {
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [library, setLibrary] = useState('');
+    const [securityQuestion, setSecurityQuestion] = useState('');
+    const [securityAnswer, setSecurityAnswer] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const { user, login } = useAuth();
@@ -38,6 +41,16 @@ export default function SignupPage() {
             return;
         }
 
+        if (!securityQuestion) {
+            setError('PLEASE SELECT A SECURITY QUESTION');
+            return;
+        }
+
+        if (!securityAnswer.trim()) {
+            setError('PLEASE PROVIDE A SECURITY ANSWER');
+            return;
+        }
+
         setLoading(true);
 
         try {
@@ -48,6 +61,8 @@ export default function SignupPage() {
                     username: username.trim(),
                     password,
                     library,
+                    securityQuestion,
+                    securityAnswer,
                 }),
             });
 
@@ -122,7 +137,7 @@ export default function SignupPage() {
                         />
                     </div>
 
-                    <div className="form-group" style={{ marginBottom: '40px' }}>
+                    <div className="form-group">
                         <label className="form-label" htmlFor="signup-confirm">CONFIRM PASSWORD</label>
                         <input
                             id="signup-confirm"
@@ -136,10 +151,43 @@ export default function SignupPage() {
                         />
                     </div>
 
+                    <div className="form-group">
+                        <label className="form-label" htmlFor="signup-question">SECURITY QUESTION</label>
+                        <select
+                            id="signup-question"
+                            className="input"
+                            value={securityQuestion}
+                            onChange={(e) => setSecurityQuestion(e.target.value)}
+                            required
+                        >
+                            <option value="">SELECT A QUESTION...</option>
+                            {SECURITY_QUESTIONS.map((q) => (
+                                <option key={q} value={q}>{q.toUpperCase()}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div className="form-group" style={{ marginBottom: '40px' }}>
+                        <label className="form-label" htmlFor="signup-answer">SECURITY ANSWER</label>
+                        <input
+                            id="signup-answer"
+                            className="input"
+                            type="text"
+                            value={securityAnswer}
+                            onChange={(e) => setSecurityAnswer(e.target.value)}
+                            placeholder="YOUR ANSWER"
+                            autoComplete="off"
+                            required
+                        />
+                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                            USED TO RECOVER YOUR PASSWORD. NOT CASE-SENSITIVE.
+                        </span>
+                    </div>
+
                     <button
                         className="btn btn-primary btn-lg"
                         type="submit"
-                        disabled={loading || !username || !password || !confirmPassword || !library}
+                        disabled={loading || !username || !password || !confirmPassword || !library || !securityQuestion || !securityAnswer}
                         style={{ padding: '20px' }}
                     >
                         {loading ? 'CREATING...' : 'REQUEST ACCESS'}

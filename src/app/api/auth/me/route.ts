@@ -28,5 +28,18 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    return NextResponse.json({ user });
+    // For library admins, the "credits" shown in the header is the library's
+    // remaining weekly pool — that's what they dispense to patrons.
+    let displayCredits = user.credits;
+    if (user.role === 'ADMIN') {
+        const library = await prisma.library.findUnique({
+            where: { name: user.library },
+            select: { poolRemaining: true },
+        });
+        if (library) displayCredits = library.poolRemaining;
+    }
+
+    return NextResponse.json({
+        user: { ...user, credits: displayCredits },
+    });
 }

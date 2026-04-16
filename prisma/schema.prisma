@@ -27,20 +27,23 @@ enum RequestStatus {
 }
 
 model User {
-  id             String          @id @default(cuid())
-  username       String          @unique
-  passwordHash   String
-  library        String          @default("Unknown")
-  role           Role            @default(PATRON)
-  status         UserStatus      @default(PENDING)
-  credits        Int             @default(100)
-  creditsResetAt DateTime        @default(now())
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  usageLogs      UsageLog[]
-  conversations  Conversation[]
-  mediaSessions  MediaSession[]
-  creditRequests CreditRequest[]
+  id                  String          @id @default(cuid())
+  username            String          @unique
+  passwordHash        String
+  library             String          @default("Unknown")
+  role                Role            @default(PATRON)
+  status              UserStatus      @default(PENDING)
+  credits             Int             @default(100)
+  creditsResetAt      DateTime        @default(now())
+  securityQuestion    String?
+  securityAnswerHash  String?
+  loginCount          Int             @default(0)
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+  usageLogs           UsageLog[]
+  conversations       Conversation[]
+  mediaSessions       MediaSession[]
+  creditRequests      CreditRequest[]
 }
 
 model Library {

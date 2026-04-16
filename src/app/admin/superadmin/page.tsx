@@ -28,6 +28,7 @@ interface UserAccount {
     credits: number;
     library: string;
     createdAt: string;
+    loginCount: number;
     totalUsage: number;
     usageByMode: Record<string, { count: number; credits: number }>;
 }
@@ -207,6 +208,7 @@ export default function SuperAdminPage() {
                                     <th style={thStyle}>Role</th>
                                     <th style={thStyle}>Status</th>
                                     <th style={thStyle}>Credits</th>
+                                    <th style={thStyle}>Logins</th>
                                     <th style={thStyle}>Usage</th>
                                     {modes.map((m) => (
                                         <th key={m} style={thStyle}>{m}</th>
@@ -236,6 +238,7 @@ export default function SuperAdminPage() {
                                             </span>
                                         </td>
                                         <td style={tdStyle}>{u.credits}</td>
+                                        <td style={tdStyle}>{u.loginCount}</td>
                                         <td style={tdStyle}>{u.totalUsage}</td>
                                         {modes.map((m) => (
                                             <td key={m} style={tdStyle}>{u.usageByMode[m]?.count || 0}</td>

@@ -37,6 +37,11 @@ export default function Header({ title, showBack = true }: HeaderProps) {
             </div>
             <div className="page-header-right">
                 <span className="credit-badge">{user.credits} Credits</span>
+                {user.role !== 'GUEST' && (
+                    <button className="back-btn" onClick={() => router.push('/account')}>
+                        My Account
+                    </button>
+                )}
                 <button className="back-btn" onClick={logout}>
                     Sign Out
                 </button>

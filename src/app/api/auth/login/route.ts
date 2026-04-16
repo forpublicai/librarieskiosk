@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
         }
 
         const user = await prisma.user.findUnique({
-            where: { username },
+            where: { username: String(username).trim().toLowerCase() },
         });
 
         if (!user || !comparePassword(password, user.passwordHash)) {
@@ -26,11 +26,33 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        if (user.status === 'BANNED') {
+            return NextResponse.json(
+                { error: 'This account has been suspended.' },
+                { status: 403 }
+            );
+        }
+
+        await prisma.user.update({
+            where: { id: user.id },
+            data: { loginCount: { increment: 1 } },
+        });
+
         const token = await signToken({
             userId: user.id,
             username: user.username,
             role: user.role,
         });
+
+        // Library admins see the library pool as their credit count.
+        let displayCredits = user.credits;
+        if (user.role === 'ADMIN') {
+            const library = await prisma.library.findUnique({
+                where: { name: user.library },
+                select: { poolRemaining: true },
+            });
+            if (library) displayCredits = library.poolRemaining;
+        }
 
         return NextResponse.json({
             token,
@@ -39,7 +61,7 @@ export async function POST(request: NextRequest) {
                 username: user.username,
                 role: user.role,
                 status: user.status,
-                credits: user.credits,
+                credits: displayCredits,
                 library: user.library,
             },
         });

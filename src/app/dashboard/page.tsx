@@ -101,6 +101,11 @@ export default function DashboardPage() {
                 <div className="page-header-right">
                     <span className="credit-badge">{user.credits} Credits</span>
                     {isGuest && <span className="credit-badge" style={{ background: 'rgba(255,77,0,0.1)', color: 'var(--accent-orange)' }}>Guest</span>}
+                    {!isGuest && (
+                        <button className="back-btn" onClick={() => router.push('/account')}>
+                            My Account
+                        </button>
+                    )}
                     <button className="back-btn" onClick={logout}>{isGuest ? 'Exit' : 'Sign Out'}</button>
                 </div>
             </header>

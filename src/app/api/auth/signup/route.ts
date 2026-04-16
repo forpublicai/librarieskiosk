@@ -3,14 +3,36 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { hashPassword, signToken } from '@/lib/auth';
+import { hashSecurityAnswer, isValidSecurityQuestion, normalizeSecurityAnswer } from '@/lib/security';
 
 export async function POST(request: NextRequest) {
     try {
-        const { username, password, library } = await request.json();
+        const { username, password, library, securityQuestion, securityAnswer } = await request.json();
 
         if (!username || !password || !library) {
             return NextResponse.json(
                 { error: 'Username, password, and library are required' },
+                { status: 400 }
+            );
+        }
+
+        if (!securityQuestion || !securityAnswer) {
+            return NextResponse.json(
+                { error: 'Security question and answer are required' },
+                { status: 400 }
+            );
+        }
+
+        if (!isValidSecurityQuestion(securityQuestion)) {
+            return NextResponse.json(
+                { error: 'Invalid security question' },
+                { status: 400 }
+            );
+        }
+
+        if (normalizeSecurityAnswer(securityAnswer).length < 2) {
+            return NextResponse.json(
+                { error: 'Security answer must contain at least 2 characters' },
                 { status: 400 }
             );
         }
@@ -67,6 +89,8 @@ export async function POST(request: NextRequest) {
                 library: trimmedLibrary,
                 role: 'PATRON',
                 credits: 100,
+                securityQuestion,
+                securityAnswerHash: hashSecurityAnswer(securityAnswer),
             },
         });
 

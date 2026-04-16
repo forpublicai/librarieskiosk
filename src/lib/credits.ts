@@ -19,7 +19,7 @@ export const CREDIT_COSTS: Record<string, number> = {
     music: 5,   // per 10 seconds
     video: 25,  // per 10 seconds
     chat: 0,
-    code: 0,
+    code: 1,
 };
 
 /**

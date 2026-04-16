@@ -33,7 +33,7 @@ interface LibraryPool {
 }
 
 export default function AdminPage() {
-    const { user, token, isLoading } = useAuth();
+    const { user, token, isLoading, refreshUser } = useAuth();
     const router = useRouter();
     const [users, setUsers] = useState<UserAccount[]>([]);
     const [creditRequests, setCreditRequests] = useState<CreditRequestItem[]>([]);
@@ -110,7 +110,7 @@ export default function AdminPage() {
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
                 body: JSON.stringify({ userId: sendCreditsModal.userId, amount: sendAmount }),
             });
-            if (res.ok) { showMessage(`Sent ${sendAmount} credits to ${sendCreditsModal.username}`); setSendCreditsModal(null); loadData(); }
+            if (res.ok) { showMessage(`Sent ${sendAmount} credits to ${sendCreditsModal.username}`); setSendCreditsModal(null); loadData(); refreshUser(); }
             else { const data = await res.json(); showMessage(data.error || 'Failed to send credits', true); }
         } catch { showMessage('Failed to send credits', true); }
         finally { setLoadingAction(null); }
@@ -124,7 +124,7 @@ export default function AdminPage() {
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
                 body: JSON.stringify({ requestId, action }),
             });
-            if (res.ok) { showMessage(`Request ${action.toLowerCase()}`); loadData(); }
+            if (res.ok) { showMessage(`Request ${action.toLowerCase()}`); loadData(); refreshUser(); }
             else { const data = await res.json(); showMessage(data.error || 'Failed', true); }
         } catch { showMessage('Failed to handle request', true); }
         finally { setLoadingAction(null); }
