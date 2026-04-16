@@ -10,6 +10,7 @@ interface SessionItem {
     id: string;
     prompt: string;
     url: string | null;
+    hasObject?: boolean;
     mimeType?: string | null;
     storageStatus?: string | null;
     createdAt: string;
@@ -55,7 +56,7 @@ export default function VideoPage() {
 
     const refreshMainUrl = useCallback(async () => {
         if (!currentSessionId || !token) return;
-        const fresh = await refreshMediaUrl(currentSessionId, token);
+        const fresh = await refreshMediaUrl(currentSessionId, token, { force: true });
         if (fresh?.url) setVideoUrl(fresh.url);
     }, [currentSessionId, token]);
 
@@ -149,10 +150,18 @@ export default function VideoPage() {
                                     background: 'var(--bg-card)',
                                     transition: 'background 0.2s',
                                 }}
-                                onClick={() => {
+                                onClick={async () => {
+                                    // Set ID immediately so refresh handler knows which session
+                                    setCurrentSessionId(s.id);
+                                    // Legacy rows may have a direct url; R2-backed rows need a
+                                    // presigned URL fetched on-demand.
                                     if (s.url) {
                                         setVideoUrl(s.url);
-                                        setCurrentSessionId(s.id);
+                                        return;
+                                    }
+                                    if (s.hasObject && token) {
+                                        const fresh = await refreshMediaUrl(s.id, token);
+                                        if (fresh?.url) setVideoUrl(fresh.url);
                                     }
                                 }}
                             >
@@ -232,6 +241,8 @@ export default function VideoPage() {
                                         controls
                                         autoPlay
                                         loop
+                                        preload="metadata"
+                                        playsInline
                                         onError={refreshMainUrl}
                                         style={{ maxWidth: '100%', maxHeight: '500px', border: '1px solid var(--border-color)' }}
                                     />

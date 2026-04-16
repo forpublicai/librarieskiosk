@@ -95,6 +95,7 @@ model MediaSession {
   storageProvider   String  @default("R2")
   storageStatus     String  @default("PENDING") // PENDING | UPLOADING | UPLOADED | FAILED
   objectKey         String? @db.Text
+  thumbnailKey      String? @db.Text
   mimeType          String?
   byteSize          Int?
   checksum          String?
@@ -109,6 +110,7 @@ model MediaSession {
   @@index([mode])
   @@index([storageStatus])
   @@index([providerRunId])
+  @@index([userId, checksum])
 }
 
 model CreditRequest {

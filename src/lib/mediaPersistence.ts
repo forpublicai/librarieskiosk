@@ -1,16 +1,19 @@
 import 'server-only';
 
+import { createHash } from 'crypto';
 import { prisma } from './db';
 import {
     buildObjectKey,
     deleteObject,
     extensionForMime,
-    generateSignedGetUrl,
     uploadBuffer,
-    uploadFromDataUrl,
     uploadFromUrl,
+    fetchBytesFromUrl,
+    bufferFromDataUrl,
     type UploadResult,
 } from './storage';
+import { getMediaReadUrl } from './mediaUrlCache';
+import { encodeImageWithThumbnail } from './imagePipeline';
 import type { ImageResult, MusicResult } from './nanogpt';
 
 /**
@@ -26,9 +29,12 @@ import type { ImageResult, MusicResult } from './nanogpt';
 export interface PersistedMedia {
     mediaSessionId: string;
     url: string;
+    thumbnailUrl?: string | null;
     mimeType: string;
     byteSize: number | null;
     storageStatus: 'UPLOADED' | 'FAILED';
+    /** True if an existing row with the same checksum was reused (no new upload) */
+    deduplicated?: boolean;
 }
 
 // ---------- Image ----------
@@ -44,37 +50,128 @@ export async function persistImageResult({
     prompt,
     result,
 }: PersistImageInput): Promise<PersistedMedia> {
-    // Resolve the binary: prefer the remote URL, fall back to base64
-    let upload: UploadResult | null = null;
-    let uploadError: unknown = null;
-    let key: string | null = null;
-
+    // 1. Fetch the raw bytes from the provider (URL or base64). We need the
+    //    bytes locally so we can transcode PNG → AVIF + thumbnail before upload.
+    let sourceBuffer: Buffer | null = null;
+    let sourceError: unknown = null;
     try {
         if (result.url) {
-            key = buildObjectKey({
-                userId,
-                mode: 'image',
-                extension: 'png',
-            });
-            upload = await uploadFromUrl(result.url, key, 'image/*');
+            const fetched = await fetchBytesFromUrl(result.url, 'image/*');
+            sourceBuffer = fetched.buffer;
         } else if (result.b64_json) {
-            key = buildObjectKey({
-                userId,
-                mode: 'image',
-                extension: 'png',
-            });
-            const dataUrl = `data:image/png;base64,${result.b64_json}`;
-            upload = await uploadFromDataUrl(dataUrl, key);
+            const { buffer } = bufferFromDataUrl(`data:image/png;base64,${result.b64_json}`);
+            sourceBuffer = buffer;
         } else {
             throw new Error('Image result contained neither url nor b64_json');
         }
     } catch (err) {
+        sourceError = err;
+    }
+
+    if (!sourceBuffer) {
+        const failed = await prisma.mediaSession.create({
+            data: {
+                userId,
+                mode: 'image',
+                prompt: prompt.slice(0, 2000),
+                storageProvider: 'R2',
+                storageStatus: 'FAILED',
+                sourceProviderUrl: result.url ?? null,
+                resultUrl: result.url ?? null,
+            },
+        });
+        console.error('persistImageResult fetch failed', sourceError);
+        return {
+            mediaSessionId: failed.id,
+            url: result.url || '',
+            mimeType: 'image/png',
+            byteSize: null,
+            storageStatus: 'FAILED',
+        };
+    }
+
+    // 2. Transcode to AVIF + thumbnail. Fall back to storing original bytes as
+    //    PNG if sharp can't handle the input (rare — sharp reads everything
+    //    modern providers emit).
+    let encoded: Awaited<ReturnType<typeof encodeImageWithThumbnail>> | null = null;
+    try {
+        encoded = await encodeImageWithThumbnail(sourceBuffer);
+    } catch (err) {
+        console.error('persistImageResult encode failed, falling back to PNG', err);
+    }
+
+    // 3. Dedup check: if the same userId already stored an identical checksum
+    //    and the row is UPLOADED, reuse it instead of writing again.
+    const fullBuffer = encoded?.full.buffer ?? sourceBuffer;
+    const fullMime = encoded?.full.contentType ?? 'image/png';
+    const fullExt = encoded?.full.extension ?? 'png';
+    const dedupChecksum = sha256Hex(fullBuffer);
+
+    const existing = await prisma.mediaSession.findFirst({
+        where: {
+            userId,
+            checksum: dedupChecksum,
+            storageStatus: 'UPLOADED',
+            objectKey: { not: null },
+        },
+        select: { id: true, objectKey: true, thumbnailKey: true, mimeType: true, byteSize: true },
+    });
+
+    if (existing?.objectKey) {
+        const row = await prisma.mediaSession.create({
+            data: {
+                userId,
+                mode: 'image',
+                prompt: prompt.slice(0, 2000),
+                storageProvider: 'R2',
+                storageStatus: 'UPLOADED',
+                objectKey: existing.objectKey,
+                thumbnailKey: existing.thumbnailKey,
+                mimeType: existing.mimeType,
+                byteSize: existing.byteSize,
+                checksum: dedupChecksum,
+                sourceProviderUrl: result.url ?? null,
+                resultUrl: null,
+            },
+        });
+        const full = await getMediaReadUrl(existing.objectKey);
+        const thumb = existing.thumbnailKey
+            ? await getMediaReadUrl(existing.thumbnailKey).catch(() => null)
+            : null;
+        return {
+            mediaSessionId: row.id,
+            url: full.url,
+            thumbnailUrl: thumb?.url ?? null,
+            mimeType: existing.mimeType || fullMime,
+            byteSize: existing.byteSize ?? null,
+            storageStatus: 'UPLOADED',
+            deduplicated: true,
+        };
+    }
+
+    // 4. Upload full + thumbnail in parallel.
+    const fullKey = buildObjectKey({ userId, mode: 'image', extension: fullExt });
+    const thumbKey = encoded
+        ? buildObjectKey({ userId, mode: 'image', extension: encoded.thumbnail.extension })
+        : null;
+
+    let upload: UploadResult | null = null;
+    let uploadError: unknown = null;
+    try {
+        const [fullUpload] = await Promise.all([
+            uploadBuffer(fullKey, fullBuffer, fullMime),
+            thumbKey && encoded
+                ? uploadBuffer(thumbKey, encoded.thumbnail.buffer, encoded.thumbnail.contentType)
+                : Promise.resolve(null),
+        ]);
+        upload = fullUpload;
+    } catch (err) {
         uploadError = err;
     }
 
-    // Upload failed: record a FAILED row, preserve the provider URL so the user
-    // can still view their generation at least once before the provider link expires
-    if (!upload || !key) {
+    if (!upload) {
+        // Best-effort cleanup of any partial uploads
+        await Promise.all([safeDelete(fullKey), thumbKey ? safeDelete(thumbKey) : Promise.resolve()]);
         const failed = await prisma.mediaSession.create({
             data: {
                 userId,
@@ -90,14 +187,13 @@ export async function persistImageResult({
         return {
             mediaSessionId: failed.id,
             url: result.url || '',
-            mimeType: 'image/png',
+            mimeType: fullMime,
             byteSize: null,
             storageStatus: 'FAILED',
         };
     }
 
-    // Upload succeeded: insert the row, rolling back R2 on insert failure
-    // so we never leak an orphan object
+    // 5. Insert DB row; roll back R2 objects on insert failure.
     try {
         const row = await prisma.mediaSession.create({
             data: {
@@ -106,7 +202,8 @@ export async function persistImageResult({
                 prompt: prompt.slice(0, 2000),
                 storageProvider: 'R2',
                 storageStatus: 'UPLOADED',
-                objectKey: key,
+                objectKey: fullKey,
+                thumbnailKey: thumbKey,
                 mimeType: upload.mimeType,
                 byteSize: upload.byteSize,
                 checksum: upload.checksum,
@@ -114,18 +211,24 @@ export async function persistImageResult({
                 resultUrl: null,
             },
         });
-        const signed = await generateSignedGetUrl(key);
+        const full = await getMediaReadUrl(fullKey);
+        const thumb = thumbKey ? await getMediaReadUrl(thumbKey).catch(() => null) : null;
         return {
             mediaSessionId: row.id,
-            url: signed,
+            url: full.url,
+            thumbnailUrl: thumb?.url ?? null,
             mimeType: upload.mimeType,
             byteSize: upload.byteSize,
             storageStatus: 'UPLOADED',
         };
     } catch (err) {
-        await safeDelete(key);
+        await Promise.all([safeDelete(fullKey), thumbKey ? safeDelete(thumbKey) : Promise.resolve()]);
         throw err;
     }
+}
+
+function sha256Hex(buffer: Buffer): string {
+    return createHash('sha256').update(buffer).digest('hex');
 }
 
 // ---------- Music ----------
@@ -204,10 +307,10 @@ export async function persistMusicResult({
                 resultUrl: null,
             },
         });
-        const signed = await generateSignedGetUrl(key);
+        const { url } = await getMediaReadUrl(key);
         return {
             mediaSessionId: row.id,
-            url: signed,
+            url,
             mimeType: upload.mimeType,
             byteSize: upload.byteSize,
             storageStatus: 'UPLOADED',
@@ -289,10 +392,10 @@ export async function finalizeVideoUpload({
 
     // Already uploaded — fast path
     if (row.storageStatus === 'UPLOADED' && row.objectKey) {
-        const signedUrl = await generateSignedGetUrl(row.objectKey);
+        const { url } = await getMediaReadUrl(row.objectKey);
         return {
             mediaSessionId: row.id,
-            signedUrl,
+            signedUrl: url,
             mimeType: row.mimeType,
             storageStatus: 'UPLOADED',
             uploadedThisCall: false,
@@ -313,7 +416,7 @@ export async function finalizeVideoUpload({
         });
         const signedUrl =
             fresh?.objectKey && fresh.storageStatus === 'UPLOADED'
-                ? await generateSignedGetUrl(fresh.objectKey)
+                ? (await getMediaReadUrl(fresh.objectKey)).url
                 : null;
         return {
             mediaSessionId: row.id,
@@ -346,10 +449,10 @@ export async function finalizeVideoUpload({
                 resultUrl: null,
             },
         });
-        const signedUrl = await generateSignedGetUrl(key);
+        const { url } = await getMediaReadUrl(key);
         return {
             mediaSessionId: row.id,
-            signedUrl,
+            signedUrl: url,
             mimeType: upload.mimeType,
             storageStatus: 'UPLOADED',
             uploadedThisCall: true,

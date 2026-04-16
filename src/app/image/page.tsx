@@ -10,6 +10,8 @@ interface SessionItem {
     id: string;
     prompt: string;
     url: string | null;
+    thumbnailUrl?: string | null;
+    hasObject?: boolean;
     mimeType?: string | null;
     storageStatus?: string | null;
     createdAt: string;
@@ -47,17 +49,21 @@ export default function ImagePage() {
 
     const refreshMainUrl = useCallback(async () => {
         if (!currentSessionId || !token) return;
-        const fresh = await refreshMediaUrl(currentSessionId, token);
+        const fresh = await refreshMediaUrl(currentSessionId, token, { force: true });
         if (fresh?.url) setImageUrl(fresh.url);
     }, [currentSessionId, token]);
 
     const refreshSessionItemUrl = useCallback(
         async (id: string) => {
             if (!token) return;
-            const fresh = await refreshMediaUrl(id, token);
+            const fresh = await refreshMediaUrl(id, token, { force: true });
             if (fresh?.url) {
                 setSessions((prev) =>
-                    prev.map((s) => (s.id === id ? { ...s, url: fresh.url } : s))
+                    prev.map((s) =>
+                        s.id === id
+                            ? { ...s, url: fresh.url, thumbnailUrl: fresh.thumbnailUrl ?? s.thumbnailUrl }
+                            : s
+                    )
                 );
             }
         },
@@ -135,17 +141,26 @@ export default function ImagePage() {
                                     background: 'var(--bg-card)',
                                     transition: 'background 0.2s',
                                 }}
-                                onClick={() => {
+                                onClick={async () => {
+                                    setCurrentSessionId(s.id);
                                     if (s.url) {
                                         setImageUrl(s.url);
-                                        setCurrentSessionId(s.id);
+                                        return;
+                                    }
+                                    // R2-backed rows don't embed a full URL in the list;
+                                    // fetch the presigned URL on demand.
+                                    if (s.hasObject && token) {
+                                        const fresh = await refreshMediaUrl(s.id, token);
+                                        if (fresh?.url) setImageUrl(fresh.url);
                                     }
                                 }}
                             >
-                                {s.url && (
+                                {(s.thumbnailUrl || s.url) && (
                                     <img
-                                        src={s.url}
+                                        src={s.thumbnailUrl || s.url || undefined}
                                         alt={s.prompt}
+                                        loading="lazy"
+                                        decoding="async"
                                         style={{ width: '100%', marginBottom: '8px' }}
                                         onError={() => refreshSessionItemUrl(s.id)}
                                     />

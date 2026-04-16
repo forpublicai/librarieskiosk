@@ -59,11 +59,18 @@ export async function DELETE(request: NextRequest) {
             return NextResponse.json({ error: 'Incorrect security answer' }, { status: 401 });
         }
 
-        // Fetch all R2 object keys before deleting DB rows
+        // Fetch all R2 object keys before deleting DB rows. Dedup means
+        // multiple rows can point at the same objectKey/thumbnailKey — collect
+        // unique keys so we don't issue redundant deletes.
         const mediaSessions = await prisma.mediaSession.findMany({
-            where: { userId: user.id, objectKey: { not: null }, storageStatus: 'UPLOADED' },
-            select: { objectKey: true },
+            where: { userId: user.id, storageStatus: 'UPLOADED' },
+            select: { objectKey: true, thumbnailKey: true },
         });
+        const keysToDelete = new Set<string>();
+        for (const s of mediaSessions) {
+            if (s.objectKey) keysToDelete.add(s.objectKey);
+            if (s.thumbnailKey) keysToDelete.add(s.thumbnailKey);
+        }
 
         // Delete all related DB rows in dependency order, then the user
         await prisma.$transaction([
@@ -76,14 +83,11 @@ export async function DELETE(request: NextRequest) {
 
         // Delete R2 objects after DB rows are gone (best-effort; log failures)
         await Promise.allSettled(
-            mediaSessions
-                .map((s) => s.objectKey!)
-                .filter(Boolean)
-                .map((key) =>
-                    deleteObject(key).catch((err) =>
-                        console.error('Failed to delete R2 object during account deletion', key, err)
-                    )
+            Array.from(keysToDelete).map((key) =>
+                deleteObject(key).catch((err) =>
+                    console.error('Failed to delete R2 object during account deletion', key, err)
                 )
+            )
         );
 
         return NextResponse.json({ success: true });

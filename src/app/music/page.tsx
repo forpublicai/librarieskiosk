@@ -10,6 +10,7 @@ interface SessionItem {
     id: string;
     prompt: string;
     url: string | null;
+    hasObject?: boolean;
     mimeType?: string | null;
     storageStatus?: string | null;
     createdAt: string;
@@ -52,7 +53,7 @@ export default function MusicPage() {
 
     const refreshMainUrl = useCallback(async () => {
         if (!currentSessionId || !token) return;
-        const fresh = await refreshMediaUrl(currentSessionId, token);
+        const fresh = await refreshMediaUrl(currentSessionId, token, { force: true });
         if (fresh?.url) setAudioUrl(fresh.url);
     }, [currentSessionId, token]);
 
@@ -128,10 +129,15 @@ export default function MusicPage() {
                                     background: 'var(--bg-card)',
                                     transition: 'background 0.2s',
                                 }}
-                                onClick={() => {
+                                onClick={async () => {
+                                    setCurrentSessionId(s.id);
                                     if (s.url) {
                                         setAudioUrl(s.url);
-                                        setCurrentSessionId(s.id);
+                                        return;
+                                    }
+                                    if (s.hasObject && token) {
+                                        const fresh = await refreshMediaUrl(s.id, token);
+                                        if (fresh?.url) setAudioUrl(fresh.url);
                                     }
                                 }}
                             >
@@ -236,6 +242,7 @@ export default function MusicPage() {
                                         src={audioUrl}
                                         controls
                                         autoPlay
+                                        preload="metadata"
                                         onError={refreshMainUrl}
                                         style={{ width: '100%', maxWidth: '600px' }}
                                     />

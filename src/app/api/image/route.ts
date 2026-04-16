@@ -96,8 +96,10 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
             mediaSessionId: persisted.mediaSessionId,
             url: persisted.url,
+            thumbnailUrl: persisted.thumbnailUrl ?? null,
             mimeType: persisted.mimeType,
             storageStatus: persisted.storageStatus,
+            deduplicated: persisted.deduplicated ?? false,
         });
     } catch (error) {
         console.error('Image error:', error);

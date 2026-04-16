@@ -3,8 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { requireAuth, isAuthResult } from '@/lib/auth';
-import { getR2Env } from '@/lib/env';
-import { generateSignedGetUrl } from '@/lib/storage';
+import { getMediaReadUrl } from '@/lib/mediaUrlCache';
 
 /**
  * GET /api/media-sessions/[id]/url
@@ -36,6 +35,7 @@ export async function GET(
             mimeType: true,
             byteSize: true,
             objectKey: true,
+            thumbnailKey: true,
             resultUrl: true,
             storageStatus: true,
         },
@@ -70,13 +70,16 @@ export async function GET(
         );
     }
 
-    const env = getR2Env();
-    const url = await generateSignedGetUrl(session.objectKey);
-    const expiresAt = new Date(Date.now() + env.signedUrlTtlSeconds * 1000).toISOString();
+    const resolved = await getMediaReadUrl(session.objectKey);
+    const thumbnail = session.thumbnailKey
+        ? await getMediaReadUrl(session.thumbnailKey).catch(() => null)
+        : null;
 
     return NextResponse.json({
-        url,
-        expiresAt,
+        url: resolved.url,
+        expiresAt: resolved.expiresAt,
+        public: resolved.public,
+        thumbnailUrl: thumbnail?.url ?? null,
         mimeType: session.mimeType,
         mode: session.mode,
         byteSize: session.byteSize,

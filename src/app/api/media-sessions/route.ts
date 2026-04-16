@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { requireAuth, isAuthResult } from '@/lib/auth';
 import { isR2Enabled } from '@/lib/env';
-import { generateSignedGetUrl } from '@/lib/storage';
+import { getMediaReadUrl } from '@/lib/mediaUrlCache';
 
 // GET /api/media-sessions?mode=image|video|music — list user's sessions
 export async function GET(request: NextRequest) {
@@ -24,6 +24,7 @@ export async function GET(request: NextRequest) {
             prompt: true,
             resultUrl: true,
             objectKey: true,
+            thumbnailKey: true,
             mimeType: true,
             byteSize: true,
             storageStatus: true,
@@ -33,30 +34,55 @@ export async function GET(request: NextRequest) {
         take: 20,
     });
 
-    // Presign R2-backed rows in parallel. Legacy rows (no objectKey) fall back
-    // to resultUrl so pre-R2 history still renders during the compat window.
+    // Presign only what the sidebar actually displays:
+    //   - Images show a thumbnail inline → presign thumbnailKey (or fall back
+    //     to objectKey for legacy pre-thumbnail rows).
+    //   - Video & music show prompt text only → skip presign entirely. The
+    //     full URL is fetched on-click via /api/media-sessions/[id]/url.
+    //
+    // This cuts class-A operations on video/music pages from 20 presigns/load
+    // to 0, and images from 40 (full+thumb) to 20 (thumb only).
     const sessions = await Promise.all(
         rows.map(async (row) => {
-            let url: string | null = row.resultUrl;
-            if (row.objectKey && row.storageStatus === 'UPLOADED') {
+            let thumbnailUrl: string | null = null;
+            const needsInlinePreview = row.mode === 'image';
+
+            if (
+                needsInlinePreview &&
+                row.storageStatus === 'UPLOADED' &&
+                (row.thumbnailKey || row.objectKey)
+            ) {
+                const key = row.thumbnailKey ?? row.objectKey!;
                 try {
-                    url = await generateSignedGetUrl(row.objectKey);
+                    const resolved = await getMediaReadUrl(key);
+                    thumbnailUrl = resolved.url;
                 } catch (err) {
-                    console.error('Failed to presign', row.id, err);
-                    url = row.resultUrl;
+                    console.error('Failed to resolve thumbnail', row.id, err);
                 }
             }
+
+            // Legacy rows without objectKey keep returning resultUrl so old
+            // history still renders during the compat window.
+            const legacyUrl =
+                row.storageStatus !== 'UPLOADED' || !row.objectKey
+                    ? row.resultUrl
+                    : null;
+
             return {
                 id: row.id,
                 mode: row.mode,
                 prompt: row.prompt,
-                url,
+                // url is intentionally null for R2-backed rows. Clients fetch
+                // the presigned URL on-click via /api/media-sessions/[id]/url.
+                url: legacyUrl,
+                thumbnailUrl,
                 mimeType: row.mimeType,
                 byteSize: row.byteSize,
                 storageStatus: row.storageStatus,
+                hasObject: Boolean(row.objectKey) && row.storageStatus === 'UPLOADED',
                 createdAt: row.createdAt,
                 // Back-compat: older clients read resultUrl
-                resultUrl: url,
+                resultUrl: legacyUrl,
             };
         })
     );

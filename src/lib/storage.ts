@@ -5,6 +5,7 @@ import {
     PutObjectCommand,
     GetObjectCommand,
     DeleteObjectCommand,
+    HeadObjectCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { createHash, randomUUID } from 'crypto';
@@ -35,6 +36,31 @@ export interface UploadResult {
     byteSize: number;
     checksum: string;
     mimeType: string;
+}
+
+export interface UploadOptions {
+    /** Extra metadata. `checksum` is always set automatically. */
+    metadata?: Record<string, string>;
+    /**
+     * Cache-Control header. Defaults to 1-year immutable since object keys
+     * include a UUID and are never mutated in place.
+     */
+    cacheControl?: string;
+    /**
+     * Content-Disposition. Defaults to `inline; filename="media.{ext}"` so
+     * browsers stream/seek <video> and <audio> instead of triggering a
+     * download prompt. Generation routes can override with `attachment`
+     * semantics if needed.
+     */
+    contentDisposition?: string;
+}
+
+const DEFAULT_CACHE_CONTROL = 'public, max-age=31536000, immutable';
+
+function defaultContentDisposition(key: string): string {
+    const dotIdx = key.lastIndexOf('.');
+    const ext = dotIdx >= 0 ? key.slice(dotIdx + 1) : 'bin';
+    return `inline; filename="media.${ext}"`;
 }
 
 export interface BuildKeyInput {
@@ -143,7 +169,8 @@ function sha256Hex(buffer: Buffer): string {
 export async function uploadBuffer(
     key: string,
     buffer: Buffer,
-    contentType: string
+    contentType: string,
+    options: UploadOptions = {}
 ): Promise<UploadResult> {
     const env = getR2Env();
     const client = getR2Client();
@@ -162,8 +189,11 @@ export async function uploadBuffer(
             Body: buffer,
             ContentType: contentType,
             ContentLength: buffer.byteLength,
+            CacheControl: options.cacheControl ?? DEFAULT_CACHE_CONTROL,
+            ContentDisposition: options.contentDisposition ?? defaultContentDisposition(key),
             Metadata: {
                 checksum,
+                ...(options.metadata ?? {}),
             },
         })
     );
@@ -190,15 +220,17 @@ export async function uploadBuffer(
 export async function uploadFromUrl(
     sourceUrl: string,
     key: string,
-    expectedMimeGlob?: string
+    expectedMimeGlob?: string,
+    options: UploadOptions = {}
 ): Promise<UploadResult> {
     const { buffer, contentType } = await safeFetchBuffer(sourceUrl, expectedMimeGlob);
-    return uploadBuffer(key, buffer, contentType);
+    return uploadBuffer(key, buffer, contentType, options);
 }
 
 export async function uploadFromDataUrl(
     dataUrl: string,
-    key: string
+    key: string,
+    options: UploadOptions = {}
 ): Promise<UploadResult> {
     const match = /^data:([^;,]+)(;base64)?,([\s\S]*)$/.exec(dataUrl);
     if (!match) {
@@ -209,7 +241,46 @@ export async function uploadFromDataUrl(
     const buffer = base64Flag
         ? Buffer.from(payload, 'base64')
         : Buffer.from(decodeURIComponent(payload), 'utf-8');
-    return uploadBuffer(key, buffer, contentType);
+    return uploadBuffer(key, buffer, contentType, options);
+}
+
+/**
+ * Returns a buffer from a URL (remote URL or data: URL) without uploading.
+ * Used when we need to transform bytes (e.g. PNG → AVIF) before uploading.
+ */
+export async function fetchBytesFromUrl(
+    sourceUrl: string,
+    expectedMimeGlob?: string
+): Promise<{ buffer: Buffer; contentType: string }> {
+    return safeFetchBuffer(sourceUrl, expectedMimeGlob);
+}
+
+export function bufferFromDataUrl(dataUrl: string): { buffer: Buffer; contentType: string } {
+    const match = /^data:([^;,]+)(;base64)?,([\s\S]*)$/.exec(dataUrl);
+    if (!match) {
+        throw new Error('Invalid data URL');
+    }
+    const [, mime, base64Flag, payload] = match;
+    const contentType = mime || 'application/octet-stream';
+    const buffer = base64Flag
+        ? Buffer.from(payload, 'base64')
+        : Buffer.from(decodeURIComponent(payload), 'utf-8');
+    return { buffer, contentType };
+}
+
+// ---------- HEAD / existence check ----------
+
+export async function objectExists(key: string): Promise<boolean> {
+    const env = getR2Env();
+    const client = getR2Client();
+    try {
+        await client.send(new HeadObjectCommand({ Bucket: env.bucket, Key: key }));
+        return true;
+    } catch (err: unknown) {
+        const status = (err as { $metadata?: { httpStatusCode?: number } })?.$metadata?.httpStatusCode;
+        if (status === 404) return false;
+        throw err;
+    }
 }
 
 // ---------- Signed URL / delete ----------

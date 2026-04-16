@@ -73,7 +73,11 @@ export function getR2Env(): R2Env {
         bucket: readRequired('R2_BUCKET'),
         accessKeyId: readRequired('R2_ACCESS_KEY_ID'),
         secretAccessKey: readRequired('R2_SECRET_ACCESS_KEY'),
-        signedUrlTtlSeconds: readNumber('R2_SIGNED_URL_TTL_SECONDS', 3600),
+        // 24 hours. Safe for private content — URLs are still bound to the
+        // object and R2 credentials. Lowers refresh round-trips dramatically
+        // for users who leave a kiosk tab open. Override via env for stricter
+        // policies.
+        signedUrlTtlSeconds: readNumber('R2_SIGNED_URL_TTL_SECONDS', 86400),
         maxUploadBytes: readNumber('R2_MAX_UPLOAD_BYTES', 100 * 1024 * 1024),
         publicBaseUrl: process.env.R2_PUBLIC_BASE_URL || undefined,
     };
