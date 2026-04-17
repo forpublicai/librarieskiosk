@@ -12,7 +12,8 @@ export class InsufficientCreditsError extends Error {
  * Video: 25 credits per 10s
  * Music: 5 credits per 10s
  * Image: 1 credit (flat)
- * Chat/Code: 0 (free model)
+ * Chat: 0 (free model)
+ * Code: 1
  */
 export const CREDIT_COSTS: Record<string, number> = {
     image: 1,

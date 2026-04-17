@@ -16,8 +16,10 @@ import sharp from 'sharp';
  */
 
 const FULL_QUALITY = 60;
-const THUMBNAIL_QUALITY = 50;
-const THUMBNAIL_MAX_DIM = 480;
+const THUMBNAIL_QUALITY = 45;
+// Sidebar renders thumbnails at ~260px wide x 110px tall. 320px on the long
+// edge stays crisp at 2x retina while cutting bytes ~40% vs 480px.
+const THUMBNAIL_MAX_DIM = 320;
 const THUMBNAIL_EFFORT = 4; // 0-9, higher = smaller but slower (4 is a good balance)
 
 export interface EncodedImage {

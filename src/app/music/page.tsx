@@ -5,6 +5,17 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
 import Header from '@/components/Header';
 import { refreshMediaUrl } from '@/lib/mediaClient';
+import { useGenerationProgress, formatElapsed } from '@/hooks/useGenerationProgress';
+
+const MUSIC_PROGRESS_MESSAGES = [
+    'Reading your prompt…',
+    'Picking a key and tempo…',
+    'Arranging instrumentation…',
+    'Laying down the groove…',
+    'Mixing layers together…',
+    'Mastering the track…',
+    'Almost done — final polish…',
+];
 
 interface SessionItem {
     id: string;
@@ -28,6 +39,11 @@ export default function MusicPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [sessions, setSessions] = useState<SessionItem[]>([]);
+    const progress = useGenerationProgress({
+        active: loading,
+        messages: MUSIC_PROGRESS_MESSAGES,
+        intervalSec: 3.5,
+    });
 
     const creditCost = Math.round((duration / 10) * 5);
 
@@ -232,7 +248,10 @@ export default function MusicPage() {
                             {loading && (
                                 <div className="gen-loading">
                                     <div className="gen-spinner" />
-                                    <div className="gen-loading-text">Composing your track...</div>
+                                    <div className="gen-loading-text">{progress.message}</div>
+                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', letterSpacing: '0.05em' }}>
+                                        {formatElapsed(progress.elapsedSec)} elapsed · typically 30–60s
+                                    </div>
                                 </div>
                             )}
 
@@ -241,7 +260,6 @@ export default function MusicPage() {
                                     <audio
                                         src={audioUrl}
                                         controls
-                                        autoPlay
                                         preload="metadata"
                                         onError={refreshMainUrl}
                                         style={{ width: '100%', maxWidth: '600px' }}

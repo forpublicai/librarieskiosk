@@ -5,6 +5,17 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
 import Header from '@/components/Header';
 import { refreshMediaUrl } from '@/lib/mediaClient';
+import { useGenerationProgress, formatElapsed } from '@/hooks/useGenerationProgress';
+
+const IMAGE_PROGRESS_MESSAGES = [
+    'Parsing your prompt…',
+    'Planning composition…',
+    'Blocking out shapes…',
+    'Sketching rough layout…',
+    'Rendering fine details…',
+    'Refining color and light…',
+    'Almost there — final touches…',
+];
 
 interface SessionItem {
     id: string;
@@ -26,6 +37,10 @@ export default function ImagePage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [sessions, setSessions] = useState<SessionItem[]>([]);
+    const progress = useGenerationProgress({
+        active: loading,
+        messages: IMAGE_PROGRESS_MESSAGES,
+    });
 
     useEffect(() => {
         if (!isLoading && !user) router.push('/');
@@ -161,7 +176,12 @@ export default function ImagePage() {
                                         alt={s.prompt}
                                         loading="lazy"
                                         decoding="async"
-                                        style={{ width: '100%', marginBottom: '8px' }}
+                                        style={{
+                                            width: '100%',
+                                            maxHeight: '110px',
+                                            objectFit: 'cover',
+                                            marginBottom: '8px',
+                                        }}
                                         onError={() => refreshSessionItemUrl(s.id)}
                                     />
                                 )}
@@ -204,7 +224,10 @@ export default function ImagePage() {
                             {loading && (
                                 <div className="gen-loading">
                                     <div className="gen-spinner" />
-                                    <div className="gen-loading-text">Creating your image...</div>
+                                    <div className="gen-loading-text">{progress.message}</div>
+                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', letterSpacing: '0.05em' }}>
+                                        {formatElapsed(progress.elapsedSec)} elapsed · typically 10–30s
+                                    </div>
                                 </div>
                             )}
 

@@ -5,6 +5,18 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
 import Header from '@/components/Header';
 import { refreshMediaUrl } from '@/lib/mediaClient';
+import { useGenerationProgress, formatElapsed } from '@/hooks/useGenerationProgress';
+
+const VIDEO_PROGRESS_MESSAGES = [
+    'Submitting to the video model…',
+    'Planning the scene…',
+    'Generating keyframes…',
+    'Filling in motion between frames…',
+    'Rendering frames…',
+    'Compositing video…',
+    'Encoding final output…',
+    'Uploading to your library…',
+];
 
 interface SessionItem {
     id: string;
@@ -28,6 +40,11 @@ export default function VideoPage() {
     const [error, setError] = useState('');
     const [sessions, setSessions] = useState<SessionItem[]>([]);
     const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const progress = useGenerationProgress({
+        active: loading,
+        messages: VIDEO_PROGRESS_MESSAGES,
+        intervalSec: 5,
+    });
 
     const creditCost = Math.round((duration / 10) * 25);
 
@@ -230,7 +247,15 @@ export default function VideoPage() {
                             {loading && (
                                 <div className="gen-loading">
                                     <div className="gen-spinner" />
-                                    <div className="gen-loading-text">{status || 'Generating...'}</div>
+                                    <div className="gen-loading-text">{progress.message}</div>
+                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', letterSpacing: '0.05em' }}>
+                                        {formatElapsed(progress.elapsedSec)} elapsed · typically 1–4 minutes
+                                    </div>
+                                    {status && (
+                                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', opacity: 0.7 }}>
+                                            {status}
+                                        </div>
+                                    )}
                                 </div>
                             )}
 
@@ -239,7 +264,6 @@ export default function VideoPage() {
                                     <video
                                         src={videoUrl}
                                         controls
-                                        autoPlay
                                         loop
                                         preload="metadata"
                                         playsInline
