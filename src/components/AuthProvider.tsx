@@ -24,7 +24,8 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-const INACTIVITY_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+const INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+const HEARTBEAT_INTERVAL_MS = 60 * 1000; // 1 minute
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
@@ -32,6 +33,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [isLoading, setIsLoading] = useState(true);
     const router = useRouter();
     const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const heartbeatRef = useRef<NodeJS.Timeout | null>(null);
+    const hadActivityRef = useRef(false);
 
     const logout = useCallback(() => {
         // If guest user, clean up ephemeral session data before logout
@@ -43,15 +46,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }).catch((e) => console.error('Cleanup failed:', e));
         }
 
+        // Release server-side session slot (no-op for roles that don't have one)
+        if (token) {
+            fetch('/api/auth/logout', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}` },
+            }).catch(() => {});
+        }
+
         setUser(null);
         setToken(null);
         localStorage.removeItem('kiosk_token');
         if (timeoutRef.current) clearTimeout(timeoutRef.current);
+        if (heartbeatRef.current) clearInterval(heartbeatRef.current);
         router.push('/');
     }, [user, token, router]);
 
     // Inactivity timer
     const resetTimer = useCallback(() => {
+        hadActivityRef.current = true;
         if (timeoutRef.current) clearTimeout(timeoutRef.current);
         if (token) {
             timeoutRef.current = setTimeout(() => {
@@ -69,6 +82,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (timeoutRef.current) clearTimeout(timeoutRef.current);
         };
     }, [resetTimer]);
+
+    // Server-side heartbeat — only pings when the user has interacted since
+    // the last tick, so idle kiosks let their server session lapse.
+    useEffect(() => {
+        if (!token || user?.role !== 'PATRON') return;
+        hadActivityRef.current = true; // count the login itself as activity
+        const tick = async () => {
+            if (!hadActivityRef.current) return;
+            hadActivityRef.current = false;
+            try {
+                const res = await fetch('/api/auth/heartbeat', {
+                    method: 'POST',
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+                if (res.status === 401) logout();
+            } catch {
+                // network hiccup — try again next interval
+            }
+        };
+        heartbeatRef.current = setInterval(tick, HEARTBEAT_INTERVAL_MS);
+        return () => {
+            if (heartbeatRef.current) clearInterval(heartbeatRef.current);
+        };
+    }, [token, user?.role, logout]);
 
     // Restore session on mount
     useEffect(() => {

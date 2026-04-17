@@ -1,14 +1,14 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAuth, isAuthResult } from '@/lib/auth';
-import { chatStream } from '@/lib/nanogpt';
+import { requireActiveSession, isAuthResult } from '@/lib/auth';
+import { chatStream, getNanogptKey } from '@/lib/nanogpt';
 import { logUsage } from '@/lib/credits';
 import { requireApproved } from '@/lib/status';
 import modelConfig from '../../../../config/models.json';
 
 export async function POST(request: NextRequest) {
-    const authResult = await requireAuth(request);
+    const authResult = await requireActiveSession(request);
     if (!isAuthResult(authResult)) return authResult;
 
     const statusCheck = await requireApproved(authResult.user.userId);
@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
         const lastMessage = messages[messages.length - 1]?.content || '';
         await logUsage(authResult.user.userId, 'chat', model, lastMessage, 0);
 
-        const stream = await chatStream(messages, model);
+        const stream = await chatStream(messages, model, getNanogptKey(authResult.user.library));
 
         return new Response(stream, {
             headers: {

@@ -1,8 +1,8 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAuth, isAuthResult } from '@/lib/auth';
-import { generateMusic } from '@/lib/nanogpt';
+import { requireActiveSession, isAuthResult } from '@/lib/auth';
+import { generateMusic, getNanogptKey } from '@/lib/nanogpt';
 import { deductCredits, logUsage, calculateCredits, InsufficientCreditsError } from '@/lib/credits';
 import { requireApproved } from '@/lib/status';
 import { isR2Enabled } from '@/lib/env';
@@ -10,7 +10,7 @@ import { persistMusicResult } from '@/lib/mediaPersistence';
 import modelConfig from '../../../../config/models.json';
 
 export async function POST(request: NextRequest) {
-    const authResult = await requireAuth(request);
+    const authResult = await requireActiveSession(request);
     if (!isAuthResult(authResult)) return authResult;
 
     const statusCheck = await requireApproved(authResult.user.userId);
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
             }
             const model = modelConfig.music.model;
             await logUsage(authResult.user.userId, 'music', model, prompt, creditCost);
-            const result = await generateMusic(prompt, lyrics || '', model, durationSec);
+            const result = await generateMusic(prompt, lyrics || '', model, getNanogptKey(authResult.user.library), durationSec);
             // Return provider URL directly without R2 persistence
             if (result.audioUrl) {
                 return NextResponse.json({ audioUrl: result.audioUrl, ephemeral: true });
@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
         const model = modelConfig.music.model;
         await logUsage(authResult.user.userId, 'music', model, prompt, creditCost);
 
-        const result = await generateMusic(prompt, lyrics || '', model, durationSec);
+        const result = await generateMusic(prompt, lyrics || '', model, getNanogptKey(authResult.user.library), durationSec);
 
         if (!isR2Enabled()) {
             // Legacy path

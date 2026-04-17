@@ -25,6 +25,13 @@ async function main() {
     });
     console.log(`Library created/found: ${salem.name}`);
 
+    const publicAi = await prisma.library.upsert({
+        where: { name: 'Public AI' },
+        update: {},
+        create: { name: 'Public AI', weeklyPool: 1750, poolRemaining: 1750 },
+    });
+    console.log(`Library created/found: ${publicAi.name}`);
+
     // Create admin user for Pottsboro
     const admin = await prisma.user.upsert({
         where: { username: 'admin_pottsboro' },
@@ -55,14 +62,14 @@ async function main() {
     });
     console.log(`Salem admin created/found: ${salemAdmin.username} (${salemAdmin.id})`);
 
-    // Create super admin user (System-wide)
+    // Super admin also acts as the admin for the "Public AI" library
     const superAdmin = await prisma.user.upsert({
         where: { username: 'superadmin' },
-        update: { library: 'System', role: 'SUPER_ADMIN', status: 'APPROVED' },
+        update: { library: 'Public AI', role: 'SUPER_ADMIN', status: 'APPROVED' },
         create: {
             username: 'superadmin',
             passwordHash: hashSync(adminPassword, 10),
-            library: 'System',
+            library: 'Public AI',
             role: 'SUPER_ADMIN',
             status: 'APPROVED',
             credits: 9999,

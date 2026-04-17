@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { hashPassword, signToken } from '@/lib/auth';
+import { hashPassword, signToken, SESSION_IDLE_MS } from '@/lib/auth';
 import { hashSecurityAnswer, isValidSecurityQuestion, normalizeSecurityAnswer } from '@/lib/security';
 
 export async function POST(request: NextRequest) {
@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
 
         // Validate library
         const trimmedLibrary = library.trim();
-        const ALLOWED_LIBRARIES = ['Pottsboro, TX', 'Salem City, UT'];
+        const ALLOWED_LIBRARIES = ['Pottsboro, TX', 'Salem City, UT', 'Public AI'];
         if (!ALLOWED_LIBRARIES.includes(trimmedLibrary)) {
             return NextResponse.json(
                 { error: 'Please select a valid library' },
@@ -94,11 +94,39 @@ export async function POST(request: NextRequest) {
             },
         });
 
+        // Enforce concurrent-session cap for the user's library before auto-login
+        const lib = await prisma.library.findUnique({
+            where: { name: user.library },
+            select: { maxConcurrentSessions: true },
+        });
+        const cap = lib?.maxConcurrentSessions ?? 1;
+        const cutoff = new Date(Date.now() - SESSION_IDLE_MS);
+        await prisma.activeSession.deleteMany({
+            where: { library: user.library, lastActivity: { lt: cutoff } },
+        });
+        const active = await prisma.activeSession.count({ where: { library: user.library } });
+        if (active >= cap) {
+            return NextResponse.json(
+                {
+                    error: 'Library at capacity, try again later or contact library admin.',
+                    code: 'LIBRARY_AT_CAPACITY',
+                },
+                { status: 409 }
+            );
+        }
+
+        const jti = crypto.randomUUID();
+        await prisma.activeSession.create({
+            data: { userId: user.id, library: user.library, jti },
+        });
+
         // Auto-login: return token
         const token = await signToken({
             userId: user.id,
             username: user.username,
             role: user.role,
+            library: user.library,
+            jti,
         });
 
         return NextResponse.json({

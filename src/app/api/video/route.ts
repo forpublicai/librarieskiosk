@@ -1,8 +1,8 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAuth, isAuthResult } from '@/lib/auth';
-import { submitVideoGeneration } from '@/lib/nanogpt';
+import { requireActiveSession, isAuthResult } from '@/lib/auth';
+import { submitVideoGeneration, getNanogptKey } from '@/lib/nanogpt';
 import { deductCredits, logUsage, calculateCredits, InsufficientCreditsError } from '@/lib/credits';
 import { requireApproved } from '@/lib/status';
 import { isR2Enabled } from '@/lib/env';
@@ -10,7 +10,7 @@ import { createPendingVideoSession } from '@/lib/mediaPersistence';
 import modelConfig from '../../../../config/models.json';
 
 export async function POST(request: NextRequest) {
-    const authResult = await requireAuth(request);
+    const authResult = await requireActiveSession(request);
     if (!isAuthResult(authResult)) return authResult;
 
     const statusCheck = await requireApproved(authResult.user.userId);
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
             }
             const model = modelConfig.video.model;
             await logUsage(authResult.user.userId, 'video', model, prompt, creditCost);
-            const result = await submitVideoGeneration(prompt, model, durationSec);
+            const result = await submitVideoGeneration(prompt, model, getNanogptKey(authResult.user.library), durationSec);
             // Return without creating persistent MediaSession for guest
             return NextResponse.json({
                 runId: result.runId,
@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
         const model = modelConfig.video.model;
         await logUsage(authResult.user.userId, 'video', model, prompt, creditCost);
 
-        const result = await submitVideoGeneration(prompt, model, durationSec);
+        const result = await submitVideoGeneration(prompt, model, getNanogptKey(authResult.user.library), durationSec);
 
         let mediaSessionId: string | null = null;
         if (isR2Enabled() && result.runId) {

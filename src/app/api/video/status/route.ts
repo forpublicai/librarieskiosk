@@ -1,13 +1,13 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAuth, isAuthResult } from '@/lib/auth';
-import { pollVideoStatus } from '@/lib/nanogpt';
+import { requireActiveSession, isAuthResult } from '@/lib/auth';
+import { pollVideoStatus, getNanogptKey } from '@/lib/nanogpt';
 import { isR2Enabled } from '@/lib/env';
 import { finalizeVideoUpload } from '@/lib/mediaPersistence';
 
 export async function GET(request: NextRequest) {
-    const authResult = await requireAuth(request);
+    const authResult = await requireActiveSession(request);
     if (!isAuthResult(authResult)) return authResult;
 
     // Guest accounts don't benefit from R2 persistence; skip finalization
@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
             if (!runId) {
                 return NextResponse.json({ error: 'runId is required' }, { status: 400 });
             }
-            const status = await pollVideoStatus(runId);
+            const status = await pollVideoStatus(runId, getNanogptKey(authResult.user.library));
             // Return status without persisting to R2
             return NextResponse.json({ ...status, ephemeral: true });
         } catch (error) {
@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
     }
 
     try {
-        const status = await pollVideoStatus(runId);
+        const status = await pollVideoStatus(runId, getNanogptKey(authResult.user.library));
 
         const isCompleted =
             String(status.status).toUpperCase() === 'COMPLETED' && !!status.videoUrl;

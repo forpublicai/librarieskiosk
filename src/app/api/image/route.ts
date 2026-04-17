@@ -1,8 +1,8 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAuth, isAuthResult } from '@/lib/auth';
-import { generateImage } from '@/lib/nanogpt';
+import { requireActiveSession, isAuthResult } from '@/lib/auth';
+import { generateImage, getNanogptKey } from '@/lib/nanogpt';
 import { deductCredits, logUsage, calculateCredits, InsufficientCreditsError } from '@/lib/credits';
 import { requireApproved } from '@/lib/status';
 import { isR2Enabled } from '@/lib/env';
@@ -10,7 +10,7 @@ import { persistImageResult } from '@/lib/mediaPersistence';
 import modelConfig from '../../../../config/models.json';
 
 export async function POST(request: NextRequest) {
-    const authResult = await requireAuth(request);
+    const authResult = await requireActiveSession(request);
     if (!isAuthResult(authResult)) return authResult;
 
     const statusCheck = await requireApproved(authResult.user.userId);
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
             }
             const model = modelConfig.image.model;
             await logUsage(authResult.user.userId, 'image', model, prompt, creditCost);
-            const result = await generateImage(prompt, model);
+            const result = await generateImage(prompt, model, getNanogptKey(authResult.user.library));
             // Return provider URL directly without R2 persistence
             return NextResponse.json({
                 url: result.url,
@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
         const model = modelConfig.image.model;
         await logUsage(authResult.user.userId, 'image', model, prompt, creditCost);
 
-        const result = await generateImage(prompt, model);
+        const result = await generateImage(prompt, model, getNanogptKey(authResult.user.library));
 
         if (!isR2Enabled()) {
             // Legacy path: client handles persistence via POST /api/media-sessions

@@ -33,6 +33,7 @@ export async function POST() {
             userId: guest.id,
             username: guest.username,
             role: guest.role,
+            library: guest.library,
         });
 
         return NextResponse.json({

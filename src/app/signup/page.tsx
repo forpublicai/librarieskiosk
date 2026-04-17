@@ -8,6 +8,7 @@ import { SECURITY_QUESTIONS } from '@/lib/security';
 const LIBRARIES = [
     'Pottsboro, TX',
     'Salem City, UT',
+    'Public AI',
 ];
 
 export default function SignupPage() {

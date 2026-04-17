@@ -44,15 +44,30 @@ model User {
   conversations       Conversation[]
   mediaSessions       MediaSession[]
   creditRequests      CreditRequest[]
+  sessions            ActiveSession[]
 }
 
 model Library {
-  id            String   @id @default(cuid())
-  name          String   @unique
-  weeklyPool    Int      @default(1750)
-  poolRemaining Int      @default(1750)
-  poolResetAt   DateTime @default(now())
-  createdAt     DateTime @default(now())
+  id                    String   @id @default(cuid())
+  name                  String   @unique
+  weeklyPool            Int      @default(1750)
+  poolRemaining         Int      @default(1750)
+  poolResetAt           DateTime @default(now())
+  maxConcurrentSessions Int      @default(1)
+  createdAt             DateTime @default(now())
+}
+
+model ActiveSession {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  library      String
+  jti          String   @unique
+  createdAt    DateTime @default(now())
+  lastActivity DateTime @default(now())
+
+  @@index([library, lastActivity])
+  @@index([userId])
 }
 
 model Conversation {

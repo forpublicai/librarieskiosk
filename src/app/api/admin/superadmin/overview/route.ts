@@ -102,6 +102,7 @@ export async function GET(request: NextRequest) {
             name: lib.name,
             weeklyPool: lib.weeklyPool,
             poolRemaining: lib.poolRemaining,
+            maxConcurrentSessions: lib.maxConcurrentSessions,
             userCount: userCountMap[lib.name] || 0,
             totalUsage: usageMap2[lib.name]?.totalUsage || 0,
             totalCredits: usageMap2[lib.name]?.totalCredits || 0,
@@ -126,5 +127,34 @@ export async function GET(request: NextRequest) {
     } catch (error) {
         console.error('Super admin overview error:', error);
         return NextResponse.json({ error: 'Failed to fetch overview' }, { status: 500 });
+    }
+}
+
+// PATCH — update a library's concurrent-session cap
+export async function PATCH(request: NextRequest) {
+    const authResult = await requireSuperAdmin(request);
+    if (!isAuthResult(authResult)) return authResult;
+
+    try {
+        const { name, maxConcurrentSessions } = await request.json();
+        if (!name || typeof name !== 'string') {
+            return NextResponse.json({ error: 'Library name is required' }, { status: 400 });
+        }
+        const cap = Number(maxConcurrentSessions);
+        if (!Number.isFinite(cap) || cap < 1 || cap > 1000 || !Number.isInteger(cap)) {
+            return NextResponse.json(
+                { error: 'maxConcurrentSessions must be an integer between 1 and 1000' },
+                { status: 400 }
+            );
+        }
+        const updated = await prisma.library.update({
+            where: { name },
+            data: { maxConcurrentSessions: cap },
+            select: { name: true, maxConcurrentSessions: true },
+        });
+        return NextResponse.json(updated);
+    } catch (error) {
+        console.error('Super admin library update error:', error);
+        return NextResponse.json({ error: 'Failed to update library' }, { status: 500 });
     }
 }

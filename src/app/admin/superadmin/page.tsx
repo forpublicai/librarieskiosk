@@ -9,6 +9,7 @@ interface LibraryBreakdown {
     name: string;
     weeklyPool: number;
     poolRemaining: number;
+    maxConcurrentSessions: number;
     userCount: number;
     totalUsage: number;
     totalCredits: number;
@@ -137,6 +138,7 @@ export default function SuperAdminPage() {
                                     <th style={thStyle}>Total Usage</th>
                                     <th style={thStyle}>Credits Used</th>
                                     <th style={thStyle}>Pool</th>
+                                    <th style={thStyle}>Session Cap</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -154,6 +156,14 @@ export default function SuperAdminPage() {
                                             }}>
                                                 {lib.poolRemaining}/{lib.weeklyPool}
                                             </span>
+                                        </td>
+                                        <td style={tdStyle}>
+                                            <SessionCapEditor
+                                                library={lib.name}
+                                                value={lib.maxConcurrentSessions}
+                                                token={token}
+                                                onSaved={loadData}
+                                            />
                                         </td>
                                     </tr>
                                 ))}
@@ -251,6 +261,91 @@ export default function SuperAdminPage() {
                     </div>
                 )}
             </div>
+        </div>
+    );
+}
+
+function SessionCapEditor({
+    library,
+    value,
+    token,
+    onSaved,
+}: {
+    library: string;
+    value: number;
+    token: string | null;
+    onSaved: () => void;
+}) {
+    const [draft, setDraft] = useState(String(value));
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        setDraft(String(value));
+    }, [value]);
+
+    const save = async () => {
+        if (!token) return;
+        const n = Number(draft);
+        if (!Number.isInteger(n) || n < 1) {
+            setError('Must be a whole number ≥ 1');
+            return;
+        }
+        setSaving(true);
+        setError(null);
+        try {
+            const res = await fetch('/api/admin/superadmin/overview', {
+                method: 'PATCH',
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ name: library, maxConcurrentSessions: n }),
+            });
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                setError(data.error || 'Save failed');
+            } else {
+                onSaved();
+            }
+        } catch {
+            setError('Save failed');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const dirty = draft !== String(value);
+
+    return (
+        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+            <input
+                type="number"
+                min={1}
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                style={{
+                    width: '64px',
+                    padding: '4px 6px',
+                    background: 'var(--bg-elevated)',
+                    border: '1px solid var(--border-color)',
+                    color: 'inherit',
+                    fontSize: '0.85rem',
+                }}
+            />
+            {dirty && (
+                <button
+                    className="btn btn-primary"
+                    onClick={save}
+                    disabled={saving}
+                    style={{ fontSize: '0.7rem', padding: '4px 8px' }}
+                >
+                    {saving ? '…' : 'Save'}
+                </button>
+            )}
+            {error && (
+                <span style={{ fontSize: '0.7rem', color: 'var(--accent-red)' }}>{error}</span>
+            )}
         </div>
     );
 }

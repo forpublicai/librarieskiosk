@@ -6,7 +6,21 @@
  */
 
 const NANOGPT_BASE_URL = 'https://nano-gpt.com';
-const API_KEY = process.env.NANOGPT_API_KEY || '';
+
+/**
+ * Resolve the NanoGPT API key for a given library.
+ * Falls back to NANOGPT_API_KEY when no per-library key is set.
+ * Library name is slugged: uppercase, non-alphanumerics collapsed to `_`.
+ * E.g. "Pottsboro, TX" -> NANOGPT_API_KEY_POTTSBORO_TX.
+ */
+export function getNanogptKey(library: string | null | undefined): string {
+    if (library) {
+        const slug = library.toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_|_$/g, '');
+        const scoped = process.env[`NANOGPT_API_KEY_${slug}`];
+        if (scoped) return scoped;
+    }
+    return process.env.NANOGPT_API_KEY || '';
+}
 
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1000;
@@ -45,14 +59,15 @@ async function fetchWithRetry(
 // ---------------------
 export async function chatStream(
     messages: Array<{ role: string; content: string }>,
-    model: string
+    model: string,
+    apiKey: string
 ): Promise<ReadableStream> {
     const response = await fetchWithRetry(
         `${NANOGPT_BASE_URL}/api/v1/chat/completions`,
         {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${API_KEY}`,
+                'Authorization': `Bearer ${apiKey}`,
                 'Content-Type': 'application/json',
                 'Accept': 'text/event-stream',
             },
@@ -86,14 +101,15 @@ export interface ImageResult {
 
 export async function generateImage(
     prompt: string,
-    model: string
+    model: string,
+    apiKey: string
 ): Promise<ImageResult> {
     const response = await fetchWithRetry(
         `${NANOGPT_BASE_URL}/api/v1/images/generations`,
         {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${API_KEY}`,
+                'Authorization': `Bearer ${apiKey}`,
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
@@ -127,6 +143,7 @@ export interface VideoSubmitResult {
 export async function submitVideoGeneration(
     prompt: string,
     model: string,
+    apiKey: string,
     duration: number = 5
 ): Promise<VideoSubmitResult> {
     const response = await fetchWithRetry(
@@ -134,7 +151,7 @@ export async function submitVideoGeneration(
         {
             method: 'POST',
             headers: {
-                'x-api-key': API_KEY,
+                'x-api-key': apiKey,
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
@@ -185,14 +202,15 @@ export interface VideoStatusResult {
 }
 
 export async function pollVideoStatus(
-    runId: string
+    runId: string,
+    apiKey: string
 ): Promise<VideoStatusResult> {
     const response = await fetchWithRetry(
         `${NANOGPT_BASE_URL}/api/video/status?requestId=${encodeURIComponent(runId)}`,
         {
             method: 'GET',
             headers: {
-                'x-api-key': API_KEY,
+                'x-api-key': apiKey,
             },
         }
     );
@@ -225,6 +243,7 @@ export interface MusicResult {
 interface TtsStatusParams {
     runId: string;
     model: string;
+    apiKey: string;
     cost?: number;
     paymentSource?: string;
     isApiRequest?: boolean;
@@ -255,7 +274,7 @@ async function pollTtsStatus(params: TtsStatusParams): Promise<MusicResult> {
             {
                 method: 'GET',
                 headers: {
-                    'x-api-key': API_KEY,
+                    'x-api-key': params.apiKey,
                 },
             }
         );
@@ -288,6 +307,7 @@ export async function generateMusic(
     prompt: string,
     lyrics: string,
     model: string,
+    apiKey: string,
     duration: number = 10
 ): Promise<MusicResult> {
     const promptText = (prompt || '').trim();
@@ -305,7 +325,7 @@ export async function generateMusic(
         {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${API_KEY}`,
+                'Authorization': `Bearer ${apiKey}`,
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
@@ -345,6 +365,7 @@ export async function generateMusic(
             return pollTtsStatus({
                 runId,
                 model,
+                apiKey,
                 cost: typeof data.cost === 'number' ? data.cost : undefined,
                 paymentSource: typeof data.paymentSource === 'string' ? data.paymentSource : undefined,
                 isApiRequest: true,

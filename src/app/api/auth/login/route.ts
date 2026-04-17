@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { comparePassword, signToken } from '@/lib/auth';
+import { comparePassword, signToken, SESSION_IDLE_MS } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
     try {
@@ -33,6 +33,39 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        const jti = crypto.randomUUID();
+
+        if (user.role === 'PATRON') {
+            const library = await prisma.library.findUnique({
+                where: { name: user.library },
+                select: { maxConcurrentSessions: true },
+            });
+            const cap = library?.maxConcurrentSessions ?? 1;
+
+            const cutoff = new Date(Date.now() - SESSION_IDLE_MS);
+            await prisma.activeSession.deleteMany({
+                where: { library: user.library, lastActivity: { lt: cutoff } },
+            });
+
+            const active = await prisma.activeSession.count({
+                where: { library: user.library },
+            });
+
+            if (active >= cap) {
+                return NextResponse.json(
+                    {
+                        error: 'Library at capacity, try again later or contact library admin.',
+                        code: 'LIBRARY_AT_CAPACITY',
+                    },
+                    { status: 409 }
+                );
+            }
+
+            await prisma.activeSession.create({
+                data: { userId: user.id, library: user.library, jti },
+            });
+        }
+
         await prisma.user.update({
             where: { id: user.id },
             data: { loginCount: { increment: 1 } },
@@ -42,6 +75,8 @@ export async function POST(request: NextRequest) {
             userId: user.id,
             username: user.username,
             role: user.role,
+            library: user.library,
+            jti,
         });
 
         // Library admins see the library pool as their credit count.
