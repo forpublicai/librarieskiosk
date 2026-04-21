@@ -15,11 +15,18 @@ export async function GET(request: NextRequest) {
             orderBy: { name: 'asc' },
         });
 
-        // Get user counts per library
+        // Get user counts per library (non-guest)
         const userCountsByLibrary = await prisma.user.groupBy({
             by: ['library'],
             _count: true,
             where: { role: { not: 'GUEST' } },
+        });
+
+        // Get guest counts per library
+        const guestCountsByLibrary = await prisma.user.groupBy({
+            by: ['library'],
+            _count: true,
+            where: { role: 'GUEST' },
         });
 
         // Get usage stats per library
@@ -47,6 +54,46 @@ export async function GET(request: NextRequest) {
             _count: true,
             _sum: { creditsUsed: true },
         });
+
+        // Get all guest users with usage
+        const allGuests = await prisma.user.findMany({
+            where: { role: 'GUEST' },
+            select: {
+                id: true,
+                username: true,
+                role: true,
+                status: true,
+                credits: true,
+                library: true,
+                createdAt: true,
+                loginCount: true,
+                _count: { select: { usageLogs: true } },
+            },
+            orderBy: { library: 'asc' },
+        });
+
+        const guestIds = allGuests.map((g) => g.id);
+        const guestUsageLogs = await prisma.usageLog.groupBy({
+            by: ['userId', 'mode'],
+            where: { userId: { in: guestIds } },
+            _sum: { creditsUsed: true },
+            _count: true,
+        });
+
+        const guestUsageMap: Record<string, Record<string, { count: number; credits: number }>> = {};
+        guestUsageLogs.forEach((log) => {
+            if (!guestUsageMap[log.userId]) guestUsageMap[log.userId] = {};
+            guestUsageMap[log.userId][log.mode] = {
+                count: log._count,
+                credits: log._sum.creditsUsed || 0,
+            };
+        });
+
+        const enrichedGuests = allGuests.map((g) => ({
+            ...g,
+            totalUsage: g._count.usageLogs,
+            usageByMode: guestUsageMap[g.id] || {},
+        }));
 
         // Get all users with usage (non-guest)
         const allUsers = await prisma.user.findMany({
@@ -98,12 +145,15 @@ export async function GET(request: NextRequest) {
             }])
         );
 
+        const guestCountMap = Object.fromEntries(guestCountsByLibrary.map((g) => [g.library, g._count]));
+
         const libraryBreakdown = libraries.map((lib) => ({
             name: lib.name,
             weeklyPool: lib.weeklyPool,
             poolRemaining: lib.poolRemaining,
             maxConcurrentSessions: lib.maxConcurrentSessions,
             userCount: userCountMap[lib.name] || 0,
+            guestCount: guestCountMap[lib.name] || 0,
             totalUsage: usageMap2[lib.name]?.totalUsage || 0,
             totalCredits: usageMap2[lib.name]?.totalCredits || 0,
         }));
@@ -123,6 +173,7 @@ export async function GET(request: NextRequest) {
                 credits: m._sum.creditsUsed || 0,
             })),
             users: enrichedUsers,
+            guests: enrichedGuests,
         });
     } catch (error) {
         console.error('Super admin overview error:', error);

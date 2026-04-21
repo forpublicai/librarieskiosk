@@ -11,6 +11,7 @@ interface LibraryBreakdown {
     poolRemaining: number;
     maxConcurrentSessions: number;
     userCount: number;
+    guestCount: number;
     totalUsage: number;
     totalCredits: number;
 }
@@ -49,7 +50,8 @@ export default function SuperAdminPage() {
     const [libraries, setLibraries] = useState<LibraryBreakdown[]>([]);
     const [usageByMode, setUsageByMode] = useState<ModeUsage[]>([]);
     const [users, setUsers] = useState<UserAccount[]>([]);
-    const [tab, setTab] = useState<'overview' | 'libraries' | 'users'>('overview');
+    const [guests, setGuests] = useState<UserAccount[]>([]);
+    const [tab, setTab] = useState<'overview' | 'libraries' | 'users' | 'guests'>('overview');
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -71,6 +73,7 @@ export default function SuperAdminPage() {
                 setLibraries(data.libraryBreakdown);
                 setUsageByMode(data.usageByMode);
                 setUsers(data.users);
+                setGuests(data.guests || []);
             }
         } catch { /* ignore */ }
         finally { setLoading(false); }
@@ -113,14 +116,14 @@ export default function SuperAdminPage() {
 
                 {/* Tabs */}
                 <div style={{ display: 'flex', gap: '0', borderBottom: '1px solid var(--border-color)', marginBottom: '24px' }}>
-                    {(['overview', 'libraries', 'users'] as const).map((t) => (
+                    {(['overview', 'libraries', 'users', 'guests'] as const).map((t) => (
                         <button
                             key={t}
                             className={tab === t ? 'btn btn-primary' : 'btn'}
                             onClick={() => setTab(t)}
                             style={{ borderBottom: 'none', fontSize: '0.8rem', textTransform: 'capitalize' }}
                         >
-                            {t === 'overview' ? `Libraries (${libraries.length})` : t === 'libraries' ? 'Pool Status' : `Users (${users.length})`}
+                            {t === 'overview' ? `Libraries (${libraries.length})` : t === 'libraries' ? 'Pool Status' : t === 'users' ? `Users (${users.length})` : `Guests (${guests.length})`}
                         </button>
                     ))}
                 </div>
@@ -135,6 +138,7 @@ export default function SuperAdminPage() {
                                 <tr style={{ borderBottom: '2px solid var(--border-strong)' }}>
                                     <th style={thStyle}>Library</th>
                                     <th style={thStyle}>Users</th>
+                                    <th style={thStyle}>Guests</th>
                                     <th style={thStyle}>Total Usage</th>
                                     <th style={thStyle}>Credits Used</th>
                                     <th style={thStyle}>Pool</th>
@@ -146,6 +150,7 @@ export default function SuperAdminPage() {
                                     <tr key={lib.name} style={{ borderBottom: '1px solid var(--border-color)' }}>
                                         <td style={tdStyle}><strong>{lib.name}</strong></td>
                                         <td style={tdStyle}>{lib.userCount}</td>
+                                        <td style={tdStyle}>{lib.guestCount}</td>
                                         <td style={tdStyle}>{lib.totalUsage}</td>
                                         <td style={tdStyle}>{lib.totalCredits}</td>
                                         <td style={tdStyle}>
@@ -204,6 +209,57 @@ export default function SuperAdminPage() {
                                 </div>
                             );
                         })}
+                    </div>
+                )}
+
+                {/* Guests tab */}
+                {!loading && tab === 'guests' && (
+                    <div style={{ overflowX: 'auto' }}>
+                        {guests.length === 0 ? (
+                            <div style={{ textAlign: 'center', padding: '48px', color: 'var(--text-muted)' }}>No guest accounts found</div>
+                        ) : (
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                                <thead>
+                                    <tr style={{ borderBottom: '2px solid var(--border-strong)' }}>
+                                        <th style={thStyle}>Username</th>
+                                        <th style={thStyle}>Library</th>
+                                        <th style={thStyle}>Status</th>
+                                        <th style={thStyle}>Credits</th>
+                                        <th style={thStyle}>Logins</th>
+                                        <th style={thStyle}>Usage</th>
+                                        {modes.map((m) => (
+                                            <th key={m} style={thStyle}>{m}</th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {guests.map((g) => (
+                                        <tr key={g.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                                            <td style={tdStyle}>
+                                                <strong>{g.username}</strong>
+                                                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginLeft: '4px' }}>GUEST</span>
+                                            </td>
+                                            <td style={tdStyle}>{g.library}</td>
+                                            <td style={tdStyle}>
+                                                <span style={{
+                                                    padding: '2px 8px', fontSize: '0.75rem', fontWeight: 600,
+                                                    background: g.status === 'APPROVED' ? 'rgba(16,185,129,0.1)' : g.status === 'BANNED' ? 'rgba(239,68,68,0.1)' : 'rgba(255,77,0,0.1)',
+                                                    color: g.status === 'APPROVED' ? 'var(--accent-green)' : g.status === 'BANNED' ? 'var(--accent-red)' : 'var(--accent-orange)',
+                                                }}>
+                                                    {g.status}
+                                                </span>
+                                            </td>
+                                            <td style={tdStyle}>{g.credits}</td>
+                                            <td style={tdStyle}>{g.loginCount}</td>
+                                            <td style={tdStyle}>{g.totalUsage}</td>
+                                            {modes.map((m) => (
+                                                <td key={m} style={tdStyle}>{g.usageByMode[m]?.count || 0}</td>
+                                            ))}
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
                     </div>
                 )}
 
