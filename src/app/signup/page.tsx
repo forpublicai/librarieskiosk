@@ -9,6 +9,7 @@ const LIBRARIES = [
     'Pottsboro, TX',
     'Salem City, UT',
     'Public AI',
+    'Tremonton, UT',
 ];
 
 export default function SignupPage() {
