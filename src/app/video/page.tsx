@@ -6,6 +6,7 @@ import { useAuth } from '@/components/AuthProvider';
 import Header from '@/components/Header';
 import { refreshMediaUrl } from '@/lib/mediaClient';
 import { useGenerationProgress, formatElapsed } from '@/hooks/useGenerationProgress';
+import { loadGuestState, saveGuestState } from '@/lib/guestSession';
 
 const VIDEO_PROGRESS_MESSAGES = [
     'Submitting to the video model…',
@@ -28,6 +29,13 @@ interface SessionItem {
     createdAt: string;
 }
 
+const GUEST_KEY = 'video';
+
+interface GuestVideoState {
+    videoUrl: string | null;
+    sessions: SessionItem[];
+}
+
 export default function VideoPage() {
     const { user, token, refreshUser, isLoading } = useAuth();
     const router = useRouter();
@@ -40,6 +48,9 @@ export default function VideoPage() {
     const [error, setError] = useState('');
     const [sessions, setSessions] = useState<SessionItem[]>([]);
     const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const isGuest = user?.role === 'GUEST';
+    const hydratedRef = useRef(false);
+    const lastPromptRef = useRef<string>('');
     const progress = useGenerationProgress({
         active: loading,
         messages: VIDEO_PROGRESS_MESSAGES,
@@ -53,11 +64,28 @@ export default function VideoPage() {
     }, [user, isLoading, router]);
 
     useEffect(() => {
-        if (token) loadSessions();
+        if (token && !isGuest) loadSessions();
         return () => {
             if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
         };
-    }, [token]);
+    }, [token, isGuest]);
+
+    useEffect(() => {
+        if (!user || hydratedRef.current) return;
+        hydratedRef.current = true;
+        if (user.role === 'GUEST') {
+            const saved = loadGuestState<GuestVideoState>(GUEST_KEY);
+            if (saved) {
+                if (saved.videoUrl) setVideoUrl(saved.videoUrl);
+                if (saved.sessions?.length) setSessions(saved.sessions);
+            }
+        }
+    }, [user]);
+
+    useEffect(() => {
+        if (!isGuest || !hydratedRef.current) return;
+        saveGuestState<GuestVideoState>(GUEST_KEY, { videoUrl, sessions });
+    }, [isGuest, videoUrl, sessions]);
 
     const loadSessions = async () => {
         try {
@@ -92,7 +120,17 @@ export default function VideoPage() {
                 setLoading(false);
                 setStatus('');
                 if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-                await loadSessions();
+                if (isGuest) {
+                    const item: SessionItem = {
+                        id: `guest_${Date.now()}`,
+                        prompt: lastPromptRef.current || '',
+                        url: data.videoUrl,
+                        createdAt: new Date().toISOString(),
+                    };
+                    setSessions((prev) => [item, ...prev].slice(0, 20));
+                } else {
+                    await loadSessions();
+                }
                 await refreshUser();
             } else if (normalizedStatus === 'FAILED' || normalizedStatus === 'CANCELED') {
                 throw new Error(data.error || 'Video generation failed');
@@ -114,6 +152,7 @@ export default function VideoPage() {
         setVideoUrl(null);
         setCurrentSessionId(null);
         setStatus('Submitting request...');
+        lastPromptRef.current = prompt.trim();
         try {
             const res = await fetch('/api/video', {
                 method: 'POST',

@@ -4,6 +4,9 @@ import { useState, useRef, useEffect, useCallback, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
 import Header from '@/components/Header';
+import { formatAssistantMessage } from '@/lib/formatMessage';
+import { useGenerationProgress, formatElapsed } from '@/hooks/useGenerationProgress';
+import { loadGuestState, saveGuestState } from '@/lib/guestSession';
 
 interface Message {
     role: 'user' | 'assistant';
@@ -14,6 +17,23 @@ interface ConversationSummary {
     id: string;
     title: string;
     updatedAt: string;
+}
+
+const CODE_PROGRESS_MESSAGES = [
+    'Reading your prompt…',
+    'Planning the approach…',
+    'Drafting the code…',
+    'Checking syntax…',
+    'Adding comments…',
+    'Tidying up…',
+    'Almost done — final review…',
+];
+
+const GUEST_KEY = 'code';
+
+interface GuestCodeState {
+    messages: Message[];
+    activeConvId: string | null;
 }
 
 export default function CodePage() {
@@ -27,6 +47,14 @@ export default function CodePage() {
     const [activeConvId, setActiveConvId] = useState<string | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const isGuest = user?.role === 'GUEST';
+    const hydratedRef = useRef(false);
+
+    const progress = useGenerationProgress({
+        active: isStreaming,
+        messages: CODE_PROGRESS_MESSAGES,
+        intervalSec: 3,
+    });
 
     useEffect(() => {
         if (!isLoading && !user) router.push('/');
@@ -37,8 +65,27 @@ export default function CodePage() {
     }, [messages]);
 
     useEffect(() => {
-        if (token) loadConversations();
-    }, [token]);
+        if (token && !isGuest) loadConversations();
+    }, [token, isGuest]);
+
+    // Hydrate guest state from sessionStorage once we know the role.
+    useEffect(() => {
+        if (!user || hydratedRef.current) return;
+        hydratedRef.current = true;
+        if (user.role === 'GUEST') {
+            const saved = loadGuestState<GuestCodeState>(GUEST_KEY);
+            if (saved) {
+                if (saved.messages?.length) setMessages(saved.messages);
+                if (saved.activeConvId) setActiveConvId(saved.activeConvId);
+            }
+        }
+    }, [user]);
+
+    // Persist guest state whenever messages/active conversation change.
+    useEffect(() => {
+        if (!isGuest || !hydratedRef.current) return;
+        saveGuestState<GuestCodeState>(GUEST_KEY, { messages, activeConvId });
+    }, [isGuest, messages, activeConvId]);
 
     useEffect(() => {
         const blocks: Array<{ lang: string; code: string }> = [];
@@ -81,6 +128,7 @@ export default function CodePage() {
 
     const saveConversation = useCallback(async (msgs: Message[], convId: string | null) => {
         if (msgs.length === 0) return;
+        if (isGuest) return; // Guests persist via sessionStorage, not the DB.
         const title = msgs[0]?.content.slice(0, 60) || 'New Code Chat';
         try {
             if (convId) {
@@ -102,7 +150,7 @@ export default function CodePage() {
                 }
             }
         } catch { /* ignore */ }
-    }, [token]);
+    }, [token, isGuest]);
 
     const scheduleSave = useCallback((msgs: Message[], convId: string | null) => {
         if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
@@ -142,7 +190,10 @@ export default function CodePage() {
                 body: JSON.stringify({ messages: newMessages }),
             });
 
-            if (!res.ok) throw new Error('Code generation failed');
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.error || 'Code generation failed');
+            }
 
             const reader = res.body?.getReader();
             if (!reader) throw new Error('No stream reader');
@@ -180,7 +231,10 @@ export default function CodePage() {
             scheduleSave(finalMessages, activeConvId);
             await refreshUser();
         } catch (err) {
-            setMessages((prev) => [...prev, { role: 'assistant', content: 'Something went wrong.' }]);
+            setMessages((prev) => [...prev, {
+                role: 'assistant',
+                content: `Error: ${err instanceof Error ? err.message : 'Something went wrong'}`,
+            }]);
         } finally {
             setIsStreaming(false);
         }
@@ -205,6 +259,11 @@ export default function CodePage() {
                         + New Project
                     </button>
                     <h2 className="form-label" style={{ marginBottom: '12px' }}>Projects</h2>
+                    {isGuest && (
+                        <p style={{ color: 'var(--text-muted)', fontSize: '0.7rem', marginBottom: '12px' }}>
+                            Guest session — history resets when you sign out.
+                        </p>
+                    )}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                         {conversations.map((c) => (
                             <div
@@ -244,7 +303,7 @@ export default function CodePage() {
                         {messages.map((msg, i) => (
                             <div key={i} className={`chat-message ${msg.role}`}>
                                 {msg.role === 'assistant' ? (
-                                    <div dangerouslySetInnerHTML={{ __html: formatCodeMessage(msg.content) }} />
+                                    <div dangerouslySetInnerHTML={{ __html: formatAssistantMessage(msg.content, 'code') }} />
                                 ) : (
                                     msg.content
                                 )}
@@ -252,10 +311,14 @@ export default function CodePage() {
                         ))}
                         {isStreaming && messages[messages.length - 1]?.role !== 'assistant' && (
                             <div className="chat-message assistant">
-                                <div className="typing-indicator">
-                                    <div className="typing-dot" />
-                                    <div className="typing-dot" />
-                                    <div className="typing-dot" />
+                                <div className="gen-loading" style={{ padding: '12px 0', alignItems: 'flex-start', gap: '10px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                        <div className="gen-spinner" style={{ width: 22, height: 22, borderWidth: 2 }} />
+                                        <div className="gen-loading-text">{progress.message}</div>
+                                    </div>
+                                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', letterSpacing: '0.05em' }}>
+                                        {formatElapsed(progress.elapsedSec)} elapsed
+                                    </div>
                                 </div>
                             </div>
                         )}
@@ -308,13 +371,4 @@ export default function CodePage() {
             </div>
         </div>
     );
-}
-
-function formatCodeMessage(text: string): string {
-    return text
-        .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre style="background:var(--bg-secondary); padding:12px; border:1px solid var(--border-color); margin:8px 0; font-family:\'NB Mono\', monospace; font-size:0.8rem; overflow-x:auto;"><code>$2</code></pre>')
-        .replace(/`([^`]+)`/g, '<code style="background:var(--bg-secondary); padding:2px 4px; font-family:\'NB Mono\', monospace;">$1</code>')
-        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-        .replace(/\*(.+?)\*/g, '<em>$1</em>')
-        .replace(/\n/g, '<br/>');
 }

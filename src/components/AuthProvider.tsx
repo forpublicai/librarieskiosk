@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { clearAllGuestState } from '@/lib/guestSession';
 
 interface User {
     id: string;
@@ -57,6 +58,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(null);
         setToken(null);
         localStorage.removeItem('kiosk_token');
+        clearAllGuestState();
         if (timeoutRef.current) clearTimeout(timeoutRef.current);
         if (heartbeatRef.current) clearInterval(heartbeatRef.current);
         router.push('/');

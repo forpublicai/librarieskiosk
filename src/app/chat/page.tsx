@@ -4,6 +4,8 @@ import { useState, useRef, useEffect, useCallback, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
 import Header from '@/components/Header';
+import { formatAssistantMessage } from '@/lib/formatMessage';
+import { loadGuestState, saveGuestState } from '@/lib/guestSession';
 
 interface Message {
     role: 'user' | 'assistant';
@@ -16,6 +18,13 @@ interface ConversationSummary {
     updatedAt: string;
 }
 
+const GUEST_KEY = 'chat';
+
+interface GuestChatState {
+    messages: Message[];
+    activeConvId: string | null;
+}
+
 export default function ChatPage() {
     const { user, token, refreshUser, isLoading } = useAuth();
     const router = useRouter();
@@ -26,6 +35,8 @@ export default function ChatPage() {
     const [activeConvId, setActiveConvId] = useState<string | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const isGuest = user?.role === 'GUEST';
+    const hydratedRef = useRef(false);
 
     useEffect(() => {
         if (!isLoading && !user) router.push('/');
@@ -36,8 +47,25 @@ export default function ChatPage() {
     }, [messages]);
 
     useEffect(() => {
-        if (token) loadConversations();
-    }, [token]);
+        if (token && !isGuest) loadConversations();
+    }, [token, isGuest]);
+
+    useEffect(() => {
+        if (!user || hydratedRef.current) return;
+        hydratedRef.current = true;
+        if (user.role === 'GUEST') {
+            const saved = loadGuestState<GuestChatState>(GUEST_KEY);
+            if (saved) {
+                if (saved.messages?.length) setMessages(saved.messages);
+                if (saved.activeConvId) setActiveConvId(saved.activeConvId);
+            }
+        }
+    }, [user]);
+
+    useEffect(() => {
+        if (!isGuest || !hydratedRef.current) return;
+        saveGuestState<GuestChatState>(GUEST_KEY, { messages, activeConvId });
+    }, [isGuest, messages, activeConvId]);
 
     const loadConversations = async () => {
         try {
@@ -66,6 +94,7 @@ export default function ChatPage() {
 
     const saveConversation = useCallback(async (msgs: Message[], convId: string | null) => {
         if (msgs.length === 0) return;
+        if (isGuest) return; // Guests persist via sessionStorage, not the DB.
         const title = msgs[0]?.content.slice(0, 60) || 'New Chat';
         try {
             if (convId) {
@@ -87,7 +116,7 @@ export default function ChatPage() {
                 }
             }
         } catch { /* ignore */ }
-    }, [token]);
+    }, [token, isGuest]);
 
     const scheduleSave = useCallback((msgs: Message[], convId: string | null) => {
         if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
@@ -248,7 +277,7 @@ export default function ChatPage() {
                         {messages.map((msg, i) => (
                             <div key={i} className={`chat-message ${msg.role}`}>
                                 {msg.role === 'assistant' ? (
-                                    <div dangerouslySetInnerHTML={{ __html: formatMessage(msg.content) }} />
+                                    <div dangerouslySetInnerHTML={{ __html: formatAssistantMessage(msg.content, 'chat') }} />
                                 ) : (
                                     msg.content
                                 )}
@@ -297,11 +326,3 @@ export default function ChatPage() {
     );
 }
 
-function formatMessage(text: string): string {
-    return text
-        .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre style="background:var(--bg-secondary); padding:16px; border:1px solid var(--border-color); margin:12px 0; font-family:\'NB Mono\', monospace; font-size:0.85rem; overflow-x:auto;"><code>$2</code></pre>')
-        .replace(/`([^`]+)`/g, '<code style="background:var(--bg-secondary); padding:2px 6px; font-family:\'NB Mono\', monospace; font-size:0.9em;">$1</code>')
-        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-        .replace(/\*(.+?)\*/g, '<em>$1</em>')
-        .replace(/\n/g, '<br/>');
-}

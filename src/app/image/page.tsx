@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, FormEvent, useEffect, useCallback } from 'react';
+import { useState, FormEvent, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
 import Header from '@/components/Header';
 import { refreshMediaUrl } from '@/lib/mediaClient';
 import { useGenerationProgress, formatElapsed } from '@/hooks/useGenerationProgress';
+import { loadGuestState, saveGuestState } from '@/lib/guestSession';
 
 const IMAGE_PROGRESS_MESSAGES = [
     'Parsing your prompt…',
@@ -28,6 +29,13 @@ interface SessionItem {
     createdAt: string;
 }
 
+const GUEST_KEY = 'image';
+
+interface GuestImageState {
+    imageUrl: string | null;
+    sessions: SessionItem[];
+}
+
 export default function ImagePage() {
     const { user, token, refreshUser, isLoading } = useAuth();
     const router = useRouter();
@@ -37,6 +45,8 @@ export default function ImagePage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [sessions, setSessions] = useState<SessionItem[]>([]);
+    const isGuest = user?.role === 'GUEST';
+    const hydratedRef = useRef(false);
     const progress = useGenerationProgress({
         active: loading,
         messages: IMAGE_PROGRESS_MESSAGES,
@@ -47,8 +57,25 @@ export default function ImagePage() {
     }, [user, isLoading, router]);
 
     useEffect(() => {
-        if (token) loadSessions();
-    }, [token]);
+        if (token && !isGuest) loadSessions();
+    }, [token, isGuest]);
+
+    useEffect(() => {
+        if (!user || hydratedRef.current) return;
+        hydratedRef.current = true;
+        if (user.role === 'GUEST') {
+            const saved = loadGuestState<GuestImageState>(GUEST_KEY);
+            if (saved) {
+                if (saved.imageUrl) setImageUrl(saved.imageUrl);
+                if (saved.sessions?.length) setSessions(saved.sessions);
+            }
+        }
+    }, [user]);
+
+    useEffect(() => {
+        if (!isGuest || !hydratedRef.current) return;
+        saveGuestState<GuestImageState>(GUEST_KEY, { imageUrl, sessions });
+    }, [isGuest, imageUrl, sessions]);
 
     const loadSessions = async () => {
         try {
@@ -122,7 +149,25 @@ export default function ImagePage() {
 
             if (data.mediaSessionId) setCurrentSessionId(data.mediaSessionId);
 
-            await loadSessions();
+            if (isGuest) {
+                const finalUrl = data.url
+                    ? data.url
+                    : data.b64_json
+                        ? `data:image/png;base64,${data.b64_json}`
+                        : null;
+                if (finalUrl) {
+                    const item: SessionItem = {
+                        id: `guest_${Date.now()}`,
+                        prompt: prompt.trim(),
+                        url: finalUrl,
+                        thumbnailUrl: finalUrl,
+                        createdAt: new Date().toISOString(),
+                    };
+                    setSessions((prev) => [item, ...prev].slice(0, 20));
+                }
+            } else {
+                await loadSessions();
+            }
             await refreshUser();
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Something went wrong');

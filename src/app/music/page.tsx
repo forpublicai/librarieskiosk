@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, FormEvent, useEffect, useCallback } from 'react';
+import { useState, FormEvent, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
 import Header from '@/components/Header';
 import { refreshMediaUrl } from '@/lib/mediaClient';
 import { useGenerationProgress, formatElapsed } from '@/hooks/useGenerationProgress';
+import { loadGuestState, saveGuestState } from '@/lib/guestSession';
 
 const MUSIC_PROGRESS_MESSAGES = [
     'Reading your prompt…',
@@ -27,6 +28,13 @@ interface SessionItem {
     createdAt: string;
 }
 
+const GUEST_KEY = 'music';
+
+interface GuestMusicState {
+    audioUrl: string | null;
+    sessions: SessionItem[];
+}
+
 export default function MusicPage() {
     const { user, token, refreshUser, isLoading } = useAuth();
     const router = useRouter();
@@ -39,6 +47,8 @@ export default function MusicPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [sessions, setSessions] = useState<SessionItem[]>([]);
+    const isGuest = user?.role === 'GUEST';
+    const hydratedRef = useRef(false);
     const progress = useGenerationProgress({
         active: loading,
         messages: MUSIC_PROGRESS_MESSAGES,
@@ -52,8 +62,25 @@ export default function MusicPage() {
     }, [user, isLoading, router]);
 
     useEffect(() => {
-        if (token) loadSessions();
-    }, [token]);
+        if (token && !isGuest) loadSessions();
+    }, [token, isGuest]);
+
+    useEffect(() => {
+        if (!user || hydratedRef.current) return;
+        hydratedRef.current = true;
+        if (user.role === 'GUEST') {
+            const saved = loadGuestState<GuestMusicState>(GUEST_KEY);
+            if (saved) {
+                if (saved.audioUrl) setAudioUrl(saved.audioUrl);
+                if (saved.sessions?.length) setSessions(saved.sessions);
+            }
+        }
+    }, [user]);
+
+    useEffect(() => {
+        if (!isGuest || !hydratedRef.current) return;
+        saveGuestState<GuestMusicState>(GUEST_KEY, { audioUrl, sessions });
+    }, [isGuest, audioUrl, sessions]);
 
     const loadSessions = async () => {
         try {
@@ -108,7 +135,17 @@ export default function MusicPage() {
             if (url) {
                 setAudioUrl(url);
                 if (data.mediaSessionId) setCurrentSessionId(data.mediaSessionId);
-                await loadSessions();
+                if (isGuest) {
+                    const item: SessionItem = {
+                        id: `guest_${Date.now()}`,
+                        prompt: prompt.trim(),
+                        url,
+                        createdAt: new Date().toISOString(),
+                    };
+                    setSessions((prev) => [item, ...prev].slice(0, 20));
+                } else {
+                    await loadSessions();
+                }
                 await refreshUser();
             } else {
                 throw new Error('No audio URL returned');
