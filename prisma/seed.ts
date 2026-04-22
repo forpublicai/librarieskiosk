@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { PrismaClient } from '../src/generated/prisma/client.js';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { hashSync } from 'bcryptjs';
+import { guestUsernameForLibrary } from '../src/lib/library';
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
 const prisma = new PrismaClient({ adapter });
@@ -92,7 +93,10 @@ async function main() {
     });
     console.log(`Patron user created/found: ${patron.username} (${patron.id}), credits: ${patron.credits}`);
 
-    // Create shared guest account (reusable, no content persistence)
+    // Legacy shared guest account (used when a kiosk has no library-specific
+    // bootstrap cookie — i.e. someone browsing the bare URL in dev/preview or
+    // from an unconfigured device). Kept as a fallback so nothing breaks if a
+    // kiosk URL isn't updated yet.
     const guest = await prisma.user.upsert({
         where: { username: 'guest' },
         update: { status: 'APPROVED' },
@@ -106,6 +110,30 @@ async function main() {
         },
     });
     console.log(`Guest account created/found: ${guest.username} (${guest.id}), credits: ${guest.credits}`);
+
+    // Per-library guest accounts — one per Library row. Their `library` field
+    // is the actual library name so `getNanogptKey(user.library)` automatically
+    // routes to the per-library NanoGPT key, and their credit pool is isolated
+    // from every other library.
+    const libraries = [pottsboro, salem, publicAi];
+    for (const lib of libraries) {
+        const username = guestUsernameForLibrary(lib.name);
+        const libGuest = await prisma.user.upsert({
+            where: { username },
+            update: { status: 'APPROVED', library: lib.name, role: 'GUEST' },
+            create: {
+                username,
+                passwordHash: hashSync('guest_session', 10),
+                library: lib.name,
+                role: 'GUEST',
+                status: 'APPROVED',
+                credits: 100,
+            },
+        });
+        console.log(
+            `Library guest created/found: ${libGuest.username} (${libGuest.id}) library="${libGuest.library}" credits: ${libGuest.credits}`
+        );
+    }
 
     // Migrate existing users to APPROVED status
     const migrated = await prisma.user.updateMany({
