@@ -40,6 +40,13 @@ async function main() {
     });
     console.log(`Library created/found: ${tremonton.name}`);
 
+    const sussex = await prisma.library.upsert({
+        where: { name: 'Sussex County, NJ' },
+        update: {},
+        create: { name: 'Sussex County, NJ', weeklyPool: 1750, poolRemaining: 1750 },
+    });
+    console.log(`Library created/found: ${sussex.name}`);
+
     // Create admin user for Pottsboro
     const admin = await prisma.user.upsert({
         where: { username: 'admin_pottsboro' },
@@ -84,6 +91,21 @@ async function main() {
         },
     });
     console.log(`Tremonton admin created/found: ${tremontonAdmin.username} (${tremontonAdmin.id})`);
+
+    // Create admin user for Sussex County
+    const sussexAdmin = await prisma.user.upsert({
+        where: { username: 'admin_sussex' },
+        update: {},
+        create: {
+            username: 'admin_sussex',
+            passwordHash: hashSync(adminPassword, 10),
+            library: 'Sussex County, NJ',
+            role: 'ADMIN',
+            status: 'APPROVED',
+            credits: 1750,
+        },
+    });
+    console.log(`Sussex admin created/found: ${sussexAdmin.username} (${sussexAdmin.id})`);
 
     // Super admin also acts as the admin for the "Public AI" library
     const superAdmin = await prisma.user.upsert({
@@ -137,7 +159,7 @@ async function main() {
     // is the actual library name so `getNanogptKey(user.library)` automatically
     // routes to the per-library NanoGPT key, and their credit pool is isolated
     // from every other library.
-    const libraries = [pottsboro, salem, publicAi, tremonton];
+    const libraries = [pottsboro, salem, publicAi, tremonton, sussex];
     for (const lib of libraries) {
         const username = guestUsernameForLibrary(lib.name);
         const libGuest = await prisma.user.upsert({
