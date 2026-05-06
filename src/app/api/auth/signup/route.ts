@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { hashPassword, signToken, SESSION_IDLE_MS } from '@/lib/auth';
 import { hashSecurityAnswer, isValidSecurityQuestion, normalizeSecurityAnswer } from '@/lib/security';
+import { renewalIso } from '@/lib/credits';
 
 export async function POST(request: NextRequest) {
     try {
@@ -120,24 +121,42 @@ export async function POST(request: NextRequest) {
             data: { userId: user.id, library: user.library, jti },
         });
 
+        const loggedInUser = await prisma.user.update({
+            where: { id: user.id },
+            data: {
+                loginCount: { increment: 1 },
+                lastLoginAt: new Date(),
+            },
+            select: {
+                id: true,
+                username: true,
+                role: true,
+                status: true,
+                credits: true,
+                creditsResetAt: true,
+                library: true,
+            },
+        });
+
         // Auto-login: return token
         const token = await signToken({
-            userId: user.id,
-            username: user.username,
-            role: user.role,
-            library: user.library,
+            userId: loggedInUser.id,
+            username: loggedInUser.username,
+            role: loggedInUser.role,
+            library: loggedInUser.library,
             jti,
         });
 
         return NextResponse.json({
             token,
             user: {
-                id: user.id,
-                username: user.username,
-                role: user.role,
-                status: user.status,
-                credits: user.credits,
-                library: user.library,
+                id: loggedInUser.id,
+                username: loggedInUser.username,
+                role: loggedInUser.role,
+                status: loggedInUser.status,
+                credits: loggedInUser.credits,
+                library: loggedInUser.library,
+                creditsRenewAt: renewalIso(loggedInUser.creditsResetAt),
             },
         }, { status: 201 });
     } catch (error) {

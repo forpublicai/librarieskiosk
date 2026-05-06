@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireSuperAdmin, isAuthResult } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { renewalIso, resetAllDueUserCreditsIfNeeded, resetLibrariesPoolsIfNeeded } from '@/lib/credits';
 
 // GET /api/admin/superadmin/overview — aggregated stats across all libraries
 export async function GET(request: NextRequest) {
@@ -10,6 +11,9 @@ export async function GET(request: NextRequest) {
     if (!isAuthResult(authResult)) return authResult;
 
     try {
+        await resetAllDueUserCreditsIfNeeded();
+        await resetLibrariesPoolsIfNeeded();
+
         // Get all libraries
         const libraries = await prisma.library.findMany({
             orderBy: { name: 'asc' },
@@ -64,9 +68,11 @@ export async function GET(request: NextRequest) {
                 role: true,
                 status: true,
                 credits: true,
+                creditsResetAt: true,
                 library: true,
                 createdAt: true,
                 loginCount: true,
+                lastLoginAt: true,
                 _count: { select: { usageLogs: true } },
             },
             orderBy: { library: 'asc' },
@@ -90,7 +96,16 @@ export async function GET(request: NextRequest) {
         });
 
         const enrichedGuests = allGuests.map((g) => ({
-            ...g,
+            id: g.id,
+            username: g.username,
+            role: g.role,
+            status: g.status,
+            credits: g.credits,
+            creditsRenewAt: renewalIso(g.creditsResetAt),
+            library: g.library,
+            createdAt: g.createdAt,
+            loginCount: g.loginCount,
+            lastLoginAt: g.lastLoginAt,
             totalUsage: g._count.usageLogs,
             usageByMode: guestUsageMap[g.id] || {},
         }));
@@ -104,9 +119,11 @@ export async function GET(request: NextRequest) {
                 role: true,
                 status: true,
                 credits: true,
+                creditsResetAt: true,
                 library: true,
                 createdAt: true,
                 loginCount: true,
+                lastLoginAt: true,
                 _count: { select: { usageLogs: true } },
             },
             orderBy: { createdAt: 'desc' },
@@ -131,7 +148,16 @@ export async function GET(request: NextRequest) {
         });
 
         const enrichedUsers = allUsers.map((u) => ({
-            ...u,
+            id: u.id,
+            username: u.username,
+            role: u.role,
+            status: u.status,
+            credits: u.credits,
+            creditsRenewAt: renewalIso(u.creditsResetAt),
+            library: u.library,
+            createdAt: u.createdAt,
+            loginCount: u.loginCount,
+            lastLoginAt: u.lastLoginAt,
             totalUsage: u._count.usageLogs,
             usageByMode: usageMap[u.id] || {},
         }));
@@ -151,6 +177,7 @@ export async function GET(request: NextRequest) {
             name: lib.name,
             weeklyPool: lib.weeklyPool,
             poolRemaining: lib.poolRemaining,
+            poolRenewAt: renewalIso(lib.poolResetAt),
             maxConcurrentSessions: lib.maxConcurrentSessions,
             userCount: userCountMap[lib.name] || 0,
             guestCount: guestCountMap[lib.name] || 0,

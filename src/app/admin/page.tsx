@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
 import Header from '@/components/Header';
+import CreditBadge from '@/components/CreditBadge';
+import { formatCreditRenewalTitle } from '@/lib/creditRenewal';
 
 interface UserAccount {
     id: string;
@@ -11,8 +13,10 @@ interface UserAccount {
     role: string;
     status: string;
     credits: number;
+    creditsRenewAt: string | null;
     library: string;
     createdAt: string;
+    lastLoginAt: string | null;
     totalUsage: number;
     usageByMode: Record<string, { count: number; credits: number }>;
 }
@@ -30,6 +34,7 @@ interface LibraryPool {
     name: string;
     weeklyPool: number;
     poolRemaining: number;
+    poolRenewAt: string | null;
 }
 
 export default function AdminPage() {
@@ -143,9 +148,9 @@ export default function AdminPage() {
                 {/* Pool info bar */}
                 <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', alignItems: 'center', flexWrap: 'wrap' }}>
                     {pool && (
-                        <div className="credit-badge">
+                        <CreditBadge renewAt={pool.poolRenewAt}>
                             🏦 {pool.poolRemaining}/{pool.weeklyPool} pool
-                        </div>
+                        </CreditBadge>
                     )}
                     <div className="credit-badge">
                         📚 {adminLibrary}
@@ -214,7 +219,9 @@ export default function AdminPage() {
                                                 {u.status}
                                             </span>
                                         </td>
-                                        <td style={tdStyle}>{u.credits}</td>
+                                        <td style={tdStyle} title={formatCreditRenewalTitle(u.creditsRenewAt)}>
+                                            {u.credits}
+                                        </td>
                                         <td style={tdStyle}>{u.totalUsage}</td>
                                         {modes.map((m) => (
                                             <td key={m} style={tdStyle}>{u.usageByMode[m]?.count || 0}</td>

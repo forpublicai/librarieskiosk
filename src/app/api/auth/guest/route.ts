@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { signToken } from '@/lib/auth';
+import { renewalIso, resetCreditsIfNeeded } from '@/lib/credits';
 import {
     KIOSK_LIBRARY_COOKIE,
     guestUsernameForLibrary,
@@ -76,23 +77,43 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        await resetCreditsIfNeeded(guest.id);
+
+        const loggedInGuest = await prisma.user.update({
+            where: { id: guest.id },
+            data: {
+                loginCount: { increment: 1 },
+                lastLoginAt: new Date(),
+            },
+            select: {
+                id: true,
+                username: true,
+                role: true,
+                status: true,
+                credits: true,
+                creditsResetAt: true,
+                library: true,
+            },
+        });
+
         // Issue token for the resolved guest account
         const token = await signToken({
-            userId: guest.id,
-            username: guest.username,
-            role: guest.role,
-            library: guest.library,
+            userId: loggedInGuest.id,
+            username: loggedInGuest.username,
+            role: loggedInGuest.role,
+            library: loggedInGuest.library,
         });
 
         return NextResponse.json({
             token,
             user: {
-                id: guest.id,
-                username: guest.username,
-                role: guest.role,
-                status: guest.status,
-                credits: guest.credits,
-                library: guest.library,
+                id: loggedInGuest.id,
+                username: loggedInGuest.username,
+                role: loggedInGuest.role,
+                status: loggedInGuest.status,
+                credits: loggedInGuest.credits,
+                library: loggedInGuest.library,
+                creditsRenewAt: renewalIso(loggedInGuest.creditsResetAt),
             },
         });
     } catch (error) {

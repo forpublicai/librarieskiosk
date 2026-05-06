@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
+import CreditBadge from '@/components/CreditBadge';
 
 const modes = [
     {
@@ -99,7 +100,7 @@ export default function DashboardPage() {
                     <img src="/images/logo.svg" alt="Public AI" className="header-logo" />
                 </div>
                 <div className="page-header-right">
-                    <span className="credit-badge">{user.credits} Credits</span>
+                    <CreditBadge renewAt={user.creditsRenewAt}>{user.credits} Credits</CreditBadge>
                     {isGuest && <span className="credit-badge" style={{ background: 'rgba(255,77,0,0.1)', color: 'var(--accent-orange)' }}>Guest</span>}
                     {!isGuest && (
                         <button className="back-btn" onClick={() => router.push('/account')}>
@@ -129,7 +130,15 @@ export default function DashboardPage() {
                         fontSize: '0.95rem',
                         lineHeight: '1.5',
                     }}>
-                        <strong style={{ color: 'var(--text-primary)' }}>Guest Session</strong> — You have full access to all services, but your work won't be saved after you exit. <a href="/" style={{ color: 'var(--accent-orange)', fontWeight: '500', textDecoration: 'none' }}>Sign in or create an account</a> to save your creations and build your portfolio.
+                        <strong style={{ color: 'var(--text-primary)' }}>Guest Session</strong> — You have full access to all services, but your work won&apos;t be saved after you exit.{' '}
+                        <button
+                            type="button"
+                            onClick={logout}
+                            style={{ color: 'var(--accent-orange)', fontWeight: '500', textDecoration: 'none', background: 'none', border: 0, padding: 0, font: 'inherit', cursor: 'pointer' }}
+                        >
+                            Sign in or create an account
+                        </button>{' '}
+                        to save your creations and build your portfolio.
                     </div>
                 )}
 

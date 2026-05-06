@@ -4,6 +4,8 @@ import { useState, useEffect, FormEvent, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
 import Header from '@/components/Header';
+import CreditBadge from '@/components/CreditBadge';
+import { formatCreditRenewalTitle } from '@/lib/creditRenewal';
 
 interface UsageData {
     totals: { totalCreditsSpent: number; totalEvents: number };
@@ -134,7 +136,10 @@ export default function AccountPage() {
                         {user.username}
                     </h1>
                     <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                        {user.role} · {user.library} · {user.credits} credits
+                        {user.role} · {user.library} ·{' '}
+                        <span title={formatCreditRenewalTitle(user.creditsRenewAt)}>
+                            {user.credits} credits
+                        </span>
                     </div>
                 </div>
 
@@ -314,9 +319,9 @@ export default function AccountPage() {
                                     <div className="credit-badge">
                                         📊 {usage.totals.totalEvents} generations
                                     </div>
-                                    <div className="credit-badge">
+                                    <CreditBadge renewAt={user.creditsRenewAt}>
                                         💰 {user.credits} remaining
-                                    </div>
+                                    </CreditBadge>
                                 </div>
 
                                 <h3 style={{ fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>

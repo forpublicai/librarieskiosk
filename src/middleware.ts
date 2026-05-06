@@ -7,6 +7,12 @@ export function middleware(request: NextRequest) {
     const token = process.env.KIOSK_ACCESS_TOKEN;
     const { pathname, searchParams } = request.nextUrl;
 
+    // Cron routes have their own CRON_SECRET authorization and must be
+    // reachable by Vercel without a kiosk browser cookie.
+    if (pathname.startsWith('/api/cron/')) {
+        return NextResponse.next();
+    }
+
     // If no token is configured, allow all access (dev/preview mode)
     if (!token) {
         return NextResponse.next();

@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
+import CreditBadge from '@/components/CreditBadge';
 
 interface HeaderProps {
     title?: string;
@@ -31,12 +32,12 @@ export default function Header({ title, showBack = true }: HeaderProps) {
                 />
                 {title && (
                     <span style={{ marginLeft: '16px', fontWeight: 'bold', fontSize: '0.85rem', letterSpacing: '0.04em' }}>
-                        // {title}
+                        {`// ${title}`}
                     </span>
                 )}
             </div>
             <div className="page-header-right">
-                <span className="credit-badge">{user.credits} Credits</span>
+                <CreditBadge renewAt={user.creditsRenewAt}>{user.credits} Credits</CreditBadge>
                 {user.role !== 'GUEST' && (
                     <button className="back-btn" onClick={() => router.push('/account')}>
                         My Account

@@ -3,30 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin, isAuthResult } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-
-const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
-
-/**
- * If a week has passed since the last reset, refill the pool
- * and push the reset date forward.
- */
-async function resetPoolIfNeeded(libraryName: string) {
-    const library = await prisma.library.findUnique({
-        where: { name: libraryName },
-    });
-    if (!library) return null;
-
-    if (Date.now() >= library.poolResetAt.getTime() + WEEK_MS) {
-        return prisma.library.update({
-            where: { name: libraryName },
-            data: {
-                poolRemaining: library.weeklyPool,
-                poolResetAt: new Date(),
-            },
-        });
-    }
-    return library;
-}
+import { renewalIso, resetLibraryPoolIfNeeded } from '@/lib/credits';
 
 // GET /api/admin/credit-pool — get library pool info
 export async function GET(request: NextRequest) {
@@ -42,16 +19,16 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Admin not found' }, { status: 404 });
     }
 
-    const library = await resetPoolIfNeeded(admin.library);
+    const library = await resetLibraryPoolIfNeeded(admin.library);
 
     if (!library) {
         // System admins or admins without a library record — return synthetic pool
         return NextResponse.json({
-            library: { name: admin.library, weeklyPool: 1750, poolRemaining: 1750 },
+            library: { name: admin.library, weeklyPool: 1750, poolRemaining: 1750, poolRenewAt: null },
         });
     }
 
-    return NextResponse.json({ library });
+    return NextResponse.json({ library: { ...library, poolRenewAt: renewalIso(library.poolResetAt) } });
 }
 
 // POST /api/admin/credit-pool — send credits from pool to a user
@@ -93,7 +70,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Check pool (reset if a week has passed)
-        const library = await resetPoolIfNeeded(admin.library);
+        const library = await resetLibraryPoolIfNeeded(admin.library);
 
         if (!library || library.poolRemaining < amount) {
             return NextResponse.json(
@@ -114,7 +91,11 @@ export async function POST(request: NextRequest) {
             select: { id: true, username: true, credits: true },
         });
 
-        return NextResponse.json({ user: updatedUser, poolRemaining: library.poolRemaining - amount });
+        return NextResponse.json({
+            user: updatedUser,
+            poolRemaining: library.poolRemaining - amount,
+            poolRenewAt: renewalIso(library.poolResetAt),
+        });
     } catch (error) {
         console.error('Send credits error:', error);
         return NextResponse.json({ error: 'Failed to send credits' }, { status: 500 });

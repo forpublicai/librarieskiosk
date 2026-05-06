@@ -4,11 +4,14 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
 import Header from '@/components/Header';
+import CreditBadge from '@/components/CreditBadge';
+import { formatCreditRenewalTitle } from '@/lib/creditRenewal';
 
 interface LibraryBreakdown {
     name: string;
     weeklyPool: number;
     poolRemaining: number;
+    poolRenewAt: string | null;
     maxConcurrentSessions: number;
     userCount: number;
     guestCount: number;
@@ -28,9 +31,11 @@ interface UserAccount {
     role: string;
     status: string;
     credits: number;
+    creditsRenewAt: string | null;
     library: string;
     createdAt: string;
     loginCount: number;
+    lastLoginAt: string | null;
     totalUsage: number;
     usageByMode: Record<string, { count: number; credits: number }>;
 }
@@ -86,6 +91,8 @@ export default function SuperAdminPage() {
     if (isLoading || !user || user.role !== 'SUPER_ADMIN') return null;
 
     const modes = ['chat', 'image', 'video', 'music', 'code'];
+    const userGroups = groupAccountsByLibrary(users, libraries);
+    const guestGroups = groupAccountsByLibrary(guests, libraries);
 
     return (
         <div className="page-container" style={{ overflow: 'auto' }}>
@@ -107,9 +114,9 @@ export default function SuperAdminPage() {
                 {usageByMode.length > 0 && (
                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '24px' }}>
                         {usageByMode.map((m) => (
-                            <div key={m.mode} className="credit-badge" style={{ fontSize: '0.8rem' }}>
+                            <CreditBadge key={m.mode} style={{ fontSize: '0.8rem' }}>
                                 {m.mode}: {m.count} uses ({m.credits} cr)
-                            </div>
+                            </CreditBadge>
                         ))}
                     </div>
                 )}
@@ -154,11 +161,14 @@ export default function SuperAdminPage() {
                                         <td style={tdStyle}>{lib.totalUsage}</td>
                                         <td style={tdStyle}>{lib.totalCredits}</td>
                                         <td style={tdStyle}>
-                                            <span style={{
-                                                padding: '2px 8px', fontSize: '0.75rem', fontWeight: 600,
-                                                background: lib.poolRemaining > 200 ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)',
-                                                color: lib.poolRemaining > 200 ? 'var(--accent-green)' : 'var(--accent-red)',
-                                            }}>
+                                            <span
+                                                title={formatCreditRenewalTitle(lib.poolRenewAt)}
+                                                style={{
+                                                    padding: '2px 8px', fontSize: '0.75rem', fontWeight: 600,
+                                                    background: lib.poolRemaining > 200 ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)',
+                                                    color: lib.poolRemaining > 200 ? 'var(--accent-green)' : 'var(--accent-red)',
+                                                }}
+                                            >
                                                 {lib.poolRemaining}/{lib.weeklyPool}
                                             </span>
                                         </td>
@@ -199,7 +209,7 @@ export default function SuperAdminPage() {
                                         </div>
                                     </div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                                        <span>{lib.poolRemaining} remaining</span>
+                                        <span title={formatCreditRenewalTitle(lib.poolRenewAt)}>{lib.poolRemaining} remaining</span>
                                         <span>{pct}%</span>
                                     </div>
                                     <div style={{ marginTop: '12px', display: 'flex', gap: '16px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
@@ -214,108 +224,163 @@ export default function SuperAdminPage() {
 
                 {/* Guests tab */}
                 {!loading && tab === 'guests' && (
-                    <div style={{ overflowX: 'auto' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                         {guests.length === 0 ? (
                             <div style={{ textAlign: 'center', padding: '48px', color: 'var(--text-muted)' }}>No guest accounts found</div>
                         ) : (
-                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
-                                <thead>
-                                    <tr style={{ borderBottom: '2px solid var(--border-strong)' }}>
-                                        <th style={thStyle}>Username</th>
-                                        <th style={thStyle}>Library</th>
-                                        <th style={thStyle}>Status</th>
-                                        <th style={thStyle}>Credits</th>
-                                        <th style={thStyle}>Logins</th>
-                                        <th style={thStyle}>Usage</th>
-                                        {modes.map((m) => (
-                                            <th key={m} style={thStyle}>{m}</th>
-                                        ))}
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {guests.map((g) => (
-                                        <tr key={g.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                                            <td style={tdStyle}>
-                                                <strong>{g.username}</strong>
-                                                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginLeft: '4px' }}>GUEST</span>
-                                            </td>
-                                            <td style={tdStyle}>{g.library}</td>
-                                            <td style={tdStyle}>
-                                                <span style={{
-                                                    padding: '2px 8px', fontSize: '0.75rem', fontWeight: 600,
-                                                    background: g.status === 'APPROVED' ? 'rgba(16,185,129,0.1)' : g.status === 'BANNED' ? 'rgba(239,68,68,0.1)' : 'rgba(255,77,0,0.1)',
-                                                    color: g.status === 'APPROVED' ? 'var(--accent-green)' : g.status === 'BANNED' ? 'var(--accent-red)' : 'var(--accent-orange)',
-                                                }}>
-                                                    {g.status}
-                                                </span>
-                                            </td>
-                                            <td style={tdStyle}>{g.credits}</td>
-                                            <td style={tdStyle}>{g.loginCount}</td>
-                                            <td style={tdStyle}>{g.totalUsage}</td>
-                                            {modes.map((m) => (
-                                                <td key={m} style={tdStyle}>{g.usageByMode[m]?.count || 0}</td>
-                                            ))}
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                            guestGroups.map((group) => (
+                                <section key={group.library}>
+                                    <GroupHeading library={group.library} count={group.accounts.length} />
+                                    <div style={{ overflowX: 'auto' }}>
+                                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                                            <thead>
+                                                <tr style={{ borderBottom: '2px solid var(--border-strong)' }}>
+                                                    <th style={thStyle}>Username</th>
+                                                    <th style={thStyle}>Status</th>
+                                                    <th style={thStyle}>Credits</th>
+                                                    <th style={thStyle}>Logins</th>
+                                                    <th style={thStyle}>Last Login</th>
+                                                    <th style={thStyle}>Usage</th>
+                                                    {modes.map((m) => (
+                                                        <th key={m} style={thStyle}>{m}</th>
+                                                    ))}
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {group.accounts.map((g) => (
+                                                    <tr key={g.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                                                        <td style={tdStyle}>
+                                                            <strong>{g.username}</strong>
+                                                            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginLeft: '4px' }}>GUEST</span>
+                                                        </td>
+                                                        <td style={tdStyle}>
+                                                            <span style={{
+                                                                padding: '2px 8px', fontSize: '0.75rem', fontWeight: 600,
+                                                                background: g.status === 'APPROVED' ? 'rgba(16,185,129,0.1)' : g.status === 'BANNED' ? 'rgba(239,68,68,0.1)' : 'rgba(255,77,0,0.1)',
+                                                                color: g.status === 'APPROVED' ? 'var(--accent-green)' : g.status === 'BANNED' ? 'var(--accent-red)' : 'var(--accent-orange)',
+                                                            }}>
+                                                                {g.status}
+                                                            </span>
+                                                        </td>
+                                                        <td style={tdStyle} title={formatCreditRenewalTitle(g.creditsRenewAt)}>{g.credits}</td>
+                                                        <td style={tdStyle}>{g.loginCount}</td>
+                                                        <td style={tdStyle}>{formatLastLogin(g.lastLoginAt, g.loginCount)}</td>
+                                                        <td style={tdStyle}>{g.totalUsage}</td>
+                                                        {modes.map((m) => (
+                                                            <td key={m} style={tdStyle}>{g.usageByMode[m]?.count || 0}</td>
+                                                        ))}
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </section>
+                            ))
                         )}
                     </div>
                 )}
 
                 {/* Users tab */}
                 {!loading && tab === 'users' && (
-                    <div style={{ overflowX: 'auto' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
-                            <thead>
-                                <tr style={{ borderBottom: '2px solid var(--border-strong)' }}>
-                                    <th style={thStyle}>User</th>
-                                    <th style={thStyle}>Library</th>
-                                    <th style={thStyle}>Role</th>
-                                    <th style={thStyle}>Status</th>
-                                    <th style={thStyle}>Credits</th>
-                                    <th style={thStyle}>Logins</th>
-                                    <th style={thStyle}>Usage</th>
-                                    {modes.map((m) => (
-                                        <th key={m} style={thStyle}>{m}</th>
-                                    ))}
-                                    <th style={thStyle}>Joined</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {users.map((u) => (
-                                    <tr key={u.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                                        <td style={tdStyle}>
-                                            <strong>{u.username}</strong>
-                                            {u.role === 'ADMIN' && <span style={{ fontSize: '0.7rem', color: 'var(--accent-orange)', marginLeft: '4px' }}>ADMIN</span>}
-                                            {u.role === 'SUPER_ADMIN' && <span style={{ fontSize: '0.7rem', color: 'var(--accent-red)', marginLeft: '4px' }}>SUPER</span>}
-                                        </td>
-                                        <td style={tdStyle}>{u.library}</td>
-                                        <td style={tdStyle}>
-                                            <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>{u.role}</span>
-                                        </td>
-                                        <td style={tdStyle}>
-                                            <span style={{
-                                                padding: '2px 8px', fontSize: '0.75rem', fontWeight: 600,
-                                                background: u.status === 'APPROVED' ? 'rgba(16,185,129,0.1)' : u.status === 'BANNED' ? 'rgba(239,68,68,0.1)' : 'rgba(255,77,0,0.1)',
-                                                color: u.status === 'APPROVED' ? 'var(--accent-green)' : u.status === 'BANNED' ? 'var(--accent-red)' : 'var(--accent-orange)',
-                                            }}>
-                                                {u.status}
-                                            </span>
-                                        </td>
-                                        <td style={tdStyle}>{u.credits}</td>
-                                        <td style={tdStyle}>{u.loginCount}</td>
-                                        <td style={tdStyle}>{u.totalUsage}</td>
-                                        {modes.map((m) => (
-                                            <td key={m} style={tdStyle}>{u.usageByMode[m]?.count || 0}</td>
-                                        ))}
-                                        <td style={tdStyle}>{new Date(u.createdAt).toLocaleDateString()}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                        {userGroups.map((group) => (
+                            <section key={group.library}>
+                                <GroupHeading library={group.library} count={group.accounts.length} />
+                                <div style={{ overflowX: 'auto' }}>
+                                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                                        <thead>
+                                            <tr style={{ borderBottom: '2px solid var(--border-strong)' }}>
+                                                <th style={thStyle}>User</th>
+                                                <th style={thStyle}>Role</th>
+                                                <th style={thStyle}>Status</th>
+                                                <th style={thStyle}>Credits</th>
+                                                <th style={thStyle}>Logins</th>
+                                                <th style={thStyle}>Last Login</th>
+                                                <th style={thStyle}>Usage</th>
+                                                {modes.map((m) => (
+                                                    <th key={m} style={thStyle}>{m}</th>
+                                                ))}
+                                                <th style={thStyle}>Joined</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {group.accounts.map((u) => (
+                                                <tr key={u.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                                                    <td style={tdStyle}>
+                                                        <strong>{u.username}</strong>
+                                                        {u.role === 'ADMIN' && <span style={{ fontSize: '0.7rem', color: 'var(--accent-orange)', marginLeft: '4px' }}>ADMIN</span>}
+                                                        {u.role === 'SUPER_ADMIN' && <span style={{ fontSize: '0.7rem', color: 'var(--accent-red)', marginLeft: '4px' }}>SUPER</span>}
+                                                    </td>
+                                                    <td style={tdStyle}>
+                                                        <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>{u.role}</span>
+                                                    </td>
+                                                    <td style={tdStyle}>
+                                                        <span style={{
+                                                            padding: '2px 8px', fontSize: '0.75rem', fontWeight: 600,
+                                                            background: u.status === 'APPROVED' ? 'rgba(16,185,129,0.1)' : u.status === 'BANNED' ? 'rgba(239,68,68,0.1)' : 'rgba(255,77,0,0.1)',
+                                                            color: u.status === 'APPROVED' ? 'var(--accent-green)' : u.status === 'BANNED' ? 'var(--accent-red)' : 'var(--accent-orange)',
+                                                        }}>
+                                                            {u.status}
+                                                        </span>
+                                                    </td>
+                                                    <td style={tdStyle} title={formatCreditRenewalTitle(u.creditsRenewAt)}>{u.credits}</td>
+                                                    <td style={tdStyle}>{u.loginCount}</td>
+                                                    <td style={tdStyle}>{formatLastLogin(u.lastLoginAt, u.loginCount)}</td>
+                                                    <td style={tdStyle}>{u.totalUsage}</td>
+                                                    {modes.map((m) => (
+                                                        <td key={m} style={tdStyle}>{u.usageByMode[m]?.count || 0}</td>
+                                                    ))}
+                                                    <td style={tdStyle}>{new Date(u.createdAt).toLocaleDateString()}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </section>
+                        ))}
                     </div>
                 )}
+            </div>
+        </div>
+    );
+}
+
+function groupAccountsByLibrary(accounts: UserAccount[], libraries: LibraryBreakdown[]) {
+    const accountsByLibrary = new Map<string, UserAccount[]>();
+
+    accounts.forEach((account) => {
+        accountsByLibrary.set(account.library, [...(accountsByLibrary.get(account.library) ?? []), account]);
+    });
+
+    const knownLibraryNames = libraries.map((library) => library.name);
+    const knownGroups = knownLibraryNames.filter((library) => accountsByLibrary.has(library));
+    const unmatchedGroups = Array.from(accountsByLibrary.keys())
+        .filter((library) => !knownLibraryNames.includes(library))
+        .sort((a, b) => a.localeCompare(b));
+
+    return [...knownGroups, ...unmatchedGroups].map((library) => ({
+        library,
+        accounts: accountsByLibrary.get(library) ?? [],
+    }));
+}
+
+function formatLastLogin(lastLoginAt: string | null, loginCount: number): string {
+    if (lastLoginAt) {
+        const date = new Date(lastLoginAt);
+        if (!Number.isNaN(date.getTime())) return date.toLocaleString();
+    }
+
+    return loginCount > 0 ? 'Unknown' : 'Never';
+}
+
+function GroupHeading({ library, count }: { library: string; count: number }) {
+    return (
+        <div style={{ marginBottom: '10px' }}>
+            <h3 style={{ fontSize: '0.9rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                {library}
+            </h3>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                {count} account{count === 1 ? '' : 's'}
             </div>
         </div>
     );

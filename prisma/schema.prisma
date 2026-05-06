@@ -38,6 +38,7 @@ model User {
   securityQuestion    String?
   securityAnswerHash  String?
   loginCount          Int             @default(0)
+  lastLoginAt         DateTime?
   createdAt           DateTime        @default(now())
   updatedAt           DateTime        @updatedAt
   usageLogs           UsageLog[]

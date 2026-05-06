@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { requireAuth, isAuthResult } from '@/lib/auth';
-import { resetCreditsIfNeeded } from '@/lib/credits';
+import { renewalIso, resetCreditsIfNeeded, resetLibraryPoolIfNeeded } from '@/lib/credits';
 
 export async function GET(request: NextRequest) {
     const result = await requireAuth(request);
@@ -20,6 +20,7 @@ export async function GET(request: NextRequest) {
             role: true,
             status: true,
             credits: true,
+            creditsResetAt: true,
             library: true,
         },
     });
@@ -31,15 +32,24 @@ export async function GET(request: NextRequest) {
     // For library admins, the "credits" shown in the header is the library's
     // remaining weekly pool — that's what they dispense to patrons.
     let displayCredits = user.credits;
+    let creditsRenewAt = renewalIso(user.creditsResetAt);
     if (user.role === 'ADMIN') {
-        const library = await prisma.library.findUnique({
-            where: { name: user.library },
-            select: { poolRemaining: true },
-        });
-        if (library) displayCredits = library.poolRemaining;
+        const library = await resetLibraryPoolIfNeeded(user.library);
+        if (library) {
+            displayCredits = library.poolRemaining;
+            creditsRenewAt = renewalIso(library.poolResetAt);
+        }
     }
 
     return NextResponse.json({
-        user: { ...user, credits: displayCredits },
+        user: {
+            id: user.id,
+            username: user.username,
+            role: user.role,
+            status: user.status,
+            credits: displayCredits,
+            library: user.library,
+            creditsRenewAt,
+        },
     });
 }

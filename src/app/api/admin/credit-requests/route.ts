@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin, isAuthResult } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { resetLibraryPoolIfNeeded } from '@/lib/credits';
 
 // GET /api/admin/credit-requests — list pending requests for admin's library
 export async function GET(request: NextRequest) {
@@ -81,9 +82,7 @@ export async function PATCH(request: NextRequest) {
 
         // If approved, transfer credits from pool
         if (action === 'APPROVED') {
-            const library = await prisma.library.findUnique({
-                where: { name: admin.library },
-            });
+            const library = await resetLibraryPoolIfNeeded(admin.library);
 
             if (library && library.poolRemaining >= creditReq.amount) {
                 await prisma.library.update({

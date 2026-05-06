@@ -10,6 +10,7 @@ interface User {
     role: 'SUPER_ADMIN' | 'ADMIN' | 'PATRON' | 'GUEST';
     status: 'PENDING' | 'APPROVED' | 'BANNED';
     credits: number;
+    creditsRenewAt: string | null;
     library: string;
 }
 

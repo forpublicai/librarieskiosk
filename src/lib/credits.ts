@@ -1,4 +1,7 @@
+import 'server-only';
+
 import { prisma } from './db';
+import { getFixedWeeklyRenewalWindow, nextFixedWeeklyRenewAt } from './creditRenewalWindow';
 
 export class InsufficientCreditsError extends Error {
     constructor() {
@@ -23,6 +26,102 @@ export const CREDIT_COSTS: Record<string, number> = {
     code: 1,
 };
 
+export const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+const WEEKLY_CREDITS: Record<string, number> = {
+    SUPER_ADMIN: 9999,
+    ADMIN: 1750,
+    PATRON: 100,
+    GUEST: 100,
+};
+
+type DueUser = {
+    id: string;
+    role: string;
+};
+
+type DueLibrary = {
+    name: string;
+    weeklyPool: number;
+};
+
+function hasValidResetDate(resetAt: Date | string | null | undefined): boolean {
+    if (!resetAt) return false;
+    const resetDate = resetAt instanceof Date ? resetAt : new Date(resetAt);
+    return !Number.isNaN(resetDate.getTime());
+}
+
+export function renewalIso(resetAt: Date | string | null | undefined): string | null {
+    if (!hasValidResetDate(resetAt)) return null;
+    return nextFixedWeeklyRenewAt().toISOString();
+}
+
+function weeklyCreditsForRole(role: string): number {
+    return WEEKLY_CREDITS[role] ?? 100;
+}
+
+function weeklyCreditsSqlCase() {
+    return `
+        CASE
+            WHEN "role"::text = 'SUPER_ADMIN' THEN ${WEEKLY_CREDITS.SUPER_ADMIN}
+            WHEN "role"::text = 'ADMIN' THEN ${WEEKLY_CREDITS.ADMIN}
+            WHEN "role"::text = 'PATRON' THEN ${WEEKLY_CREDITS.PATRON}
+            WHEN "role"::text = 'GUEST' THEN ${WEEKLY_CREDITS.GUEST}
+            ELSE 100
+        END
+    `;
+}
+
+async function resetDueUserRows(users: DueUser[], resetBoundary: Date): Promise<number> {
+    const byResetAmount: Record<string, string[]> = {};
+
+    for (const user of users) {
+        const resetAmount = String(weeklyCreditsForRole(user.role));
+        byResetAmount[resetAmount] ??= [];
+        byResetAmount[resetAmount].push(user.id);
+    }
+
+    const results = await Promise.all(Object.entries(byResetAmount).map(([resetAmount, ids]) => (
+        prisma.user.updateMany({
+            where: {
+                id: { in: ids },
+                creditsResetAt: { lt: resetBoundary },
+            },
+            data: {
+                credits: Number(resetAmount),
+                creditsResetAt: resetBoundary,
+            },
+        })
+    )));
+
+    return results.reduce((total, result) => total + result.count, 0);
+}
+
+async function resetDueLibraryRows(libraries: DueLibrary[], resetBoundary: Date): Promise<number> {
+    const byWeeklyPool: Record<string, string[]> = {};
+
+    for (const library of libraries) {
+        const weeklyPool = String(library.weeklyPool);
+        byWeeklyPool[weeklyPool] ??= [];
+        byWeeklyPool[weeklyPool].push(library.name);
+    }
+
+    const results = await Promise.all(Object.entries(byWeeklyPool).map(([weeklyPool, names]) => (
+        prisma.library.updateMany({
+            where: {
+                name: { in: names },
+                poolResetAt: { lt: resetBoundary },
+            },
+            data: {
+                poolRemaining: Number(weeklyPool),
+                poolResetAt: resetBoundary,
+            },
+        })
+    )));
+
+    return results.reduce((total, result) => total + result.count, 0);
+}
+
 /**
  * Calculate credits for a generation based on mode and duration.
  */
@@ -46,26 +145,39 @@ export function calculateCredits(mode: string, durationSeconds?: number): number
 export async function deductCredits(userId: string, amount: number): Promise<number> {
     if (amount <= 0) return (await prisma.user.findUnique({ where: { id: userId }, select: { credits: true } }))?.credits ?? 0;
 
-    const result = await prisma.user.updateMany({
-        where: {
-            id: userId,
-            credits: { gte: amount },
-        },
-        data: {
-            credits: { decrement: amount },
-        },
-    });
+    const { currentResetAt } = getFixedWeeklyRenewalWindow();
+    const weeklyCreditsCase = weeklyCreditsSqlCase();
+    const updated = await prisma.$queryRawUnsafe<{ credits: number }[]>(
+        `
+            UPDATE "User"
+            SET
+                "credits" = CASE
+                    WHEN "creditsResetAt" < $2 THEN (${weeklyCreditsCase}) - $3
+                    ELSE "credits" - $3
+                END,
+                "creditsResetAt" = CASE
+                    WHEN "creditsResetAt" < $2 THEN $2
+                    ELSE "creditsResetAt"
+                END
+            WHERE "id" = $1
+              AND (
+                  CASE
+                      WHEN "creditsResetAt" < $2 THEN (${weeklyCreditsCase})
+                      ELSE "credits"
+                  END
+              ) >= $3
+            RETURNING "credits"
+        `,
+        userId,
+        currentResetAt,
+        amount
+    );
 
-    if (result.count === 0) {
+    if (updated.length === 0) {
         throw new InsufficientCreditsError();
     }
 
-    const user = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { credits: true },
-    });
-
-    return user?.credits ?? 0;
+    return updated[0].credits;
 }
 
 /**
@@ -79,37 +191,84 @@ export async function getBalance(userId: string): Promise<number> {
     return user?.credits ?? 0;
 }
 
-const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
-
-const WEEKLY_CREDITS: Record<string, number> = {
-    SUPER_ADMIN: 9999,
-    ADMIN: 1750,
-    PATRON: 100,
-    GUEST: 100,
-};
-
 /**
  * Reset user credits if a week has passed since their last reset.
  * Returns the updated user or null if no reset was needed.
  */
 export async function resetCreditsIfNeeded(userId: string) {
+    const { currentResetAt } = getFixedWeeklyRenewalWindow();
     const user = await prisma.user.findUnique({
         where: { id: userId },
         select: { id: true, role: true, credits: true, creditsResetAt: true },
     });
     if (!user) return null;
 
-    if (Date.now() >= user.creditsResetAt.getTime() + WEEK_MS) {
-        const resetAmount = WEEKLY_CREDITS[user.role] ?? 100;
-        return prisma.user.update({
-            where: { id: userId },
-            data: {
-                credits: resetAmount,
-                creditsResetAt: new Date(),
-            },
-        });
+    if (user.creditsResetAt >= currentResetAt) return null;
+
+    await resetDueUserRows([user], currentResetAt);
+    return prisma.user.findUnique({ where: { id: userId } });
+}
+
+export async function resetUsersCreditsIfNeeded(userIds: string[]): Promise<number> {
+    const uniqueUserIds = Array.from(new Set(userIds));
+    if (uniqueUserIds.length === 0) return 0;
+
+    const { currentResetAt } = getFixedWeeklyRenewalWindow();
+    const users = await prisma.user.findMany({
+        where: {
+            id: { in: uniqueUserIds },
+            creditsResetAt: { lt: currentResetAt },
+        },
+        select: { id: true, role: true },
+    });
+
+    return resetDueUserRows(users, currentResetAt);
+}
+
+export async function resetAllDueUserCreditsIfNeeded(): Promise<number> {
+    const { currentResetAt } = getFixedWeeklyRenewalWindow();
+    const users = await prisma.user.findMany({
+        where: { creditsResetAt: { lt: currentResetAt } },
+        select: { id: true, role: true },
+    });
+
+    return resetDueUserRows(users, currentResetAt);
+}
+
+export async function resetLibraryPoolIfNeeded(libraryName: string) {
+    const { currentResetAt } = getFixedWeeklyRenewalWindow();
+    const library = await prisma.library.findUnique({
+        where: { name: libraryName },
+    });
+    if (!library) return null;
+
+    if (library.poolResetAt < currentResetAt) {
+        await resetDueLibraryRows([library], currentResetAt);
+        return prisma.library.findUnique({ where: { name: libraryName } });
     }
-    return null;
+
+    return library;
+}
+
+export async function resetLibrariesPoolsIfNeeded(libraryNames?: string[]): Promise<number> {
+    const uniqueLibraryNames = libraryNames ? Array.from(new Set(libraryNames)) : null;
+    if (uniqueLibraryNames && uniqueLibraryNames.length === 0) return 0;
+
+    const { currentResetAt } = getFixedWeeklyRenewalWindow();
+    const libraries = uniqueLibraryNames
+        ? await prisma.library.findMany({
+            where: {
+                name: { in: uniqueLibraryNames },
+                poolResetAt: { lt: currentResetAt },
+            },
+            select: { name: true, weeklyPool: true },
+        })
+        : await prisma.library.findMany({
+            where: { poolResetAt: { lt: currentResetAt } },
+            select: { name: true, weeklyPool: true },
+        });
+
+    return resetDueLibraryRows(libraries, currentResetAt);
 }
 
 /**

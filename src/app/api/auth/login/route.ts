@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { comparePassword, signToken, SESSION_IDLE_MS } from '@/lib/auth';
+import { renewalIso, resetCreditsIfNeeded, resetLibraryPoolIfNeeded } from '@/lib/credits';
 
 export async function POST(request: NextRequest) {
     try {
@@ -66,38 +67,54 @@ export async function POST(request: NextRequest) {
             });
         }
 
-        await prisma.user.update({
+        await resetCreditsIfNeeded(user.id);
+
+        const loggedInUser = await prisma.user.update({
             where: { id: user.id },
-            data: { loginCount: { increment: 1 } },
+            data: {
+                loginCount: { increment: 1 },
+                lastLoginAt: new Date(),
+            },
+            select: {
+                id: true,
+                username: true,
+                role: true,
+                status: true,
+                credits: true,
+                creditsResetAt: true,
+                library: true,
+            },
         });
 
         const token = await signToken({
-            userId: user.id,
-            username: user.username,
-            role: user.role,
-            library: user.library,
+            userId: loggedInUser.id,
+            username: loggedInUser.username,
+            role: loggedInUser.role,
+            library: loggedInUser.library,
             jti,
         });
 
         // Library admins see the library pool as their credit count.
-        let displayCredits = user.credits;
-        if (user.role === 'ADMIN') {
-            const library = await prisma.library.findUnique({
-                where: { name: user.library },
-                select: { poolRemaining: true },
-            });
-            if (library) displayCredits = library.poolRemaining;
+        let displayCredits = loggedInUser.credits;
+        let creditsRenewAt = renewalIso(loggedInUser.creditsResetAt);
+        if (loggedInUser.role === 'ADMIN') {
+            const library = await resetLibraryPoolIfNeeded(loggedInUser.library);
+            if (library) {
+                displayCredits = library.poolRemaining;
+                creditsRenewAt = renewalIso(library.poolResetAt);
+            }
         }
 
         return NextResponse.json({
             token,
             user: {
-                id: user.id,
-                username: user.username,
-                role: user.role,
-                status: user.status,
+                id: loggedInUser.id,
+                username: loggedInUser.username,
+                role: loggedInUser.role,
+                status: loggedInUser.status,
                 credits: displayCredits,
-                library: user.library,
+                library: loggedInUser.library,
+                creditsRenewAt,
             },
         });
     } catch (error) {
