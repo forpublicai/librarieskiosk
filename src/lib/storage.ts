@@ -287,16 +287,17 @@ export async function objectExists(key: string): Promise<boolean> {
 
 export async function generateSignedGetUrl(
     key: string,
-    ttlSeconds?: number
+    ttlSeconds?: number,
+    options?: { downloadFilename?: string }
 ): Promise<string> {
     const env = getR2Env();
     const client = getR2Client();
     const ttl = ttlSeconds ?? env.signedUrlTtlSeconds;
-    return getSignedUrl(
-        client,
-        new GetObjectCommand({ Bucket: env.bucket, Key: key }),
-        { expiresIn: ttl }
-    );
+    const commandInput: Parameters<typeof GetObjectCommand>[0] = { Bucket: env.bucket, Key: key };
+    if (options?.downloadFilename) {
+        commandInput.ResponseContentDisposition = `attachment; filename="${options.downloadFilename}"`;
+    }
+    return getSignedUrl(client, new GetObjectCommand(commandInput), { expiresIn: ttl });
 }
 
 export async function deleteObject(key: string): Promise<void> {

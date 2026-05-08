@@ -4,6 +4,8 @@ import { useState, FormEvent, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
 import Header from '@/components/Header';
+import GuidePanel from '@/components/GuidePanel';
+import CoachmarkTour from '@/components/CoachmarkTour';
 import { refreshMediaUrl } from '@/lib/mediaClient';
 import { useGenerationProgress, formatElapsed } from '@/hooks/useGenerationProgress';
 import { loadGuestState, saveGuestState } from '@/lib/guestSession';
@@ -45,6 +47,7 @@ export default function ImagePage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [sessions, setSessions] = useState<SessionItem[]>([]);
+    const [guideOpen, setGuideOpen] = useState(false);
     const isGuest = user?.role === 'GUEST';
     const hydratedRef = useRef(false);
     const progress = useGenerationProgress({
@@ -94,6 +97,34 @@ export default function ImagePage() {
         const fresh = await refreshMediaUrl(currentSessionId, token, { force: true });
         if (fresh?.url) setImageUrl(fresh.url);
     }, [currentSessionId, token]);
+
+    const handleDownload = useCallback(async () => {
+        if (!imageUrl) return;
+        if (currentSessionId && token) {
+            try {
+                const res = await fetch(
+                    `/api/media-sessions/${currentSessionId}/url?download=true`,
+                    { headers: { Authorization: `Bearer ${token}` } }
+                );
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.url) { window.location.href = data.url; return; }
+                }
+            } catch { /* fall through */ }
+        }
+        try {
+            const res = await fetch(imageUrl);
+            const blob = await res.blob();
+            const objectUrl = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = objectUrl;
+            a.download = 'generated-image.png';
+            a.click();
+            URL.revokeObjectURL(objectUrl);
+        } catch {
+            window.open(imageUrl, '_blank');
+        }
+    }, [imageUrl, currentSessionId, token]);
 
     const refreshSessionItemUrl = useCallback(
         async (id: string) => {
@@ -180,10 +211,19 @@ export default function ImagePage() {
 
     return (
         <div className="page-container">
-            <Header title="Images" />
+            <Header title="Images" actions={
+                <button
+                    className={`guide-toggle-btn${guideOpen ? ' guide-toggle-btn--active' : ''}`}
+                    onClick={() => setGuideOpen(o => !o)}
+                    data-tour="guide-btn"
+                >
+                    <span className="guide-toggle-icon">?</span>
+                    Learning Guide
+                </button>
+            } />
 
             <div className="gen-container">
-                <aside className="gen-sidebar">
+                <aside className="gen-sidebar" data-tour="image-sidebar">
                     <h2 className="form-label" style={{ marginBottom: '20px' }}>History</h2>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                         {sessions.length === 0 && (
@@ -240,7 +280,7 @@ export default function ImagePage() {
 
                 <main className="gen-main">
                     <div style={{ width: '100%', maxWidth: '800px' }}>
-                        <form className="gen-prompt-area" onSubmit={handleGenerate}>
+                        <form className="gen-prompt-area" onSubmit={handleGenerate} data-tour="image-prompt">
                             <label className="form-label">Describe the image you want to create</label>
                             <div style={{ display: 'flex' }}>
                                 <input
@@ -261,11 +301,16 @@ export default function ImagePage() {
                                     {loading ? '...' : 'Generate'}
                                 </button>
                             </div>
+                            <div className="example-prompts">
+                                <span className="example-prompts-label">Try:</span>
+                                <button type="button" className="example-chip" onClick={() => setPrompt('A peaceful sunset over the ocean')}>A peaceful sunset over the ocean</button>
+                                <button type="button" className="example-chip" onClick={() => setPrompt('A friendly robot exploring a forest')}>A friendly robot exploring a forest</button>
+                            </div>
                         </form>
 
                         {error && <div className="gen-error" style={{ marginBottom: '20px' }}>{error}</div>}
 
-                        <div className="gen-result-area">
+                        <div className="gen-result-area" data-tour="image-result">
                             {loading && (
                                 <div className="gen-loading">
                                     <div className="gen-spinner" />
@@ -284,15 +329,12 @@ export default function ImagePage() {
                                         className="gen-image-result"
                                         onError={refreshMainUrl}
                                     />
-                                    <a
-                                        href={imageUrl}
-                                        download="generated-image.png"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
+                                    <button
                                         className="btn"
+                                        onClick={handleDownload}
                                     >
                                         Download Image
-                                    </a>
+                                    </button>
                                 </div>
                             )}
 
@@ -305,7 +347,10 @@ export default function ImagePage() {
                         </div>
                     </div>
                 </main>
+
+                <GuidePanel tool="image" isOpen={guideOpen} />
             </div>
+            <CoachmarkTour tool="image" />
         </div>
     );
 }

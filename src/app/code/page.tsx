@@ -4,6 +4,8 @@ import { useState, useRef, useEffect, useCallback, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
 import Header from '@/components/Header';
+import GuidePanel from '@/components/GuidePanel';
+import CoachmarkTour from '@/components/CoachmarkTour';
 import { formatAssistantMessage } from '@/lib/formatMessage';
 import { useGenerationProgress, formatElapsed } from '@/hooks/useGenerationProgress';
 import { loadGuestState, saveGuestState } from '@/lib/guestSession';
@@ -45,6 +47,7 @@ export default function CodePage() {
     const [codeBlocks, setCodeBlocks] = useState<Array<{ lang: string; code: string }>>([]);
     const [conversations, setConversations] = useState<ConversationSummary[]>([]);
     const [activeConvId, setActiveConvId] = useState<string | null>(null);
+    const [guideOpen, setGuideOpen] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const isGuest = user?.role === 'GUEST';
@@ -250,11 +253,21 @@ export default function CodePage() {
 
     return (
         <div className="page-container">
-            <Header title="Code Assistant" />
+            <Header title="Code Assistant" actions={
+                <button
+                    className={`guide-toggle-btn${guideOpen ? ' guide-toggle-btn--active' : ''}`}
+                    onClick={() => setGuideOpen(o => !o)}
+                    data-tour="guide-btn"
+                >
+                    <span className="guide-toggle-icon">?</span>
+                    Learning Guide
+                </button>
+            } />
 
-            <div className="code-container" style={{ gridTemplateColumns: '260px 1fr 1fr' }}>
+            <div className="gen-container">
+            <div className="code-container" style={{ gridTemplateColumns: '260px 1fr 1fr', flex: 1 }}>
                 {/* History sidebar */}
-                <aside className="gen-sidebar" style={{ width: 'auto', minWidth: 0 }}>
+                <aside className="gen-sidebar" style={{ width: 'auto', minWidth: 0 }} data-tour="code-sidebar">
                     <button className="btn btn-primary" onClick={handleNewChat} style={{ width: '100%', marginBottom: '24px', fontSize: '0.8rem' }}>
                         + New Project
                     </button>
@@ -292,7 +305,7 @@ export default function CodePage() {
                 </aside>
 
                 {/* Chat pane */}
-                <div className="code-chat-pane">
+                <div className="code-chat-pane" data-tour="code-chat">
                     <div className="chat-messages" style={{ flex: 1, overflowY: 'auto' }}>
                         {messages.length === 0 && (
                             <div className="gen-empty" style={{ margin: 'auto' }}>
@@ -326,6 +339,13 @@ export default function CodePage() {
                     </div>
 
                     <div className="chat-input-area">
+                        {messages.length === 0 && !isStreaming && (
+                            <div className="example-prompts" style={{ marginBottom: '8px' }}>
+                                <span className="example-prompts-label">Try:</span>
+                                <button type="button" className="example-chip" onClick={() => setInput('Build a simple to-do list webpage')}>Build a simple to-do list webpage</button>
+                                <button type="button" className="example-chip" onClick={() => setInput('Write a function to reverse a string')}>Write a function to reverse a string</button>
+                            </div>
+                        )}
                         <form className="chat-input-wrapper" onSubmit={handleSubmit}>
                             <input
                                 className="chat-input"
@@ -343,7 +363,7 @@ export default function CodePage() {
                 </div>
 
                 {/* Code output pane */}
-                <div className="code-editor-pane">
+                <div className="code-editor-pane" data-tour="code-output">
                     <div className="code-editor-header">
                         <span>{latestCode ? `// ${latestCode.lang}` : '// Code Output'}</span>
                         {latestCode && (
@@ -369,6 +389,10 @@ export default function CodePage() {
                     </div>
                 </div>
             </div>
+
+                <GuidePanel tool="code" isOpen={guideOpen} />
+            </div>
+            <CoachmarkTour tool="code" />
         </div>
     );
 }

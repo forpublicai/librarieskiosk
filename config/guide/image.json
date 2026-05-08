@@ -1,0 +1,153 @@
+{
+  "whatIsIt": {
+    "tier1": "This is an image creation tool. You describe what you want to see — a scene, an object, a style — and it creates an image for you. No drawing or design skills needed.",
+    "tier2": "This is an AI-powered image generation tool. It uses a model trained on large amounts of visual data to generate images from your prompts (text descriptions). The more descriptive your prompt, the more control you have over the result.",
+    "tier3": "This is an AI-powered image generation tool that generates images from your text prompts. Familiarity with prompting techniques — specifying style, lighting, composition, and aspect ratio — will give you more precise and repeatable results."
+  },
+  "useCases": [
+    {
+      "id": "custom-artwork",
+      "label": "Create a custom image or artwork — for personal projects, gifts, or creative exploration",
+      "gettingStarted": {
+        "intro": "Type a description of what you want to see in the prompt field. Here's an example to get you started:",
+        "examplePrompt": "A [subject] in [setting], [lighting or mood], [art style if you have one in mind]",
+        "tips": [
+          "For example: \"A golden retriever sitting in a sunny park, warm afternoon light, watercolor style.\"",
+          "The more detail you include, the closer the result will be to what you imagined. Adding words like \"photorealistic,\" \"cartoon,\" \"vintage poster,\" or \"oil painting\" will change the look significantly.",
+          "Not sure what details to include? Ask the chat tool first: \"What details should I include in an image prompt for [what you want to create]?\" Then use that answer here.",
+          "Your previous generations appear in the History panel on the left — use them as a reference when refining."
+        ],
+        "cautions": [
+          "Do not create images of real, identifiable people without their permission.",
+          "Avoid generating anything that could be misleading, harmful, or used to deceive others."
+        ]
+      }
+    },
+    {
+      "id": "marketing-materials",
+      "label": "Generate or mockup marketing materials like posters, flyers, or social media visuals for your business",
+      "gettingStarted": {
+        "intro": "Describe the type of material you need, what it's for, and the look and feel you want. Here's an example to get you started:",
+        "examplePrompt": "A [type of material] for my [type of business] promoting [product/event/offer]. Style: [bold/clean/warm/colorful]. Include [any key visual elements].",
+        "tips": [
+          "For example: \"A social media flyer for my food truck promoting a summer special. Style: bold and colorful with a fun street food vibe.\"",
+          "Be specific about the platform or format if you have one in mind — a social media post, a printed flyer, and a poster all have different proportions and visual weight. Mention this in your prompt for better results.",
+          "Not sure what style fits your business? Ask the chat tool first: \"What visual style would work well for a [type of business] marketing flyer?\" Then use that answer to shape your prompt.",
+          "If the first result isn't quite right, tweak one element — the color palette, the mood, or the layout description — and generate again."
+        ],
+        "cautions": [
+          "The image tool generates flat image files that cannot be edited after download. If your marketing material needs specific text — like a phone number, address, or price — use the generated image as a visual base and add text using a free design tool like canva.com.",
+          "Review the image carefully before using it publicly. AI-generated visuals can sometimes include distorted text or unusual details that need to be caught before publishing."
+        ]
+      }
+    },
+    {
+      "id": "product-photos",
+      "label": "Generate product photos or promotional visuals for your small business",
+      "gettingStarted": {
+        "intro": "Describe your product, how you want it to look, and the setting or background you have in mind. Here's an example to get you started:",
+        "examplePrompt": "A product photo of [product description] on a [background]. Lighting: [natural/studio/warm/bright]. Style: [photorealistic/clean/lifestyle].",
+        "tips": [
+          "For example: \"A product photo of a handmade silver bracelet on a white marble surface. Lighting: soft and natural. Style: photorealistic and clean.\"",
+          "Think about how you want the product to feel — a rustic background suits handmade goods, a clean white background suits professional or commercial products, and a lifestyle setting (like a coffee on a cafe table) suits food and drink businesses.",
+          "Not sure how to describe your product effectively? Ask the chat tool first: \"What details should I include in a prompt to generate a professional product photo for [your product]?\" Then use that answer here.",
+          "If the result doesn't look quite right, try adjusting the background, lighting, or style description one at a time."
+        ],
+        "cautions": [
+          "Before using a generated image publicly, review it carefully for any unusual details — AI image tools can sometimes produce distorted text, extra fingers on hands, or other small errors that are easy to miss at first glance. If everything looks right, the image is ready to use.",
+          "Do not include personal or business details like your address or pricing in your prompt.",
+          "AI-generated images may have restrictions on commercial use. Check the tool's terms of service or ask a librarian before using generated product photos in paid advertising or on e-commerce listings."
+        ]
+      }
+    },
+    {
+      "id": "other",
+      "label": "I have something else in mind",
+      "gettingStarted": null
+    }
+  ],
+  "faqs": {
+    "concept": [
+      {
+        "q": "What is AI?",
+        "a": "AI stands for Artificial Intelligence. It refers to computer programs that can do things that normally require human thinking — like answering questions, writing text, or creating images. The tools on this kiosk are all powered by AI."
+      },
+      {
+        "q": "What is a large language model (LLM)?",
+        "a": "A large language model is a type of AI that learned from reading a huge amount of text — books, articles, and websites. That's how it learned to understand and respond to your questions in plain language. Think of it as a very well-read assistant."
+      },
+      {
+        "q": "What is open source?",
+        "a": "Open source means the technology behind the tool is publicly available — not owned or locked away by one company. It's a bit like a recipe that anyone can read, use, or improve. The image tool on this kiosk uses an open source model."
+      },
+      {
+        "q": "What is a prompt?",
+        "a": "A prompt is simply what you type into the tool — your description of the image you want to create. The clearer and more detailed your prompt, the closer the result will be to what you had in mind. For example: \"a golden retriever sitting in a sunny park, warm afternoon light, watercolor style\" or \"a professional headshot of a woman in a business suit, plain white background.\""
+      },
+      {
+        "q": "What is an AI-generated image?",
+        "a": "An AI-generated image is a picture created entirely by a computer program based on your text description. No photographer, artist, or designer is involved — the tool interprets your words and produces a visual from scratch. The results can range from photorealistic to illustrated depending on what you ask for."
+      },
+      {
+        "q": "What is art style?",
+        "a": "Art style refers to the visual look and feel of an image — whether it looks like a photograph, a painting, a cartoon, or something else. You can describe a style by naming it directly or by describing what you want it to look like. Some examples: \"watercolor painting,\" \"photorealistic,\" \"cartoon,\" \"vintage poster,\" \"oil painting,\" \"pencil sketch,\" \"comic book style.\" Adding a style to your prompt gives the tool more direction and usually improves the result."
+      },
+      {
+        "q": "How does the image tool decide what to create?",
+        "a": "The tool was trained on a large amount of images and their descriptions. When you type a prompt, it uses what it learned to generate an image that matches your words as closely as it can. It doesn't copy existing images — it creates something new each time based on patterns it learned during training."
+      }
+    ],
+    "practical": [
+      {
+        "q": "What should I include in my image description?",
+        "a": "Try to describe the main subject, the setting, the mood or lighting, and a style if you have one in mind. For example: \"a cozy coffee shop at night, warm golden lighting, illustrated style.\" You don't need all of these every time — even a simple description like \"a cat sitting on a windowsill\" will produce a result. Adding more detail just gives you more control."
+      },
+      {
+        "q": "How do I get results that look more like what I imagined?",
+        "a": "Add more specific detail to your prompt. Describe the lighting, the colors, the mood, and the style. If the result is close but not quite right, tweak one or two details and generate again. For example, if the image looks too dark, add \"bright lighting\" or \"daylight\" to your description. It often takes a few tries to get exactly what you want."
+      },
+      {
+        "q": "What art styles can I ask for?",
+        "a": "You can ask for a wide range of styles. Some popular ones include: photorealistic, watercolor, oil painting, pencil sketch, cartoon, comic book, vintage poster, minimalist, abstract, and anime. You can also describe a style without naming it — for example \"soft and dreamy\" or \"bold and colorful.\" Experimenting with different styles is part of the fun."
+      },
+      {
+        "q": "Can I generate multiple images at once?",
+        "a": "No — the tool generates one image at a time. If you want to compare different ideas, generate them one after another and use the History panel on the left to review and compare."
+      },
+      {
+        "q": "How many credits does generating an image cost?",
+        "a": "Each image generation uses a set number of credits. You can see the credit cost displayed on the interface before you generate. To make the most of your credits, refine your prompt before generating rather than generating many times with vague descriptions."
+      },
+      {
+        "q": "Can I download or save my generated image?",
+        "a": "Yes — once your image is generated it will appear on screen. You can download it by clicking the \"Download Image\" button below the image. Your previous creations also appear in the History panel on the left so you can revisit them during your session."
+      },
+      {
+        "q": "What file format is the downloaded image?",
+        "a": "Your generated image will be downloaded as a JPEG file."
+      },
+      {
+        "q": "What is a JPEG file?",
+        "a": "A JPEG is one of the most common image file formats. It's how most photos and images are stored and shared digitally. You can open a JPEG on almost any device — phone, tablet, or computer — and it can be inserted into documents, shared by email, or posted on social media. Think of it the same way you would a photo you take on your phone."
+      },
+      {
+        "q": "What happens if I don't like the result?",
+        "a": "Adjust your description and generate again. Try adding more detail, changing the style, or describing the mood differently. Small changes to your prompt can produce very different results. You can also look back at your history to compare previous generations and identify what worked best."
+      }
+    ],
+    "criticalUse": [
+      {
+        "q": "Can I generate images of real people?",
+        "a": "You can describe general types of people — \"a young woman in a red coat\" — but you should not attempt to generate realistic images of specific real, identifiable people without their permission. Creating images that could be mistaken for real photos of real people raises serious ethical and legal concerns."
+      },
+      {
+        "q": "Are there types of images I should not generate?",
+        "a": "Yes. Do not generate images that are violent, sexually explicit, hateful, or that could be used to deceive or harm others. Do not generate images designed to look like real news photographs or that depict real people in misleading situations. This is a public tool and responsible use is expected."
+      },
+      {
+        "q": "Can AI images be mistaken for real photographs?",
+        "a": "Yes — AI-generated images can look very realistic and convincing. Be transparent about how an image was made if you share it with others, especially in professional or public contexts. Using AI-generated images to mislead people — for example, presenting a generated photo as a real one — is considered dishonest and can have serious consequences."
+      }
+    ]
+  }
+}

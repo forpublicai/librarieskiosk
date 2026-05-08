@@ -190,6 +190,11 @@ export default function DashboardPage() {
                         </a>
                     )}
                 </div>
+
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '24px', marginTop: '40px', fontSize: '0.85rem', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    <a href="/resources" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Resources</a>
+                    <a href="/faqs" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>FAQs</a>
+                </div>
             </main>
 
             <footer style={{ padding: '40px', borderTop: '1px solid var(--border-color)', textAlign: 'center', fontSize: '0.8rem', color: 'var(--text-muted)' }}>

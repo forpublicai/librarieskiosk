@@ -405,7 +405,7 @@ export async function finalizeVideoUpload({
     // Atomic claim: only one concurrent poller wins
     const claim = await prisma.mediaSession.updateMany({
         where: { id: row.id, storageStatus: 'PENDING' },
-        data: { storageStatus: 'UPLOADING' },
+        data: { storageStatus: 'UPLOADING', resultUrl: providerVideoUrl },
     });
 
     if (claim.count === 0) {
@@ -464,6 +464,7 @@ export async function finalizeVideoUpload({
             data: {
                 storageStatus: 'FAILED',
                 sourceProviderUrl: providerVideoUrl,
+                resultUrl: providerVideoUrl,
             },
         });
         console.error('finalizeVideoUpload failed', err);

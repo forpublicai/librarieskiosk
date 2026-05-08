@@ -4,6 +4,8 @@ import { useState, FormEvent, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
 import Header from '@/components/Header';
+import GuidePanel from '@/components/GuidePanel';
+import CoachmarkTour from '@/components/CoachmarkTour';
 import { refreshMediaUrl } from '@/lib/mediaClient';
 import { useGenerationProgress, formatElapsed } from '@/hooks/useGenerationProgress';
 import { loadGuestState, saveGuestState } from '@/lib/guestSession';
@@ -47,6 +49,7 @@ export default function VideoPage() {
     const [status, setStatus] = useState<string>('');
     const [error, setError] = useState('');
     const [sessions, setSessions] = useState<SessionItem[]>([]);
+    const [guideOpen, setGuideOpen] = useState(false);
     const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const isGuest = user?.role === 'GUEST';
     const hydratedRef = useRef(false);
@@ -104,6 +107,34 @@ export default function VideoPage() {
         const fresh = await refreshMediaUrl(currentSessionId, token, { force: true });
         if (fresh?.url) setVideoUrl(fresh.url);
     }, [currentSessionId, token]);
+
+    const handleDownload = useCallback(async () => {
+        if (!videoUrl) return;
+        if (currentSessionId && token) {
+            try {
+                const res = await fetch(
+                    `/api/media-sessions/${currentSessionId}/url?download=true`,
+                    { headers: { Authorization: `Bearer ${token}` } }
+                );
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.url) { window.location.href = data.url; return; }
+                }
+            } catch { /* fall through */ }
+        }
+        try {
+            const res = await fetch(videoUrl);
+            const blob = await res.blob();
+            const objectUrl = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = objectUrl;
+            a.download = 'generated-video.mp4';
+            a.click();
+            URL.revokeObjectURL(objectUrl);
+        } catch {
+            window.open(videoUrl, '_blank');
+        }
+    }, [videoUrl, currentSessionId, token]);
 
     const pollStatus = async (id: string) => {
         try {
@@ -185,10 +216,19 @@ export default function VideoPage() {
 
     return (
         <div className="page-container">
-            <Header title="Videos" />
+            <Header title="Videos" actions={
+                <button
+                    className={`guide-toggle-btn${guideOpen ? ' guide-toggle-btn--active' : ''}`}
+                    onClick={() => setGuideOpen(o => !o)}
+                    data-tour="guide-btn"
+                >
+                    <span className="guide-toggle-icon">?</span>
+                    Learning Guide
+                </button>
+            } />
 
             <div className="gen-container">
-                <aside className="gen-sidebar">
+                <aside className="gen-sidebar" data-tour="video-sidebar">
                     <h2 className="form-label" style={{ marginBottom: '20px' }}>History</h2>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                         {sessions.length === 0 && (
@@ -207,17 +247,19 @@ export default function VideoPage() {
                                     transition: 'background 0.2s',
                                 }}
                                 onClick={async () => {
-                                    // Set ID immediately so refresh handler knows which session
                                     setCurrentSessionId(s.id);
-                                    // Legacy rows may have a direct url; R2-backed rows need a
-                                    // presigned URL fetched on-demand.
+                                    setError('');
                                     if (s.url) {
                                         setVideoUrl(s.url);
                                         return;
                                     }
-                                    if (s.hasObject && token) {
-                                        const fresh = await refreshMediaUrl(s.id, token);
-                                        if (fresh?.url) setVideoUrl(fresh.url);
+                                    setVideoUrl(null);
+                                    if (!token) return;
+                                    const fresh = await refreshMediaUrl(s.id, token);
+                                    if (fresh?.url) {
+                                        setVideoUrl(fresh.url);
+                                    } else {
+                                        setError('This video is no longer available.');
                                     }
                                 }}
                             >
@@ -236,7 +278,7 @@ export default function VideoPage() {
                     <div style={{ width: '100%', maxWidth: '800px' }}>
                         <form className="gen-prompt-area" onSubmit={handleGenerate}>
                             <label className="form-label">Describe the video you want to create</label>
-                            <div style={{ display: 'flex' }}>
+                            <div style={{ display: 'flex' }} data-tour="video-prompt">
                                 <input
                                     className="input"
                                     value={prompt}
@@ -255,8 +297,13 @@ export default function VideoPage() {
                                     {loading ? '...' : 'Generate'}
                                 </button>
                             </div>
+                            <div className="example-prompts">
+                                <span className="example-prompts-label">Try:</span>
+                                <button type="button" className="example-chip" onClick={() => setPrompt('Waves crashing on a beach at sunset')}>Waves crashing on a beach at sunset</button>
+                                <button type="button" className="example-chip" onClick={() => setPrompt('A butterfly landing on a flower')}>A butterfly landing on a flower</button>
+                            </div>
 
-                            <div className="duration-slider">
+                            <div className="duration-slider" data-tour="video-duration">
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                     <label className="form-label" style={{ margin: 0 }}>Duration: {duration}s</label>
                                     <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>
@@ -282,7 +329,7 @@ export default function VideoPage() {
 
                         {error && <div className="gen-error" style={{ marginBottom: '20px' }}>{error}</div>}
 
-                        <div className="gen-result-area">
+                        <div className="gen-result-area" data-tour="video-result">
                             {loading && (
                                 <div className="gen-loading">
                                     <div className="gen-spinner" />
@@ -309,15 +356,12 @@ export default function VideoPage() {
                                         onError={refreshMainUrl}
                                         style={{ maxWidth: '100%', maxHeight: '500px', border: '1px solid var(--border-color)' }}
                                     />
-                                    <a
-                                        href={videoUrl}
-                                        download="generated-video.mp4"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
+                                    <button
                                         className="btn"
+                                        onClick={handleDownload}
                                     >
                                         Download Video
-                                    </a>
+                                    </button>
                                 </div>
                             )}
 
@@ -330,7 +374,10 @@ export default function VideoPage() {
                         </div>
                     </div>
                 </main>
+
+                <GuidePanel tool="video" isOpen={guideOpen} />
             </div>
+            <CoachmarkTour tool="video" />
         </div>
     );
 }

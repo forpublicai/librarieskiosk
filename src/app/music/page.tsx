@@ -4,6 +4,8 @@ import { useState, FormEvent, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
 import Header from '@/components/Header';
+import GuidePanel from '@/components/GuidePanel';
+import CoachmarkTour from '@/components/CoachmarkTour';
 import { refreshMediaUrl } from '@/lib/mediaClient';
 import { useGenerationProgress, formatElapsed } from '@/hooks/useGenerationProgress';
 import { loadGuestState, saveGuestState } from '@/lib/guestSession';
@@ -47,6 +49,7 @@ export default function MusicPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [sessions, setSessions] = useState<SessionItem[]>([]);
+    const [guideOpen, setGuideOpen] = useState(false);
     const isGuest = user?.role === 'GUEST';
     const hydratedRef = useRef(false);
     const progress = useGenerationProgress({
@@ -99,6 +102,35 @@ export default function MusicPage() {
         const fresh = await refreshMediaUrl(currentSessionId, token, { force: true });
         if (fresh?.url) setAudioUrl(fresh.url);
     }, [currentSessionId, token]);
+
+    const handleDownload = useCallback(async () => {
+        if (!audioUrl) return;
+        if (currentSessionId && token) {
+            try {
+                const res = await fetch(
+                    `/api/media-sessions/${currentSessionId}/url?download=true`,
+                    { headers: { Authorization: `Bearer ${token}` } }
+                );
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.url) { window.location.href = data.url; return; }
+                }
+            } catch { /* fall through */ }
+        }
+        // Fallback for legacy/guest URLs: blob download
+        try {
+            const res = await fetch(audioUrl);
+            const blob = await res.blob();
+            const objectUrl = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = objectUrl;
+            a.download = 'generated-track.mp3';
+            a.click();
+            URL.revokeObjectURL(objectUrl);
+        } catch {
+            window.open(audioUrl, '_blank');
+        }
+    }, [audioUrl, currentSessionId, token]);
 
     const handleGenerate = async (e: FormEvent) => {
         e.preventDefault();
@@ -161,10 +193,19 @@ export default function MusicPage() {
 
     return (
         <div className="page-container">
-            <Header title="Music" />
+            <Header title="Music" actions={
+                <button
+                    className={`guide-toggle-btn${guideOpen ? ' guide-toggle-btn--active' : ''}`}
+                    onClick={() => setGuideOpen(o => !o)}
+                    data-tour="guide-btn"
+                >
+                    <span className="guide-toggle-icon">?</span>
+                    Learning Guide
+                </button>
+            } />
 
             <div className="gen-container">
-                <aside className="gen-sidebar">
+                <aside className="gen-sidebar" data-tour="music-sidebar">
                     <h2 className="form-label" style={{ marginBottom: '20px' }}>History</h2>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                         {sessions.length === 0 && (
@@ -207,7 +248,7 @@ export default function MusicPage() {
 
                 <main className="gen-main">
                     <div style={{ width: '100%', maxWidth: '800px' }}>
-                        <form className="gen-prompt-area" onSubmit={handleGenerate}>
+                        <form className="gen-prompt-area" onSubmit={handleGenerate} data-tour="music-form">
                             <div className="form-group">
                                 <label className="form-label">Style &amp; Mood</label>
                                 <input
@@ -218,6 +259,11 @@ export default function MusicPage() {
                                     disabled={loading}
                                     autoFocus
                                 />
+                            </div>
+                            <div className="example-prompts">
+                                <span className="example-prompts-label">Try:</span>
+                                <button type="button" className="example-chip" onClick={() => setPrompt('Calm piano music for focus')}>Calm piano music for focus</button>
+                                <button type="button" className="example-chip" onClick={() => setPrompt('Upbeat jazz with a happy mood')}>Upbeat jazz with a happy mood</button>
                             </div>
 
                             {!instrumental && (
@@ -258,7 +304,7 @@ export default function MusicPage() {
                             </div>
 
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem' }}>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem' }} data-tour="music-instrumental">
                                     <input
                                         type="checkbox"
                                         checked={instrumental}
@@ -281,7 +327,7 @@ export default function MusicPage() {
 
                         {error && <div className="gen-error" style={{ marginBottom: '20px' }}>{error}</div>}
 
-                        <div className="gen-result-area" style={{ minHeight: '250px' }}>
+                        <div className="gen-result-area" style={{ minHeight: '250px' }} data-tour="music-result">
                             {loading && (
                                 <div className="gen-loading">
                                     <div className="gen-spinner" />
@@ -301,15 +347,12 @@ export default function MusicPage() {
                                         onError={refreshMainUrl}
                                         style={{ width: '100%', maxWidth: '600px' }}
                                     />
-                                    <a
-                                        href={audioUrl}
-                                        download="generated-track.mp3"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
+                                    <button
                                         className="btn"
+                                        onClick={handleDownload}
                                     >
                                         Download Audio
-                                    </a>
+                                    </button>
                                 </div>
                             )}
 
@@ -322,7 +365,10 @@ export default function MusicPage() {
                         </div>
                     </div>
                 </main>
+
+                <GuidePanel tool="music" isOpen={guideOpen} />
             </div>
+            <CoachmarkTour tool="music" />
         </div>
     );
 }

@@ -23,6 +23,7 @@ export async function GET(request: NextRequest) {
             mode: true,
             prompt: true,
             resultUrl: true,
+            sourceProviderUrl: true,
             objectKey: true,
             thumbnailKey: true,
             mimeType: true,
@@ -62,10 +63,12 @@ export async function GET(request: NextRequest) {
             }
 
             // Legacy rows without objectKey keep returning resultUrl so old
-            // history still renders during the compat window.
+            // history still renders during the compat window. For video sessions
+            // where R2 upload failed, sourceProviderUrl is the last-resort
+            // fallback (the original provider URL stored at failure time).
             const legacyUrl =
                 row.storageStatus !== 'UPLOADED' || !row.objectKey
-                    ? row.resultUrl
+                    ? (row.resultUrl ?? row.sourceProviderUrl)
                     : null;
 
             return {

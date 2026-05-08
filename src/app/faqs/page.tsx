@@ -29,6 +29,10 @@ const PATRON_FAQS: FAQItem[] = [
     a: 'Your First Visit: Simply let your librarian know you\'d like to create a personal Public AI account. Once they have authorized your registration, you can log in with your credentials to access the full suite of tools.\n\nReturning Visits: On subsequent visits, you can simply log in to your secure account and pick up exactly where you left off!',
   },
   {
+    q: 'If I forgot my password, how can I reset it?',
+    a: 'No problem – just click the "Forgot Password" option on the login screen. You\'ll be asked to answer the security question you set up when you created your account, and then you can choose a new password.',
+  },
+  {
     q: 'Is my data safe?',
     a: 'Yes. Privacy is a core feature of this kiosk. Because you have a dedicated account, your work and history are private to you. We utilize industry-leading Large Language Models (LLMs) that adhere to strict data protection and security standards.',
   },

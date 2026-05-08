@@ -1,0 +1,191 @@
+{
+  "whatIsIt": {
+    "tier1": "This is a coding assistant. You can use it to help you build simple websites, apps, or tools by describing what you want in plain language. You don't need to know how to code to get started — it will guide you through the process.",
+    "tier2": "This is an AI-powered coding assistant. It can write, explain, and debug code across multiple programming languages. It's useful for both beginners learning to code and those with experience who want to move faster or get unstuck.",
+    "tier3": "This is an AI-powered coding assistant with strong capabilities across languages and frameworks. It can generate, refactor, explain, and debug code. Understanding how to frame technical problems clearly — specifying language, constraints, and desired behavior — will help you get more accurate and usable outputs."
+  },
+  "useCases": [
+    {
+      "id": "build-website",
+      "label": "Build a simple website or personal webpage",
+      "gettingStarted": {
+        "intro": "Describe what you want in plain language in the chat panel on the left — you do not need to know any code.",
+        "examplePrompt": "Build me a [type of page] for [purpose]. Include [element 1], [element 2], and [element 3].",
+        "tips": [
+          "For example: \"Build me a one-page website for my small bakery. Include the business name, a short description, our opening hours, and a contact email.\"",
+          "Not sure what to ask for? Try: \"What information do you need from me to build a simple [type] webpage?\" and let the tool guide you.",
+          "Your generated code will appear in the Code Output panel on the right. You don't need to understand it — just ask follow-up questions to make changes, like \"can you add a photo section?\" or \"can you change the colors to blue and white?\""
+        ],
+        "cautions": [
+          "Do not include your home address, phone number, or any passwords in what you ask the tool to build.",
+          "Review anything the tool generates before using it — it can occasionally make errors or include placeholder details that need to be replaced with your real information."
+        ]
+      }
+    },
+    {
+      "id": "build-app",
+      "label": "Build a simple app, tool, or script to solve a problem or automate a task",
+      "gettingStarted": {
+        "intro": "Describe the problem you want to solve or the task you want to automate in plain language.",
+        "examplePrompt": "Build me a [type of tool or script] that [does what]. It should [any specific requirements].",
+        "tips": [
+          "For example: \"Build me a simple tool that calculates how much tip to leave based on a bill amount\" or \"Write a script that automatically renames a folder of files by adding today's date to each filename.\"",
+          "Be specific about what triggers the task and what the end result should look like. The more clearly you describe the problem, the better the tool will understand what to build.",
+          "Not sure how to describe what you need? Try asking: \"What information do you need from me to build a simple tool that [does what you want]?\" and let it guide you.",
+          "Your generated code will appear in the Code Output panel on the right. Ask follow-up questions to refine it — like \"can you make it work for multiple files at once?\" or \"can you add a way to undo the changes?\""
+        ],
+        "cautions": [
+          "Do not include passwords, account details, or sensitive data in your prompt. If your tool needs to connect to a service or account, describe it in general terms and add the real details yourself afterward.",
+          "Review the generated code before running it — especially for scripts that make changes to files or data. Ask the tool to explain what the code does before you use it."
+        ]
+      }
+    },
+    {
+      "id": "understand-code",
+      "label": "Understand what a piece of code you're looking at does or means",
+      "gettingStarted": {
+        "intro": "Paste the code you want to understand into the chat panel on the left and ask the tool to explain it.",
+        "examplePrompt": "Can you explain what this code does in plain language? [paste your code here]",
+        "tips": [
+          "If the explanation is too technical, ask the tool to simplify: \"Can you explain that like I have never seen code before?\"",
+          "If you want to understand a specific part rather than the whole thing, highlight just that section and ask: \"What does this specific part do: [paste the section]?\"",
+          "You can also ask follow-up questions to go deeper — \"Why is this line necessary?\" or \"What would happen if I removed this part?\"",
+          "Not sure what questions to ask? Try: \"What are the most important things to understand about this piece of code?\""
+        ],
+        "cautions": [
+          "Remove any passwords, API keys, or sensitive credentials from the code before pasting it into the chat. Replace them with placeholders like [PASSWORD] or [API KEY].",
+          "The tool's explanation is a starting point — if you're working with code that will be used for something important, always have someone with coding experience verify your understanding."
+        ]
+      }
+    },
+    {
+      "id": "troubleshoot",
+      "label": "Troubleshoot or fix code that isn't working the way you want",
+      "gettingStarted": {
+        "intro": "Paste your code into the chat panel and describe what's going wrong as clearly as you can.",
+        "examplePrompt": "This code is supposed to [what it should do] but instead it [what is actually happening]. Can you find the problem and fix it? [paste your code here]",
+        "tips": [
+          "For example: \"This code is supposed to calculate a total price but it keeps giving me zero. Can you find the problem and fix it?\"",
+          "The more detail you give about what's going wrong, the easier it is for the tool to identify the issue. Include any error messages you're seeing — just copy and paste them directly into the chat.",
+          "If the fix doesn't work, describe what happened: \"I tried your fix but now it's doing [new problem].\" Keep going back and forth until it works."
+        ],
+        "cautions": [
+          "Remove any passwords, API keys, or sensitive credentials from your code before pasting it. Replace them with placeholders like [PASSWORD] or [API KEY].",
+          "The tool can fix the immediate problem but may not catch every issue in your code. Always test the fixed code carefully before using it for anything important."
+        ]
+      }
+    },
+    {
+      "id": "learn-coding",
+      "label": "Learn coding basics through guided, hands-on practice",
+      "gettingStarted": {
+        "intro": "You don't need any prior knowledge to get started — just tell the tool where you are and what you want to learn.",
+        "examplePrompt": "Teach me what a [coding concept] is with a simple example.",
+        "tips": [
+          "Other ways to get started: \"Walk me through building a basic [type of project] step by step\" or \"Quiz me on basic coding concepts and tell me if my answers are right.\"",
+          "For example: \"Teach me what a variable is with a simple example\" or \"Walk me through building a basic webpage step by step, explaining each part as we go.\"",
+          "If something isn't clear, just say \"can you explain that more simply?\" or \"can you give me another example?\" The tool works best as a patient back-and-forth tutor — there are no wrong questions.",
+          "Want to know where to start? Ask: \"I am a complete beginner. What are the most important coding concepts to learn first?\""
+        ],
+        "cautions": [
+          "Learning to code takes time and repetition — don't be discouraged if things don't click immediately. Use the tool to practice the same concept multiple ways until it feels familiar.",
+          "The tool is a great starting point but not a substitute for structured learning resources. Ask a librarian about free online coding courses like those on code.org or Khan Academy if you want to go further.",
+          "Do not share any personal information while practicing — keep your examples fictional, like \"build a webpage for an imaginary business\" rather than using your real details."
+        ]
+      }
+    },
+    {
+      "id": "other",
+      "label": "I have something else in mind",
+      "gettingStarted": null
+    }
+  ],
+  "faqs": {
+    "concept": [
+      {
+        "q": "What is AI?",
+        "a": "AI stands for Artificial Intelligence. It refers to computer programs that can do things that normally require human thinking — like answering questions, writing text, or creating images. The tools on this kiosk are all powered by AI."
+      },
+      {
+        "q": "What is a large language model (LLM)?",
+        "a": "A large language model is a type of AI that learned from reading a huge amount of text — books, articles, and websites. That's how it learned to understand and respond to your questions in plain language. Think of it as a very well-read assistant."
+      },
+      {
+        "q": "What is open source?",
+        "a": "Open source means the technology behind the tool is publicly available — not owned or locked away by one company. It's a bit like a recipe that anyone can read, use, or improve. The coding tool on this kiosk uses an open source model."
+      },
+      {
+        "q": "What is a prompt?",
+        "a": "A prompt is simply what you type into the tool — your description of what you want it to build or help you with. The clearer and more specific your prompt, the better the result will be. For example: \"build me a simple webpage with my name and a short bio\" or \"write a Python script that adds up a list of numbers.\""
+      },
+      {
+        "q": "What is a programming language?",
+        "a": "A programming language is a specific language made up of words, rules, and grammar that computers can understand. Whenever you want a computer to do something for you — build a website, do a calculation — you have to instruct it using one of these languages. Different languages are used for different purposes: HTML is used to build webpages, Python is used for data and automation tasks, and JavaScript makes websites interactive. You don't need to know these languages to use this tool — but knowing the name of one can help you ask for more specific results."
+      },
+      {
+        "q": "What is coding?",
+        "a": "Coding means writing instructions for a computer using a programming language. These instructions are called \"code\" or a \"program.\" When you write code, you are essentially telling the computer exactly what to do, step by step — like displaying a webpage or running a calculation. You don't need to know how to code to use this tool — you can describe what you want in plain English and the tool will write the code for you."
+      },
+      {
+        "q": "What is the difference between a website and an app?",
+        "a": "\"App\" is short for \"application\" — it just means a software program designed to help you do something. A website is a type of app that you access through a browser like Chrome or Safari by typing in a web address. Other apps are downloaded and installed directly on your phone or computer — like the Maps app or a banking app. Both let you do things like shop, communicate, or manage information. The main difference is how you access them: one through a browser, one installed on your device. This tool can help you build either."
+      },
+      {
+        "q": "What does \"debugging\" mean?",
+        "a": "Debugging means finding and fixing errors in code. When code doesn't work the way it should, there is usually a bug — a mistake — in the instructions. Debugging is the process of figuring out what went wrong and correcting it. You can ask the coding tool to help you debug by pasting your code and describing what isn't working."
+      },
+      {
+        "q": "What is a script?",
+        "a": "A script is a short piece of code written to automate a specific task — like renaming a bunch of files at once, sending a regular email, or pulling data from a spreadsheet. Scripts are usually simpler than full apps and are designed to do one thing quickly and repeatedly."
+      }
+    ],
+    "practical": [
+      {
+        "q": "What programming language should I ask for?",
+        "a": "If you're building a webpage, ask for HTML. If you want to automate a task or work with data, ask for Python. If you're not sure, just describe what you want to build and the tool will choose an appropriate language for you. You can also ask: \"What programming language is best for [whatever you want to build]?\""
+      },
+      {
+        "q": "How do I describe what I want the tool to build?",
+        "a": "Use plain language and be as specific as you can about what you want the end result to look like or do. Instead of \"make me a website,\" try \"build me a one-page website for my small bakery. Include the business name, a short description, our opening hours, and a contact email.\" The more context you give, the better the result. If you're not sure how to describe it, ask the tool: \"What information do you need from me to build [whatever you want]?\""
+      },
+      {
+        "q": "Where does my generated code appear?",
+        "a": "Your generated code appears in the Code Output panel on the right side of the screen. The left panel is where you chat with the tool and make requests."
+      },
+      {
+        "q": "Can I ask the tool to explain the code it wrote?",
+        "a": "Yes — just ask. Type \"can you explain what this code does in plain language?\" and the tool will walk you through it step by step. This is a great way to learn what the code is doing even if you have no prior experience."
+      },
+      {
+        "q": "How do I know if the code the tool wrote actually works?",
+        "a": "The tool will do its best to write working code, but it can make mistakes. The most reliable way to check is to run or test the code — someone with coding experience can help you with this. You can also ask the tool: \"Can you check this code for errors?\" or \"Does this code do what I described?\""
+      },
+      {
+        "q": "Can I paste my own code for the tool to fix or improve?",
+        "a": "Yes — paste your code into the chat panel and describe what isn't working or what you want to change. For example: \"This code is supposed to calculate a total but it's giving me the wrong number — can you find the problem?\" The tool will review it and suggest fixes."
+      },
+      {
+        "q": "What happens if the code doesn't work?",
+        "a": "Describe the problem to the tool and ask it to fix it. For example: \"The webpage isn't showing the right colors\" or \"The script stops running after the first line.\" The tool can often identify and correct errors if you give it enough detail about what's going wrong. If you're still stuck, ask a librarian for help finding additional coding support resources."
+      },
+      {
+        "q": "Can I save or download my code?",
+        "a": "Yes — you can select and copy the code from the Code Output panel and paste it into a text file or document to save it. Make sure to save your work before ending your session as it may not be stored permanently."
+      }
+    ],
+    "criticalUse": [
+      {
+        "q": "Can I trust code generated by the tool?",
+        "a": "Not without checking it first. The tool can write code that looks correct but contains errors or doesn't do exactly what you intended. Always review generated code carefully — or have someone with coding experience look it over — before using it for anything important. Think of it as a helpful first draft, not a finished product."
+      },
+      {
+        "q": "Should I share passwords or sensitive data when asking for coding help?",
+        "a": "No — never paste passwords, API keys, personal account details, or any sensitive data into the chat. If your code needs to connect to a service or database, describe it in general terms — for example \"connect to a database\" — without including real credentials. You can add those details yourself after the code is generated."
+      },
+      {
+        "q": "What should I do before using code generated by the tool?",
+        "a": "Read through it carefully, even if you don't fully understand it. Ask the tool to explain anything that's unclear. Test it in a safe environment before using it for anything important. And never run code that asks for access to your personal accounts, files, or sensitive systems unless you fully understand what it does."
+      }
+    ]
+  }
+}

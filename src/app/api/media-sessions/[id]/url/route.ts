@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { requireAuth, isAuthResult } from '@/lib/auth';
 import { getMediaReadUrl } from '@/lib/mediaUrlCache';
+import { generateSignedGetUrl } from '@/lib/storage';
 
 /**
  * GET /api/media-sessions/[id]/url
@@ -70,15 +71,32 @@ export async function GET(
         );
     }
 
-    const resolved = await getMediaReadUrl(session.objectKey);
+    const isDownload = request.nextUrl.searchParams.get('download') === 'true';
+
+    let url: string;
+    let expiresAt: string | null = null;
+    let isPublic = false;
+
+    if (isDownload) {
+        const ext = session.mimeType?.split('/')[1]?.split(';')[0] ?? 'bin';
+        const filename = `generated-${session.mode}.${ext}`;
+        url = await generateSignedGetUrl(session.objectKey, undefined, { downloadFilename: filename });
+        expiresAt = new Date(Date.now() + 3600 * 1000).toISOString();
+    } else {
+        const resolved = await getMediaReadUrl(session.objectKey);
+        url = resolved.url;
+        expiresAt = resolved.expiresAt ? String(resolved.expiresAt) : null;
+        isPublic = resolved.public ?? false;
+    }
+
     const thumbnail = session.thumbnailKey
         ? await getMediaReadUrl(session.thumbnailKey).catch(() => null)
         : null;
 
     return NextResponse.json({
-        url: resolved.url,
-        expiresAt: resolved.expiresAt,
-        public: resolved.public,
+        url,
+        expiresAt,
+        public: isPublic,
         thumbnailUrl: thumbnail?.url ?? null,
         mimeType: session.mimeType,
         mode: session.mode,

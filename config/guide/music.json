@@ -1,0 +1,150 @@
+{
+  "whatIsIt": {
+    "tier1": "This is a music creation tool. You can use it to create your own original songs without any musical or technology training or instruments. You describe whatever you want — a mood, a style, a theme — and it generates a song for you.",
+    "tier2": "This is an AI-powered music generation tool. It uses machine learning models trained on large amounts of music to generate original songs from your text descriptions. You can create the music you want by describing the genre, mood, tempo, and/or lyrical themes you have in mind.",
+    "tier3": "This is a music generation tool powered by a machine learning model trained on diverse musical data. It generates vocals, instrumentation, and structure from your text prompts. Understanding how to describe musical elements precisely — genre, BPM, instrumentation, emotional tone — will help you get more controlled and consistent outputs."
+  },
+  "useCases": [
+    {
+      "id": "original-song",
+      "label": "Create an original song from scratch — just describe the mood, genre, or theme you have in mind",
+      "gettingStarted": {
+        "intro": "Type a description of what you want in the Style & Mood field. Here's an example to get you started:",
+        "examplePrompt": "[Upbeat/slow/energetic] [genre] song about [theme or topic]",
+        "tips": [
+          "Leave the Lyrics field blank to let the tool generate them, or type your own if you have something in mind.",
+          "Use the duration slider to set how long your track should be. Start short while experimenting — it uses fewer credits.",
+          "Check the Instrumental Only box if you don't want vocals.",
+          "Not sure how to describe your idea? Ask the chat tool first: \"What are some good style and mood descriptions for a [type of song]?\" Then use that answer in your music prompt.",
+          "If you don't love the result, tweak one detail and generate again. For example: \"make it more upbeat\" or \"add a [genre] feel.\""
+        ],
+        "cautions": [
+          "Each generation uses credits — start with shorter durations while you experiment.",
+          "Do not include real names, personal details, or sensitive information in your lyrics."
+        ]
+      }
+    },
+    {
+      "id": "occasion-song",
+      "label": "Create a personalized song for a special occasion (birthday, anniversary, celebration)",
+      "gettingStarted": {
+        "intro": "Start by describing the occasion and the person or moment you want to celebrate. Here's an example to get you started:",
+        "examplePrompt": "A [upbeat/warm/emotional] [genre] song for my [person] on their [occasion]. They love [something about them] and the song should feel [mood].",
+        "tips": [
+          "For example: \"A warm acoustic song for my mom on her birthday. She loves gardening and the song should feel joyful and loving.\"",
+          "Use the Lyrics field to add any personal touches — a special memory, an inside joke, or a message you want the song to include. Leave it blank if you'd prefer the tool to generate lyrics based on your description.",
+          "Not sure what to include? Ask the chat tool first: \"What details should I include to make a personalized birthday song feel special?\" Then use that answer to build your prompt.",
+          "Use the duration slider to set the length. A 30–60 second clip is enough to capture the sentiment without using too many credits."
+        ],
+        "cautions": [
+          "Each generation uses credits — start with shorter durations while you experiment.",
+          "Keep personal details general — avoid including full names, addresses, or any sensitive information in your lyrics. A first name is fine."
+        ]
+      }
+    },
+    {
+      "id": "explore-genres",
+      "label": "Explore music styles and genres as a creative hobby — no instruments or training needed",
+      "gettingStarted": {
+        "intro": "Start with any style or mood that interests you — there's no wrong answer here. Here's an example to get you started:",
+        "examplePrompt": "A [genre] song with a [mood] feel.",
+        "tips": [
+          "For example: \"A reggae song with a relaxed summer feel\" or \"A dramatic classical piece with a lot of strings.\"",
+          "Not sure where to start? Try asking the chat tool: \"What are some interesting music genres I could explore with an AI music tool?\" Then pick one that sounds interesting and use it as your first prompt.",
+          "Use the duration slider to keep clips short while you explore — 10–20 seconds is enough to get a feel for a style without using many credits.",
+          "Try the Instrumental Only box if you want to focus on the musical style without lyrics getting in the way.",
+          "Once you've tried one style, tweak a single detail and generate again — for example swap \"reggae\" for \"jazz\" or change \"relaxed\" to \"upbeat.\" Exploring is all about experimenting freely."
+        ],
+        "cautions": [
+          "Each generation uses credits — short durations are your friend when experimenting with multiple styles.",
+          "There are no wrong choices here — this use case is purely for creative exploration. Try unexpected combinations and see what surprises you."
+        ]
+      }
+    },
+    {
+      "id": "other",
+      "label": "I have something else in mind",
+      "gettingStarted": null
+    }
+  ],
+  "faqs": {
+    "concept": [
+      {
+        "q": "What is AI?",
+        "a": "AI stands for Artificial Intelligence. It refers to computer programs that can do things that normally require human thinking — like answering questions, writing text, or creating images. The tools on this kiosk are all powered by AI."
+      },
+      {
+        "q": "What is a large language model (LLM)?",
+        "a": "A large language model is a type of AI that learned from reading a huge amount of text — books, articles, and websites. That's how it learned to understand and respond to your questions in plain language. Think of it as a very well-read assistant."
+      },
+      {
+        "q": "What is open source?",
+        "a": "Open source means the technology behind the tool is publicly available — not owned or locked away by one company. It's a bit like a recipe that anyone can read, use, or improve. The chat tool on this kiosk uses an open source model."
+      },
+      {
+        "q": "What is a prompt?",
+        "a": "A prompt is simply what you type into the tool — your description or instruction for what you want it to create. The clearer and more detailed your prompt, the closer the result will be to what you had in mind. For example: \"upbeat country song about summer\" or \"slow sad piano ballad with lyrics about missing home.\""
+      },
+      {
+        "q": "What is AI-generated music?",
+        "a": "AI-generated music is music created entirely by a computer program based on your description. You don't need any musical training or instruments — you just describe what you want and the tool composes and produces the track for you, including vocals and instrumentation."
+      },
+      {
+        "q": "How does the music tool create songs from text?",
+        "a": "The tool was trained on a large amount of music and musical patterns. When you type a description, it uses what it learned to generate a song that matches your prompt — choosing a style, tempo, instruments, and lyrics that fit. It's a bit like describing a song to a musician and having them play it for you on the spot."
+      },
+      {
+        "q": "Can AI-generated music sound like real music?",
+        "a": "Yes — AI-generated music can sound surprisingly realistic and polished. The quality varies depending on how detailed your prompt is and what style you ask for. Some genres work better than others, and results can be unpredictable, so experimenting with different descriptions is part of the process."
+      }
+    ],
+    "practical": [
+      {
+        "q": "What should I type in the Style & Mood field?",
+        "a": "Describe the kind of music you want using words that capture the feel, genre, or theme. For example: \"relaxing acoustic guitar,\" \"energetic hip hop beat,\" \"80s pop with a fun vibe,\" or \"sad folk song about missing home.\" You can be as simple or as detailed as you like — even a single word like \"jazz\" or \"upbeat\" is a valid starting point."
+      },
+      {
+        "q": "Can I write my own lyrics?",
+        "a": "Yes — the Lyrics field lets you type your own words if you have something in mind. You can write a full set of lyrics or just a few lines and let the tool fill in the rest. If you leave it blank, the tool will generate lyrics automatically based on your style and mood description."
+      },
+      {
+        "q": "What happens if I don't like the result?",
+        "a": "Just tweak your description and generate again. Try changing one thing at a time — the genre, the mood, the tempo, or the lyrics — to get closer to what you want. Each generation is a new attempt, so don't be discouraged if the first result isn't quite right."
+      },
+      {
+        "q": "What happens if I leave the Lyrics field blank?",
+        "a": "The tool will automatically generate lyrics that match your Style & Mood description. This is a good option if you want to see what the tool comes up with on its own or if you're not sure what you want the song to say."
+      },
+      {
+        "q": "What does the Instrumental Only option do?",
+        "a": "Checking Instrumental Only tells the tool to create music without any vocals or singing. The result will be a purely musical track — useful for background music, presentations, or if you simply prefer music without lyrics."
+      },
+      {
+        "q": "How do I choose the right duration for my track?",
+        "a": "Use the duration slider to set how long you want your track to be — anywhere from 10 seconds to 5 minutes. Start with a shorter duration while you're experimenting so you don't use up too many credits. Once you're happy with the style, you can generate a longer version."
+      },
+      {
+        "q": "How many credits does generating music cost?",
+        "a": "The cost depends on the duration you choose — longer tracks use more credits. You can see the credit cost displayed next to the duration slider before you generate. Start short to keep costs low while you experiment."
+      },
+      {
+        "q": "Can I download or save my generated track?",
+        "a": "Yes — once your track is generated it will appear in the audio player on screen. You can download it by clicking the \"Download Audio\" button below the player, or by clicking the three-dot menu on the right side of the audio player and selecting \"Download.\" Your previous creations also appear in the History panel on the left so you can revisit them during your session."
+      },
+      {
+        "q": "What is an MP3 file?",
+        "a": "An MP3 is a common audio file format — it's how most music is stored and shared digitally. When you download your generated track it will likely be saved as an MP3 file. You can play it on most phones, computers, and music apps. Think of it the same way you would a song you download from the internet."
+      }
+    ],
+    "criticalUse": [
+      {
+        "q": "Should I include real names or personal details in my lyrics?",
+        "a": "Avoid including full names of real people, personal addresses, or any sensitive information in your lyrics. Keep your content general and creative rather than personal or identifying."
+      },
+      {
+        "q": "Can AI music be mistaken for real music by others?",
+        "a": "Yes — AI-generated music can sound convincing enough that listeners may not realize it was computer-generated. Be transparent about how your music was made if you share it with others, especially if you're presenting it in a professional or creative context. Passing off AI-generated work as entirely your own without disclosure can be misleading."
+      }
+    ]
+  }
+}

@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/components/AuthProvider";
-import ThemeToggle from "@/components/ThemeToggle";
 
 export const metadata: Metadata = {
   title: "Library AI Kiosk",
@@ -20,7 +19,6 @@ export default function RootLayout({
       </head>
       <body>
         <AuthProvider>
-          <ThemeToggle />
           {children}
         </AuthProvider>
       </body>

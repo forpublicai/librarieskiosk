@@ -1,9 +1,11 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback, FormEvent } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
 import Header from '@/components/Header';
+import GuidePanel from '@/components/GuidePanel';
+import CoachmarkTour from '@/components/CoachmarkTour';
 import { formatAssistantMessage } from '@/lib/formatMessage';
 import { loadGuestState, saveGuestState } from '@/lib/guestSession';
 
@@ -20,6 +22,11 @@ interface ConversationSummary {
 
 const GUEST_KEY = 'chat';
 
+const CHAT_CHIPS = [
+    'What can you help me with?',
+    'Write me a short poem about nature',
+];
+
 interface GuestChatState {
     messages: Message[];
     activeConvId: string | null;
@@ -35,6 +42,9 @@ export default function ChatPage() {
     const [activeConvId, setActiveConvId] = useState<string | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const [guideOpen, setGuideOpen] = useState(false);
+    const [chipsVisible, setChipsVisible] = useState(true);
+    const [usedChips, setUsedChips] = useState<Set<string>>(new Set());
     const isGuest = user?.role === 'GUEST';
     const hydratedRef = useRef(false);
 
@@ -45,6 +55,10 @@ export default function ChatPage() {
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
+
+    useEffect(() => {
+        if (messages.length === 0) setChipsVisible(true);
+    }, [messages.length]);
 
     useEffect(() => {
         if (token && !isGuest) loadConversations();
@@ -126,6 +140,7 @@ export default function ChatPage() {
     const handleNewChat = () => {
         setMessages([]);
         setActiveConvId(null);
+        setUsedChips(new Set());
     };
 
     const handleDeleteConversation = async (id: string) => {
@@ -158,11 +173,10 @@ export default function ChatPage() {
         URL.revokeObjectURL(url);
     };
 
-    const handleSubmit = async (e: FormEvent) => {
-        e.preventDefault();
-        if (!input.trim() || isStreaming) return;
+    const sendMessage = async (content: string) => {
+        if (!content.trim() || isStreaming) return;
 
-        const userMessage: Message = { role: 'user', content: input.trim() };
+        const userMessage: Message = { role: 'user', content: content.trim() };
         const newMessages = [...messages, userMessage];
         setMessages(newMessages);
         setInput('');
@@ -176,8 +190,9 @@ export default function ChatPage() {
             });
 
             if (!res.ok) {
-                const errData = await res.json();
-                throw new Error(errData.error || 'Chat failed');
+                let errMessage = 'Chat failed';
+                try { const errData = await res.json(); errMessage = errData.error || errMessage; } catch { }
+                throw new Error(errMessage);
             }
 
             const reader = res.body?.getReader();
@@ -225,15 +240,29 @@ export default function ChatPage() {
         }
     };
 
+    const handleSubmit = (e: { preventDefault(): void }) => {
+        e.preventDefault();
+        sendMessage(input);
+    };
+
     if (isLoading || !user) return null;
 
     return (
         <div className="page-container">
-            <Header title="Chat" />
+            <Header title="Chat" actions={
+                <button
+                    className={`guide-toggle-btn${guideOpen ? ' guide-toggle-btn--active' : ''}`}
+                    onClick={() => setGuideOpen(o => !o)}
+                    data-tour="guide-btn"
+                >
+                    <span className="guide-toggle-icon">?</span>
+                    Learning Guide
+                </button>
+            } />
 
             <div className="chat-container">
                 {/* Sidebar */}
-                <aside className="gen-sidebar" style={{ width: '320px', minWidth: '320px' }}>
+                <aside className="gen-sidebar" style={{ width: '320px', minWidth: '320px' }} data-tour="chat-sidebar">
                     <button className="btn btn-primary" onClick={handleNewChat} style={{ width: '100%', marginBottom: '24px' }}>
                         + New Chat
                     </button>
@@ -267,7 +296,7 @@ export default function ChatPage() {
 
                 {/* Chat main */}
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
-                    <div className="chat-messages" style={{ flex: 1, overflowY: 'auto' }}>
+                    <div className="chat-messages" style={{ flex: 1, overflowY: 'auto' }} data-tour="chat-messages">
                         {messages.length === 0 && (
                             <div className="gen-empty" style={{ margin: 'auto' }}>
                                 <div className="gen-empty-icon">💬</div>
@@ -295,12 +324,28 @@ export default function ChatPage() {
                         <div ref={messagesEndRef} />
                     </div>
 
-                    <div className="chat-input-area">
+                    <div className="chat-input-area" data-tour="chat-input">
+                        {messages.filter(m => m.role === 'user').length < 2 && !isStreaming && chipsVisible && CHAT_CHIPS.some(p => !usedChips.has(p)) && (
+                            <div className="example-prompts" style={{ marginBottom: '8px' }}>
+                                <span className="example-prompts-label">Try:</span>
+                                {CHAT_CHIPS.filter(p => !usedChips.has(p)).map(p => (
+                                    <button
+                                        key={p}
+                                        type="button"
+                                        className="example-chip"
+                                        onClick={() => {
+                                            setUsedChips(prev => new Set([...prev, p]));
+                                            setInput(p);
+                                        }}
+                                    >{p}</button>
+                                ))}
+                            </div>
+                        )}
                         <form className="chat-input-wrapper" onSubmit={handleSubmit}>
                             <input
                                 className="chat-input"
                                 value={input}
-                                onChange={(e) => setInput(e.target.value)}
+                                onChange={(e) => { setInput(e.target.value); setChipsVisible(false); }}
                                 placeholder="Type your message..."
                                 disabled={isStreaming}
                                 autoFocus
@@ -321,7 +366,10 @@ export default function ChatPage() {
                         )}
                     </div>
                 </div>
+
+                <GuidePanel tool="chat" isOpen={guideOpen} />
             </div>
+            <CoachmarkTour tool="chat" />
         </div>
     );
 }

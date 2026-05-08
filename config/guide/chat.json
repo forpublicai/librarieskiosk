@@ -1,0 +1,214 @@
+{
+  "whatIsIt": {
+    "tier1": "This is a chat tool. You can use it as a knowledgeable assistant with whom you text and ask any question you have. You type a question or request, and it responds in plain language. It can help you write, research, plan, and think through problems.",
+    "tier2": "This is a chat tool powered by a large language model (LLM). A large language model is a type of AI trained on vast amounts of text to understand and generate human language. It generates responses to your questions and requests, and is good at language tasks like writing, summarizing, explaining, and brainstorming.",
+    "tier3": "This is a chat tool powered by an open-source large language model (LLM). It has strong general capabilities — it excels at writing, summarizing, and reasoning through problems, but can occasionally produce inaccurate information, so it's important to verify anything critical. Understanding its strengths and limitations will help you craft better prompts and get more reliable outputs."
+  },
+  "useCases": [
+    {
+      "id": "resume",
+      "label": "Write or improve a resume, cover letter, or job application",
+      "gettingStarted": {
+        "intro": "Start by describing your situation and the job you're applying for.",
+        "examplePrompt": "Help me write a resume for a [job title] position. I have [X] years of experience in [field] and I am good at [skill 1] and [skill 2].",
+        "tips": [
+          "If you already have a resume or cover letter, paste it in and ask the tool to improve it instead.",
+          "Not sure what to include? Ask the tool: \"What information do you need from me to write a strong cover letter?\" It will guide you through the details.",
+          "Once you have a first draft, refine it with follow-up requests like \"can you make this sound more confident?\" or \"can you shorten this to one paragraph?\""
+        ],
+        "cautions": [
+          "Do not type your full home address, Social Security number, or date of birth into the chat. Use your first name and general location only if needed.",
+          "Always read through anything the tool writes before sending it to an employer. Make sure it sounds like you and that all details are accurate — the tool can sometimes include experience or skills you didn't mention. Remove anything that isn't true."
+        ]
+      }
+    },
+    {
+      "id": "email",
+      "label": "Draft a professional email or letter",
+      "gettingStarted": {
+        "intro": "Describe who you're writing to and why.",
+        "examplePrompt": "Help me write a [type of email/letter] to [recipient] about [topic or reason].",
+        "tips": [
+          "For example: \"Help me write an email to my landlord asking him to fix the heating in my apartment.\"",
+          "Be specific about the tone you need — professional, polite, firm, apologetic. If you're not sure, just describe the situation and the tool will suggest an appropriate tone.",
+          "If you already have a draft, paste it in and ask the tool to improve it instead: \"Can you make this email sound more professional?\"",
+          "Not sure what to include? Ask: \"What information do you need from me to write a strong [type of letter]?\""
+        ],
+        "cautions": [
+          "Do not type your full home address, phone number, or any account numbers into the chat unless absolutely necessary. Use general details only — \"my landlord\" rather than their full name and address.",
+          "Always read through the email before sending it. Make sure it accurately reflects your situation — the tool doesn't know the full context the way you do."
+        ]
+      }
+    },
+    {
+      "id": "research",
+      "label": "Understand something better — research a topic for school, work, personal curiosity, or everyday life",
+      "gettingStarted": {
+        "intro": "Just ask about whatever you want to understand.",
+        "examplePrompt": "Can you explain [topic] in simple terms?",
+        "tips": [
+          "For example: \"Can you explain how student loans work in simple terms?\" or \"What is climate change and why does it matter?\"",
+          "If the first explanation is too complex, ask the tool to simplify: \"Can you explain that like I'm hearing it for the first time?\" or \"How would you explain that to a 5-year old?\"",
+          "If you want to go deeper, ask follow-up questions — \"Why does that happen?\" or \"Can you give me an example?\" The tool works best as a back-and-forth conversation.",
+          "Not sure where to start? Try: \"What are the most important things to know about [topic]?\""
+        ],
+        "cautions": [
+          "The tool can be wrong, especially on topics that change frequently — current events, laws, medical advice, or financial information. Always verify important facts using a trusted source, try factcheck.org, or ask a librarian.",
+          "Do not share personal details like your full name, address, or medical history when asking health-related questions. Keep questions general — \"what are the symptoms of diabetes?\" rather than sharing your own medical records."
+        ]
+      }
+    },
+    {
+      "id": "brainstorm",
+      "label": "Brainstorm ideas for a business, project, or creative work",
+      "gettingStarted": {
+        "intro": "Describe what you're working on and what kind of ideas you need.",
+        "examplePrompt": "Help me brainstorm ideas for [type of project or goal]. Here is some context: [brief description].",
+        "tips": [
+          "For example: \"Help me brainstorm names for my home cleaning business. I want something friendly and easy to remember.\"",
+          "The more context you give, the more useful the ideas will be. Tell the tool your audience, your budget, your constraints, or anything else that's relevant.",
+          "If you like some ideas but not others, tell the tool: \"I like option 2 and 3 — can you give me more ideas in that direction?\"",
+          "Not sure how to frame your idea? Ask: \"What questions should I answer before brainstorming [type of project]?\""
+        ],
+        "cautions": [
+          "Brainstorming is low-risk — you're generating ideas, not making decisions. Use the tool's suggestions as a starting point, not a final answer.",
+          "Do not share sensitive business information like financial details, proprietary plans, or client names. Keep descriptions general."
+        ]
+      }
+    },
+    {
+      "id": "marketing",
+      "label": "Write or improve marketing content for a small business",
+      "gettingStarted": {
+        "intro": "Describe your business and what you need.",
+        "examplePrompt": "Write a [type of content] for my [type of business]. Here is some context: [brief description of your business and what makes it special].",
+        "tips": [
+          "For example: \"Write a short Facebook post for my food truck. We sell Tex-Mex food and are open on weekends at the Riverside Farmers Market.\"",
+          "Be specific about where the content will be used — a social media post, a flyer, a website — because the length and tone will differ for each.",
+          "If you want to try different versions, ask: \"Can you give me three different versions of this so I can pick the one I like best?\"",
+          "Not sure what to ask for? Try: \"What marketing content should a small [type of business] have to attract customers?\""
+        ],
+        "cautions": [
+          "Review everything before publishing. The tool doesn't know your customers the way you do — make sure the tone and details feel right for your community.",
+          "Do not include specific pricing, personal contact details, or addresses in your chat prompt unless you're comfortable with them being part of the generated content."
+        ]
+      }
+    },
+    {
+      "id": "document",
+      "label": "Get help understanding a complex document (lease, medical form, benefits letter)",
+      "gettingStarted": {
+        "intro": "Paste or type the part of the document you don't understand, and ask the tool to explain it.",
+        "examplePrompt": "Can you explain what this means in plain language: [paste the text you don't understand]. I found this in a [lease / medical form / benefits letter / other document].",
+        "tips": [
+          "For example: paste a confusing paragraph from a lease and ask \"What does this clause mean in my lease? What am I agreeing to?\"",
+          "If you want to understand the whole document, start with the sections that feel most important or confusing — you don't have to do it all at once.",
+          "Not sure what to focus on? Ask: \"What are the most important things to look for in a [type of document]?\""
+        ],
+        "cautions": [
+          "Remove or replace any personal information before pasting text — your full name, address, Social Security number, account numbers, or date of birth. You can replace them with placeholders like \"NAME\" or \"ADDRESS\".",
+          "The tool can help you understand what a document says, but it is not a lawyer or a financial advisor. For anything with serious legal or financial consequences — a lease, a benefits appeal, a contract — always follow up with a professional or ask a librarian for referrals to free legal aid services."
+        ]
+      }
+    },
+    {
+      "id": "planning",
+      "label": "Plan something — an event, a budget, a trip",
+      "gettingStarted": {
+        "intro": "Describe what you're planning and any key details or constraints.",
+        "examplePrompt": "Help me plan a [type of event or trip]. Here are the details: [key information like budget, date, number of people, location].",
+        "tips": [
+          "For example: \"Help me plan a birthday party for 15 kids aged 6-8. My budget is around $200 and I want to keep it simple.\"",
+          "Ask the tool to give you a checklist or timeline if that's helpful: \"Can you give me a step-by-step plan with a timeline?\"",
+          "If you want to refine the plan, ask follow-up questions — \"What are some cheaper alternatives for the venue?\" or \"What am I forgetting?\"",
+          "Not sure where to start? Ask: \"What are the most important things to figure out first when planning a [type of event or trip]?\""
+        ],
+        "cautions": [
+          "The tool doesn't have access to real-time information like current prices, availability, or local events. Treat its suggestions as a starting framework and verify specific details — especially costs and bookings — independently.",
+          "Do not share financial account details or specific addresses when planning something like a trip or budget."
+        ]
+      }
+    },
+    {
+      "id": "other",
+      "label": "I have something else in mind",
+      "gettingStarted": null
+    }
+  ],
+  "faqs": {
+    "concept": [
+      {
+        "q": "What is AI?",
+        "a": "AI stands for Artificial Intelligence. It refers to computer programs that can do things that normally require human thinking — like answering questions, writing text, or creating images. The tools on this kiosk are all powered by AI."
+      },
+      {
+        "q": "What is a large language model (LLM)?",
+        "a": "A large language model is a type of AI that learned from reading a huge amount of text — books, articles, and websites. That's how it learned to understand and respond to your questions in plain language. Think of it as a very well-read assistant."
+      },
+      {
+        "q": "What is open source?",
+        "a": "Open source means the technology behind the tool is publicly available — not owned or locked away by one company. It's a bit like a recipe that anyone can read, use, or improve. The chat tool on this kiosk uses an open source model."
+      },
+      {
+        "q": "What is a prompt?",
+        "a": "A prompt is simply what you type into the tool. It could be a question, a request, or an instruction — like \"help me write an email\" or \"explain what a mortgage is.\" The clearer your prompt, the better the response you'll get."
+      },
+      {
+        "q": "How does the chat tool come up with its answers?",
+        "a": "The tool was trained on a large amount of text before you started using it. When you ask it something, it uses what it learned to write a response that fits your question. It doesn't search the internet in real time — it draws on knowledge it already has, which means it can sometimes be outdated or incorrect."
+      },
+      {
+        "q": "How is using the chat tool to find answers different from searching for answers on Google?",
+        "a": "When you search on Google, you get a list of links to websites — you have to click through and read them yourself. The chat tool instead reads your question and writes you a direct answer in plain language. It's more like asking a knowledgeable person than browsing the web. The tradeoff is that unlike Google, it doesn't always have the latest information and could sometimes get things wrong."
+      },
+      {
+        "q": "Does the chat tool learn from what I type?",
+        "a": "No. What you type stays within your current session only. The tool does not update itself based on your conversations. Its knowledge comes from its original training, which happened before you started using it."
+      }
+    ],
+    "practical": [
+      {
+        "q": "How do I write a good question or request?",
+        "a": "Be specific and give context. Instead of \"help me with my resume,\" try something like \"help me write a resume for a cashier job. I have one year of retail experience.\" The more detail you include, the more useful the response will be. If you're not sure how to start, ask the tool: \"What information do you need from me to help with [your task]?\""
+      },
+      {
+        "q": "Can I ask follow-up questions?",
+        "a": "Yes — and you should. The chat tool is designed for back-and-forth conversation. If something isn't clear, just ask \"can you explain that differently?\" or \"what do you mean by X?\" Each follow-up builds on what came before."
+      },
+      {
+        "q": "What happens if I don't like the response I get?",
+        "a": "Just ask again differently. Try \"can you make that simpler?\" or \"can you try a different version?\" or \"can you add more detail about X?\" You are never stuck with the first response — the tool works best as a back-and-forth conversation."
+      },
+      {
+        "q": "Can I upload a document or file?",
+        "a": "No — the chat tool on this kiosk does not currently support file uploads. If you want the tool to help with a document, you can copy and paste the relevant text directly into the chat. Make sure to remove any personal information before doing so."
+      },
+      {
+        "q": "Can I download or copy the responses given to me?",
+        "a": "You can copy any response by selecting the text and copying it, then paste it into an email or document. There is no dedicated download button for chat responses. If you want to save something, copy it before you end your session."
+      },
+      {
+        "q": "What languages can I use?",
+        "a": "The tool works best in English but can understand and respond in many other languages. If you prefer to write in Spanish, French, or another language, just go ahead — it will do its best to respond in the same language."
+      },
+      {
+        "q": "How long can my message be?",
+        "a": "You can type quite a lot — there is no strict limit. That said, clear and focused messages tend to get better responses than very long ones. If you have a lot of context to share, break it into parts and go one step at a time."
+      }
+    ],
+    "criticalUse": [
+      {
+        "q": "Can I trust what the chat tool tells me?",
+        "a": "Not always. The tool can sound confident even when it is wrong. It can make up facts, give outdated information, or misunderstand your question. Always double-check anything important — especially health, legal, money, or current events — using a trusted source like factcheck.org or by asking a librarian."
+      },
+      {
+        "q": "What information should I never type into the chat?",
+        "a": "Never type your Social Security number, passwords, bank account details, or full home address into the chat. For most tasks you only need to share general information — for example \"I live in Utah\" rather than your full address. When in doubt, leave out personal details related to your identity."
+      },
+      {
+        "q": "What should I do if the chat tool gives me medical, legal, or financial information?",
+        "a": "Use it as a starting point only — not as professional advice. The tool can help you understand general concepts or prepare questions, but it is not a doctor, lawyer, or financial advisor. For anything important, always follow up with a qualified professional or ask your librarian to help you find the right resources."
+      }
+    ]
+  }
+}
