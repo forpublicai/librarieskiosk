@@ -22,6 +22,12 @@ export function getNanogptKey(library: string | null | undefined): string {
     return process.env.NANOGPT_API_KEY || '';
 }
 
+// Generic key for cross-library features (e.g. the Learning Guide) that should
+// not bill against any one library's NanoGPT account.
+export function getGenericNanogptKey(): string {
+    return process.env.NANOGPT_API_KEY || '';
+}
+
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1000;
 
@@ -60,8 +66,12 @@ async function fetchWithRetry(
 export async function chatComplete(
     messages: Array<{ role: string; content: string }>,
     model: string,
-    apiKey: string
+    apiKey: string,
+    options?: { maxTokens?: number }
 ): Promise<string> {
+    const body: Record<string, unknown> = { model, messages, stream: false };
+    if (options?.maxTokens != null) body.max_tokens = options.maxTokens;
+
     const response = await fetchWithRetry(
         `${NANOGPT_BASE_URL}/api/v1/chat/completions`,
         {
@@ -70,7 +80,7 @@ export async function chatComplete(
                 'Authorization': `Bearer ${apiKey}`,
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ model, messages, stream: false }),
+            body: JSON.stringify(body),
         }
     );
 

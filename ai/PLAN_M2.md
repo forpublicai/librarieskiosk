@@ -1,0 +1,366 @@
+# M2 plan: Interactive Learning Guide + UX polish
+
+> **Note:** This document is a *retrospective* milestone record. Unlike a forward-looking PLAN_M{n}.md it was written after the work landed on the `arpita-explore` branch. Sections that ordinarily capture pre-implementation alignment (Locked user decisions, AI VALIDATION PLAN) are written from observed behavior. The file otherwise follows the [ai/PLAN.md](PLAN.md) template so future milestones have a precedent.
+
+## Summary
+
+This milestone makes the kiosk genuinely usable by patrons who have never met an AI tool before. It introduces:
+
+1. A new **Learning Guide** side panel (`GuidePanel`) on every generation page (chat, image, video, music, code) that combines:
+   - a 3-tier "describe yourself" gate that customizes complexity of explanations,
+   - structured static content (per-tier "what is this", use-case-driven "getting started" walkthroughs, three-bucket FAQs),
+   - free-form questions answered by either fuzzy-matching against the static FAQs or, when no match, calling a tier-aware live model via a new `/api/guide` route.
+2. A **Coachmark page tour** (`CoachmarkTour`) that highlights the major UI regions the first time a user lands on a tool.
+3. A **proper download path** for generated images, video, and audio that goes through R2 with a forced `Content-Disposition: attachment` instead of relying on the browser's `<a download>` heuristic.
+4. UI polish: theme toggle moved into the header, "Try:" example-prompt chips on every generation page, dashboard footer links, an extra password-recovery FAQ, and small video-history resilience fixes.
+
+Validation: type-check clean, the guide functions across all five tools, the download button produces a real file (not a new tab), and patrons returning to a tool see the page tour exactly once until they explicitly restart it from the guide panel.
+
+## HOW TO EXECUTE A MILESTONE
+
+[Verbatim from [ai/PLAN.md](PLAN.md) §"HOW TO EXECUTE A MILESTONE", reproduced here so this file is self-contained.]
+
+If the user asks you to execute on a plan, these are the steps to take.
+
+1. Implement the plan
+   - You should check your work with AI autonomous validation and testing.
+   - The hope is that implementation can be done with a minimum of user interaction, preferably none at all.
+   - Once it is complete, fill in the "Validation" section to the bottom of the plan showing how you have validated it and what were the results.
+   - You might have discovered better engineering
+2. Perform your testing and validation
+   - Update the "AI VALIDATION RESULTS" section of your PLAN_M{n}.md file
+3. Review your own code. Also, ask Claude to review your work
+   - You will need to provide it context: your plan document PLAN_M{n}.md, and tell it which files or functions you've worked on. Ask it also to review your validation steps.
+   - If Claude found no blockers or problems with your work, you may proceed. Do static checking (formatting, eslint, typechecking). If you need any fixes, static check again to make sure it's clean.
+   - If you couldn't get Claude to run for whatever reason, the user wants you to abort and report what's wrong.
+   - Keep iterating with Claude until you no longer make changes (either because you've taken on Claude's feedback from past rounds, or because your plan no successfully defends its positions so Claude accepts them). However, if you take more than 10 rounds, then something is wrong, so stop and let the user know.
+   - We aren't looking for "blocker vs non-blocker" decisions. Instead for every suggestion from Claude you must evaluate "will this improve my code? if so then modify your code, and if not then pre-emptively defend (in code comments) why not". And if you made modifications or comments, then circle back with Claude again.
+   - Do NOT reference previous rounds when you invoke it: Claude does best if starting from scratch each round, so it can re-examine the whole ask from fundamentals. Note that each time you invoke Claude it has no memory of previous invocations, which is good and will help this goal! Also, avoid asking it something like "please review the updated files" since (1) you should not reference previous rounds implicitly or explicitly, (2) it has no understanding of what the updates were; it only knows about the current state of files+repo on disk.
+4. After implementation, do a "better engineering" phase
+   - Clean up LEARNINGS.md and ARCHITECTURE.md. If any information there is just restating information from other files then delete it. If it would belong better elsewhere, move it. Please be careful to follow the "learnings decision tree" — LEARNINGS.md for durable engineering wisdom, ARCHITECTURE.md for things that will apply to CodexAgent.ts in its finished state, PLAN_M{n}.md for milestone-specific notes
+   - You will have several Claude review tasks to do, below. You must launch all the following Claude review tasks in parallel, since they each take some time: prepare all their inputs, then execute them all in parallel. You should start addressing the first findings as soon as you get them, rather than waiting for all to be consolidated. You can be doing your own review while you wait for Claude.
+   - (1) Review the code for correctness. Also ask Claude to evaluate this.
+   - (2) Validate whether work obeys the codebase style guidelines in AGENTS.md. Also ask Claude to evaluate this. The user is INSISTENT that they must be obeyed.
+   - (3) Validate whether the work obeys each learning you gathered in LEARNINGS.md. Also ask Claude to evaluate this. (A separate instance of Claude; it can't do too much in one go).
+   - (4) Validate whether the work has satisfied the milestone's goals. Also ask Claude to evaluate this.
+   - (5) Check if there is KISS, or consolidation, or refactoring that would improve quality of codebase. Also ask Claude the same question.
+   - If you make changes, they'll need a pass of static checking (formatting, eslint, typechecking), and again to make sure it's clean.
+   - You might decide to do better engineering yourself. If not, write notes about whats needed in the "BETTER ENGINEERING INSIGHTS" section of the plan.
+   - Tell the user how you have done code cleanup. The user is passionate about clean code and will be delighted to hear how you have improved it.
+5. Upon completion, ask for user review. Tell the user what to test, what commands to use, what gestures to try out, what to look for
+
+## Locked user decisions
+
+These are the decisions that were made (often interactively, over multiple iterations) during the work and that future milestones should treat as constraints unless explicitly revisited.
+
+1. **Three audience tiers, not one.** Patrons identify themselves as `Tier 1` (new to tech), `Tier 2` (tech-savvy, AI-new) or `Tier 3` (AI explorer). All on-screen and live explanations switch language, jargon, and depth based on the chosen tier. The choice is per-browser via `localStorage['guide_tier']` and editable from a chip in the panel header.
+2. **Static content is canonical; the live model fills gaps.** Every tool ships hand-written copy in `config/guide/<tool>.json`. The live model is only invoked when the user types a free-form question that doesn't match any FAQ or use-case. Static content is sourced verbatim from authored PDFs (Music, Image, Video Static Content; Chat and Code to follow). Wording is not paraphrased.
+3. **Three-dot menu and the explicit Download button must both work** for music and video. The audio/video elements keep their browser-native controls; the explicit `Download` button is the *primary* affordance. Confirmed by the user that both paths work.
+4. **Forced-download header on the API.** A query param `?download=true` on `/api/media-sessions/[id]/url` produces a presigned URL with `Content-Disposition: attachment; filename="..."`. The client prefers this over the legacy blob-fetch path because the latter triggers a CORS preflight against R2 that some kiosk browsers block.
+5. **Coachmark tour is per-user, per-tool, persistent.** Storage key `cm_<username>_<tool>`, value `'true'` once dismissed. A guest's tour state is keyed under `cm_anon_<tool>`. The tour is restartable from the Learning Guide's "↺ Restart page tour" link.
+6. **Theme toggle lives in the header**, not as a fixed-position floating control. Removed from `layout.tsx`; added inside `<Header>` to the right of the credit badge. CSS shrunk to 32×32 to match other header chrome.
+7. **Headers expose an `actions` slot.** The Learning Guide button is per-page, not global, so `<Header>` accepts an `actions: React.ReactNode` prop. Each generation page passes its own button. This is the canonical extension point for any future per-page header chrome.
+8. **Guide chats are stateless.** No history is persisted server-side or in the DB. The `/api/guide` route takes one question and one tier and returns one response. Following questions are independent calls.
+9. **Off-topic deflection in the live guide system prompt.** If the user asks a question that isn't about the current tool, the live guide is instructed to politely refuse, point at the matching tool's own guide, and ask if there's anything about *this* tool to help with.
+10. **Bubble splitting on `\n\n`.** Both static and live answers are split on blank lines into multiple sequential bubbles separated by ~500ms typing animation. The model's system prompt explicitly asks for blank-line-separated paragraphs.
+
+## PLAN
+
+### Files added
+
+```
+config/guide/chat.json                       (+214 lines)  static guide content for Chat
+config/guide/code.json                       (+191 lines)  static guide content for Code
+config/guide/image.json                      (+153 lines)  static guide content for Image
+config/guide/music.json                      (+150 lines)  static guide content for Music
+config/guide/video.json                      (+152 lines)  static guide content for Video
+src/app/api/guide/route.ts                   (+ 75 lines)  POST /api/guide → tier-aware live answer
+src/components/CoachmarkTour.tsx             (+155 lines)  per-tool first-visit page tour
+src/components/GuidePanel.tsx                (+649 lines)  the main side-panel UI
+```
+
+### Files modified
+
+```
+src/app/api/media-sessions/[id]/url/route.ts   ?download=true → forced-attachment signed URL
+src/app/api/media-sessions/route.ts            list endpoint exposes sourceProviderUrl + falls back to it
+src/app/chat/page.tsx                          guide panel + coachmarks + chips + sendMessage(content)
+src/app/code/page.tsx                          guide panel + coachmarks + chips
+src/app/dashboard/page.tsx                     footer Resources/FAQs links
+src/app/faqs/page.tsx                          new "forgot password" FAQ
+src/app/globals.css                            +500 lines: guide panel, coachmark, chips, header toggle
+src/app/image/page.tsx                         guide panel + coachmarks + chips + handleDownload
+src/app/layout.tsx                             ThemeToggle removed (moved into Header)
+src/app/music/page.tsx                         guide panel + coachmarks + chips + handleDownload
+src/app/video/page.tsx                         guide panel + coachmarks + chips + handleDownload + history fallback
+src/components/Header.tsx                      actions prop + ThemeToggle in right side
+src/lib/mediaPersistence.ts                    finalizeVideoUpload writes resultUrl on claim + on failure
+src/lib/nanogpt.ts                             new exported chatComplete() (non-streaming) for /api/guide
+src/lib/storage.ts                             generateSignedGetUrl options.downloadFilename
+```
+
+Total: 23 files changed, ~2,600 insertions, ~83 deletions.
+
+### Subsystem 1 — Static guide content schema
+
+Each `config/guide/<tool>.json` file conforms to:
+
+```ts
+interface GuideContent {
+  whatIsIt: { tier1: string; tier2: string; tier3: string };  // free text, may contain "\n\n"
+  useCases: Array<{
+    id: string;
+    label: string;                                             // shown as a button
+    gettingStarted: {
+      intro: string;
+      examplePrompt: string;                                   // copy-able by the user
+      tips: string[];
+      cautions: string[];
+    } | null;                                                  // null = "I have something else in mind"
+  }>;
+  faqs: {
+    concept:     Array<{ q: string; a: string }>;             // "What is this and how does it work?"
+    practical:   Array<{ q: string; a: string }>;             // "How do I use it?"
+    criticalUse: Array<{ q: string; a: string }>;             // "What should I know about safety and trust?"
+  };
+}
+```
+
+The bot bubbles render whitespace-aware: any `\n\n` in `whatIsIt[tier]` or `faqs[*].a` produces a bubble break. Tips and cautions render as bullet lists.
+
+The "I have something else in mind" use-case (always last; `gettingStarted: null`) is the entry point to a free-form question.
+
+### Subsystem 2 — `GuidePanel` state machine
+
+`Screen` state values:
+
+```
+tier-select → entry-point → ┬→ what-is-it
+                            ├→ use-cases → getting-started
+                            │                ↘
+                            │                 → open-question (for "I have something else in mind")
+                            └→ faq-categories → faq-list → faq-answer
+```
+
+Free-form input is allowed on every screen except `tier-select`. On submit:
+
+1. Try `fuzzyMatchUseCase` against `content.useCases`. On hit (score ≥ 0.25), render the use-case's getting-started bundle and transition to `getting-started`.
+2. Try `fuzzyMatch` against the union of all FAQs. On hit (score ≥ 0.35), render the answer and transition to `faq-answer`.
+3. Otherwise, call `/api/guide` with `{question, tool, tier}` and render the streamed segments. Transition to `faq-answer`.
+
+#### Fuzzy matching algorithm
+
+Located in `src/components/GuidePanel.tsx`. Two refinements that came out of testing:
+
+1. **Query normalization**: strip intent-framing wrappers ("I don't know what X is" → "X", "What does X mean?" → "X", "Tell me about X" → "X") before tokenizing. See `normalizeQuery()`.
+2. **Stop-word list**: a hand-tuned list of 60+ words covering structural grammar, intent framing, and conversational fillers. See `FUZZY_STOP`.
+3. **Orphan-token check**: build the union of tokens that appear anywhere in the FAQ corpus (questions + answers). If *any* query token is missing from the corpus, the question is by definition about something the static content doesn't cover — return `null` and let the live model handle it. This was the fix for "Is PNG the same as JPEG?" incorrectly matching the JPEG FAQ.
+4. **Two-pass scoring**: first pass scores against question text only; if no result above threshold, fall back to question + answer combined. This was the fix for "I don't know what a JPEG is" matching the *file format* FAQ instead of the *what is JPEG* FAQ — the question-only pass disambiguates between FAQs whose answers happen to share vocabulary.
+
+Threshold (0.35) was tuned empirically. Lower → too many false positives. Higher → live model is invoked for well-covered questions.
+
+#### Bubble cadence
+
+`add(...messages)` separates messages by role: user messages render immediately; bot messages are queued through a `setTimeout(500ms)` chain so each bubble appears after a typing-dots indicator. The same cadence is used for live model responses by manually toggling `isThinking` between segments.
+
+#### Tier persistence and reset
+
+- `localStorage['guide_tier']` stores `"1" | "2" | "3"`.
+- Read on first open of the panel; bypass `tier-select` if a valid tier is present.
+- The header chip ("New to tech ✎" etc.) is the reset affordance — clicking it removes the localStorage entry and reopens the wizard.
+- One-time highlight pulse on the chip after the user picks a tier so they discover the chip exists. Same mechanism (a separate `--highlight` modifier with a CSS keyframe) is used to draw attention to the input on `open-question`.
+
+### Subsystem 3 — Live guide route (`/api/guide`)
+
+`POST /api/guide` body: `{ question: string, tool: string, tier: 1|2|3 }`.
+
+- Authentication: same as every other generation route — `requireActiveSession` then `requireApproved`.
+- API key: per-library key via `getNanogptKey(authResult.user.library)`.
+- Model: `modelConfig.chat.model` (the chat tool's model — chosen because it's already proven on this kiosk surface and is not video/image/code-specialized).
+- System prompt is composed from three pieces:
+  - `TOOL_DESCRIPTIONS[tool]` (e.g. "Image Generator tool — an AI tool that creates images from text descriptions")
+  - `TIER_LABELS[tier]` reproduced verbatim so the model can refer to it.
+  - `TIER_GUIDANCE[tier]` — the actual instruction (Tier 1: "no jargon, plain everyday language, real-world analogies, short and encouraging"; Tier 2: "general tech terms ok, explain AI-specific concepts; Tier 3: "AI/tech terminology free, focus on nuance, prompting strategies, limitations").
+- Off-topic guard in the system prompt asks the model to politely deflect and point to the correct tool's guide if asked about something else.
+- Output guidance asks for blank-line-separated paragraphs so the client can split into bubbles.
+
+Why non-streaming: the response is short, the bubble-splitter wants the full text, and it lets us reuse a simple `chatComplete()` helper rather than threading SSE through this side-panel use case.
+
+### Subsystem 4 — `CoachmarkTour`
+
+A standalone component that mounts at the bottom of every generation page. It does not depend on `GuidePanel` other than via the `cm-restart` window event.
+
+- Tour content lives in `TOURS: Record<tool, Step[]>` inside the component. Each step has `{target, title, body, pos}`.
+- `target` is matched against `data-tour="<value>"` on the page. Each generation page tagged the relevant regions: e.g. `data-tour="chat-sidebar"`, `data-tour="image-prompt"`, `data-tour="guide-btn"` (the Learning Guide toggle in the header).
+- Storage key `cm_<username>_<tool>`; the value is the literal string `'true'` once dismissed.
+- The component renders a four-rect backdrop (cropping a hole around the highlighted element), a glowing ring around the cropped region, and a fixed-position tooltip with skip / back / next.
+- On first paint or window resize, the rect is recomputed via `getBoundingClientRect()`.
+- Restart: GuidePanel emits `new CustomEvent('cm-restart', { detail: { tool } })` after clearing `localStorage[cm_*]`. CoachmarkTour listens, resets `stepIdx=0`, and reopens.
+
+### Subsystem 5 — Download path
+
+The pre-existing `<a href={imageUrl} download="...">` pattern was replaced because it does not work on R2 presigned URLs (the browser ignores the `download` hint when the response is from a cross-origin host without `Content-Disposition`).
+
+New flow on the image, video, and music pages:
+
+```ts
+async function handleDownload() {
+  if (!url) return;
+  if (currentSessionId && token) {
+    const res = await fetch(`/api/media-sessions/${id}/url?download=true`, { headers: { Authorization: `Bearer ${token}` } });
+    if (res.ok) { const { url } = await res.json(); window.location.href = url; return; }
+  }
+  // Fallback for legacy/guest cases that don't have a sessionId.
+  try {
+    const blob = await (await fetch(url)).blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'generated-<mode>.<ext>';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  } catch {
+    window.open(url, '_blank');
+  }
+}
+```
+
+The API contract: when `?download=true` is present, the route generates a fresh signed URL with `ResponseContentDisposition: 'attachment; filename="..."'` baked in. Bucket presigned URLs ignore client-supplied response-overrides unless they are part of the signature, so this *must* be set inside `generateSignedGetUrl` — it cannot be appended client-side.
+
+The legacy non-download path (`?download` absent) is unchanged: it still goes through `getMediaUrlCache` so that public-base-URL mode (Cloudflare in front of R2) returns a cacheable URL.
+
+### Subsystem 6 — Header `actions` slot + ThemeToggle relocation
+
+`Header` accepts `{ title?, showBack?, actions? }`. Each generation page passes its `<button data-tour="guide-btn">` for the Learning Guide. ThemeToggle is rendered inside `Header` between "My Account" and "Sign Out" — never as a fixed-position floating button anymore. The CSS for `.theme-toggle` was rewritten: `position: fixed`, `width/height: 44px`, `bottom/right: 24px`, `z-index: 1000` all removed; size shrunk to 32×32 to match the rest of the header chrome. `layout.tsx` no longer renders the toggle.
+
+### Subsystem 7 — Example-prompt chips
+
+Every generation page (chat, image, video, music, code) has a `.example-prompts` block under the input with two `.example-chip` buttons that prefill the input on click.
+
+- Image / video / music / code: chips are static and always visible while there's room.
+- Chat: chips disappear after the second user message and once the user begins typing. Used chips are tracked in a `Set<string>` (`usedChips`) so they don't reappear after `New Chat`. The set is cleared on `handleNewChat`.
+
+### Subsystem 8 — Video history resilience
+
+Three small fixes:
+
+1. `finalizeVideoUpload` now writes `resultUrl: providerVideoUrl` *both* on the atomic `PENDING → UPLOADING` claim and inside the failure handler. Reason: if the upload fails mid-way, the row otherwise has `objectKey: null` and `resultUrl: null`, leaving the sidebar item permanently broken.
+2. `/api/media-sessions` now selects `sourceProviderUrl` and uses it as a final fallback when the row is non-UPLOADED and `resultUrl` is also null. This keeps even pre-fix rows recoverable for the lifetime of the provider URL.
+3. The video page sidebar item handler now clears `videoUrl` and surfaces an error (`"This video is no longer available."`) when neither stored nor presigned URLs are available, instead of silently doing nothing.
+
+### Subsystem 9 — Misc
+
+- New non-streaming export `chatComplete(messages, model, apiKey)` in `lib/nanogpt.ts`. Reuses `fetchWithRetry`, posts `{ model, messages, stream: false }` to `/api/v1/chat/completions`, returns `data.choices[0].message.content`. Used only by `/api/guide` today.
+- Chat page's submit logic was refactored to a `sendMessage(content: string)` helper so the chips can pass a string directly instead of going via `setInput` + simulated form submit. Chat error handling now wraps `res.json()` in `try/catch` since some upstream failures return non-JSON.
+- Dashboard footer now has Resources / FAQs links centered below the tile grid.
+- FAQs page has a new entry: "If I forgot my password, how can I reset it?".
+
+## BETTER ENGINEERING INSIGHTS + BACKLOG ADDITIONS
+
+Insights gained while building this milestone, plus things that should be improved in a future milestone but were out of scope.
+
+### Insights worth keeping
+
+- **Static-first, model-second is the right default** for any "explain this tool" affordance on a kiosk that has metered credits. The static content is always free and always consistent; the model is the long-tail backstop. Patron credit is not spent unless the question genuinely needs the model.
+- **Two-pass fuzzy matching beats fancier scoring** for FAQ disambiguation. Question-text-priority handles the case where two FAQs share answer vocabulary (the original "JPEG" bug). Combined-text fallback handles questions whose phrasing diverges from the FAQ wording.
+- **Orphan-token detection is a small but high-leverage check.** It cheaply routes truly novel questions to the live model. It also doubles as a partial spell-check signal: a typo'd word that doesn't match any corpus token will route to the model rather than fuzzy-matching to something irrelevant.
+- **`data-tour` attribute as the join key** between page markup and the tour-step config is durable: pages can be rearranged structurally without breaking the tour as long as the data attribute stays on a sensibly-shaped element. This is preferable to CSS-class targeting (brittle) or React refs (would force the tour data structure inside each page).
+- **`ResponseContentDisposition` is part of the signature**, not a header you can attach client-side. Forced-download for cross-origin presigned URLs only works if the disposition is folded into the signed URL.
+
+### Backlog (deferred, not blocking)
+
+- **Guide content for Chat and Code** — the user is providing PDFs progressively. `chat.json` and `code.json` exist with placeholder/draft copy and need a verbatim pass against the still-pending PDFs. The image, video, and music JSON files have already been verbatim-aligned against their PDFs.
+- **Live guide answers are not credit-deducted** today. The guide route calls NanoGPT but doesn't go through `deductCredits` or `logUsage`. This is currently fine because the responses are short and infrequent, but if usage grows it should either be instrumented for visibility or moved onto a small dedicated credit cost.
+- **Single-question stateless live guide.** Multi-turn follow-up ("can you explain that more simply?") is not supported. This is intentional for now (keeps state simple) but is the most likely thing a Tier 1 patron will want — it should be revisited if user testing surfaces it.
+- **No analytics on which static FAQs are read vs. which questions go to the live model.** A lightweight client-side ping on FAQ open / use-case open / live-guide invocation would tell us where the static content is too thin.
+- **Coachmark target rect doesn't auto-update on layout changes other than resize.** If a tour step's target element scrolls or is otherwise repositioned without a window resize, the ring drifts. Acceptable for the kiosk's current pages (no virtualized lists) but a future content-rich page would need an `IntersectionObserver` or a per-frame poll.
+- **`FUZZY_STOP` and `URL_RE` are GuidePanel-local.** If we ever build a second fuzzy-matched surface, both should move to a `lib/guide/fuzzy.ts` module with shared tests.
+- **The guide tier is per-browser, not per-user.** A patron logging in on a different kiosk gets the wizard again. Acceptable for the kiosk model (browsers are dedicated devices), but if a persistent login surface ever materializes, this should move to `User.guideTier`.
+
+## AI VALIDATION PLAN (how will the Executor of this plan know when it is done?)
+
+The plan was implemented over multiple sessions on `arpita-explore`; this section reflects what would prove the implementation correct.
+
+1. **Static analysis**: `npx tsc --noEmit` passes; no untyped JSON imports, no `any` in `GuidePanel.tsx` or `CoachmarkTour.tsx`. The guide content JSON files are typed via the `GuideContent` interface and used through `as GuideContent` casts.
+2. **Build**: `npm run build` succeeds with no Next.js client/server boundary errors. The most fragile boundary is `GuidePanel`'s static JSON imports — they must not pull `'server-only'` modules transitively.
+3. **`/api/guide` smoke test**: posting `{ question: "what is a prompt?", tool: "image", tier: 1 }` with a valid bearer token returns a 200 with a non-empty `response` field whose content is at a Tier-1 reading level. Posting without auth returns 401. Posting with `tool: "weather"` (an unknown tool) still returns a 200 because `TOOL_DESCRIPTIONS` falls back to a generic descriptor — this is intentional.
+4. **Fuzzy match unit checks** (manual at the moment, should be automated in a follow-up):
+   - `"I don't know what a JPEG is"` returns the `What is a JPEG file?` FAQ in the image guide.
+   - `"JPEG means?"` returns the same.
+   - `"Is PNG the same as JPEG?"` returns `null` (orphan token `png`) and routes to the live model.
+   - `"How do I download my image?"` returns the download FAQ (token-overlap with the "Can I download or save my generated image?" question).
+5. **Coachmark tour**: clearing `localStorage` and reloading any generation page shows the tour. Clicking through to "Got it!" persists `cm_<user>_<tool>=true`. Clicking "↺ Restart page tour" inside the Learning Guide replays the tour without a reload.
+6. **Download**: clicking Download on an UPLOADED image/video/music session results in a file download (not a new browser tab) with a sensible filename (`generated-image.avif`, `generated-video.mp4`, `generated-music.mp3` etc.). Confirm via DevTools Network that the request is to `/api/media-sessions/<id>/url?download=true` and the redirected R2 response includes `Content-Disposition: attachment`.
+7. **Theme toggle in header**: switching themes from the toggle in the header persists across page navigations and reloads. No theme flash on cold reloads (the inline `<script>` in `<head>` still wins).
+8. **Header `actions`**: removing the actions prop from any generation page (e.g. by reverting just one page) cleanly drops the Learning Guide button without breaking layout. The `actions` slot is otherwise unused on the dashboard and admin pages.
+9. **Video history resilience**: simulate a video session whose R2 upload failed — its sidebar entry should still play via the provider URL until that URL expires. After expiration, clicking it should set the `"This video is no longer available."` error rather than silently doing nothing.
+
+## AI VALIDATION RESULTS (how did the Executor show that it was done?)
+
+Filled retrospectively from the live state of `arpita-explore`.
+
+- **TypeScript / build**: no boundary or type errors observed in the live dev server during the work. (Re-running `npx prisma generate` was needed once after pulling main due to a stale generated client; documented in the previous session.)
+- **Fuzzy match bugs (specific cases reported by user)**:
+  - "I don't know what a JPEG is" → was returning the file-format FAQ, then was fixed by the question-text-priority pass; now returns the *What is a JPEG file?* FAQ.
+  - "JPEG means?" → same fix.
+  - "Is PNG the same as JPEG?" → was matching the JPEG FAQ via "same" as an incidental token; fixed by orphan-token detection (`png` is not in the image guide corpus); now routes to the live model.
+- **Three-dot menu vs. button**: confirmed by the user that both work for music and video (initial fix incorrectly removed the three-dot menu reference from the FAQ; restored to the verbatim PDF copy).
+- **Theme toggle**: visually verified inside the header on all generation pages; floating fixed-position version is gone from `layout.tsx`.
+- **Download button**: end-to-end download produces a file (not a tab) on an UPLOADED image session.
+- **Coachmark tour**: per-user-per-tool persistence verified manually; restart link in Learning Guide replays the tour.
+- **Login**: separately fixed during this session — the "Unknown argument `lastLoginAt`" error was due to a stale generated Prisma client; resolved by `npx prisma generate`. Not a code change in this milestone.
+- **Merge with main**: the merge brought in `CreditBadge` (renewal-tooltip wrapper) from `main`. Header was reconciled to keep both `CreditBadge` and the milestone's `actions` + `ThemeToggle` additions. No conflict markers remain in the tree (`grep -R '<<<<<<< '` clean).
+
+Outstanding: chat.json and code.json are awaiting verbatim alignment with the user-supplied PDFs (PDFs not yet provided).
+
+## USER VALIDATION SUGGESTIONS
+
+A walkthrough you can follow to see what's been built.
+
+### A. Learning Guide — first-time user (Tier 1)
+
+1. Open an Incognito window (so localStorage is fresh) and log in or continue as guest.
+2. Open any tool, e.g. **Images**.
+3. The page tour starts after ~500ms — click **Next** through each step until **Got it!**.
+4. Click the **Learning Guide** button in the header. A side panel slides in with "Hi! Before we start…".
+5. Pick **"I'm new to technology and AI tools"**. Notice the orange chip pulse in the panel header — that's the affordance to change tier later.
+6. Click **What is this tool?** — the answer should be jargon-free and short.
+7. Click **What can I do with this tool?** — pick a use case. You should see an intro, an example prompt with a copy button, tips, and a "Keep in mind" cautions block.
+8. Click the **copy** button — it should briefly say "✓ Copied!" and the prompt is in your clipboard.
+9. Type any of the FAQ questions roughly (e.g. "what does art style mean?") into the input — it should fuzzy-match to the corresponding FAQ.
+10. Type a clearly novel question that mentions a word not in the corpus (e.g. "how do I print my image on a postcard?"). The thinking dots should appear and then a multi-bubble live-model answer at Tier-1 complexity.
+
+### B. Tier change
+
+1. Inside the Learning Guide, click the **New to tech ✎** chip in the panel header. The wizard should reset.
+2. Pick **"I've tried AI tools and want to learn how to use them more effectively"**.
+3. Re-ask the same novel question — the answer should now use AI/prompting terminology more freely.
+
+### C. Coachmark restart
+
+1. Inside the Learning Guide, click **↺ Restart page tour** at the top.
+2. The tour should replay from step 1 without a page reload.
+
+### D. Download
+
+1. Generate an image (or open an existing one from history).
+2. Click **Download Image**. A file with a `.avif` (or whatever the underlying mime is) extension should land in your downloads folder.
+3. DevTools Network tab should show a request to `/api/media-sessions/<id>/url?download=true` followed by a navigation to a long R2 presigned URL.
+4. Repeat for video (Download Video → mp4) and music (Download Audio → mp3).
+5. Confirm the **three-dot menu** in the audio/video player still also offers Download — both paths are first-class.
+
+### E. Theme toggle
+
+1. Click the small theme icon in the page header (between the credit badge and Sign Out).
+2. The whole UI should switch themes immediately, no flash on subsequent navigations.
+
+### F. Fuzzy match regression
+
+1. In the Image learning guide, type **"Is PNG the same as JPEG?"** — you should see thinking dots and a live-model response, **not** the JPEG FAQ.
+2. Type **"I don't know what a JPEG is"** — you should see the static "What is a JPEG file?" FAQ answer, **not** the file-format one.
+
+### G. Video history resilience
+
+1. Open a video that successfully uploaded. It should play.
+2. Click an older history item that failed mid-upload. Either it plays from the provider URL fallback, or you see the **"This video is no longer available."** error — never a silent black box.
+
+If any of A–G doesn't behave as described, that's a regression worth filing.

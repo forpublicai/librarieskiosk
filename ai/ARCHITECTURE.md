@@ -23,6 +23,7 @@ When adding architectural notes, follow the LEARNINGS scope ladder (see [LEARNIN
 │  /api/auth/*    → JWT issue/verify, ActiveSession            │
 │  /api/{mode}    → credit deduct, usage log, NanoGPT call,    │
 │                   optional R2 persistence                    │
+│  /api/guide     → tier-aware live answer (no credit deduct)  │
 │  /admin /api/admin/*                                         │
 │  /admin/superadmin /api/admin/superadmin/*                   │
 └──────┬────────────────────────┬──────────────────────────────┘
@@ -188,23 +189,28 @@ Notable fields and invariants:
 
 ## 6. Storage layer
 
-- **`lib/storage.ts`**: S3 SDK wrapper for R2. Lazy client. `forcePathStyle: true` (R2 requires it). Object keys `media/{mode}/{userId}/{yyyy}/{mm}/{uuid}.{ext}` — `userId` is sanitized; UUID guarantees uniqueness within the same month-bucket.
+- **`lib/storage.ts`**: S3 SDK wrapper for R2. Lazy client. `forcePathStyle: true` (R2 requires it). Object keys `media/{mode}/{userId}/{yyyy}/{mm}/{uuid}.{ext}` — `userId` is sanitized; UUID guarantees uniqueness within the same month-bucket. `generateSignedGetUrl(key, ttl?, { downloadFilename? })`: when `downloadFilename` is set, the signed URL bakes `ResponseContentDisposition: attachment; filename="..."` into the *signature* — that header has to be part of the signed query, not appended client-side.
 - **SSRF guard** for `uploadFromUrl`: HTTPS only, DNS lookup before fetch with private-IP rejection (IPv4 + IPv6 incl. `::ffff:` v4-mapped), `redirect: 'manual'` with max 1 hop, content-length pre-check, content-type allow list, no forwarded auth/cookies.
 - **`lib/imagePipeline.ts`**: sharp pipeline → AVIF full (q60) + thumbnail (max 320px, q45). Failure falls back to original PNG.
 - **`lib/mediaPersistence.ts`**: orchestrator between routes and storage. Each `persistXxxResult` writes a `MediaSession` even on failure (UI still gets *something*). Best-effort cleanup of half-uploaded objects.
 - **`lib/mediaUrlCache.ts`**: read-URL resolution. Public base URL → cacheable URL (preferred when set); else memoized signed URL with 5-min refresh margin. Per-pod memo, no shared cache needed (objects are immutable).
+- **Forced-attachment download path**: `GET /api/media-sessions/[id]/url?download=true` calls `generateSignedGetUrl` with a `downloadFilename` and bypasses the URL cache (the cached URL doesn't have `Content-Disposition: attachment` baked in). Generation pages call this when the user clicks Download; falling back to a blob fetch only for legacy/guest cases that don't have a sessionId. Without the forced disposition, R2 cross-origin presigned URLs render in the browser instead of downloading because the `<a download>` hint is ignored cross-origin.
+- **Video failure fallback**: `MediaSession.sourceProviderUrl` is the provider's original URL, written by `finalizeVideoUpload` on both the atomic claim and the failure handler. If R2 upload fails, `/api/media-sessions` returns it as `legacyUrl` so the patron's history item still plays for as long as the provider URL stays alive.
 
 ## 7. Frontend
 
-- App Router with one root `layout.tsx` that wraps everything in `AuthProvider` + `ThemeToggle`.
+- App Router with one root `layout.tsx` that wraps everything in `AuthProvider`. The inline theme-flash-prevention `<script>` is in `<head>`; the visible toggle is no longer in the root layout.
 - `AuthProvider`:
   - Keeps `user` + `token` in React state, mirrored to `localStorage['kiosk_token']`.
   - On mount: if a token exists, calls `/api/auth/me`; on 401, logs out.
   - 10-minute inactivity timer (mouse/keyboard/touch/scroll); fires `logout()`.
   - 1-minute heartbeat (PATRONs only) — only pings if `hadActivityRef` was set since the last tick. Idle kiosks let their server session lapse naturally.
   - Logout flow: best-effort `/api/auth/cleanup` (guest only) + `/api/auth/logout` + clears local state + `clearAllGuestState()`.
-- `ThemeToggle`: light/dark toggle persisted in `localStorage['theme']`. SSR-safe initial class set by an inline `<script>` in `layout.tsx` to avoid theme flash.
-- Pages: each mode (`/chat`, `/image`, `/video`, `/music`, `/code`) is a single `'use client'` page that fetches once, manages its own state, and posts to its API route. No global state library.
+- `Header`: shows credit badge, optional `actions` slot for per-page chrome (used by the Learning Guide button), `<ThemeToggle>`, sign-out. The `actions` prop is the canonical extension point — never reach for a parallel `<Header2>`.
+- `ThemeToggle`: light/dark toggle persisted in `localStorage['theme']`. SSR-safe initial class set by an inline `<script>` in `layout.tsx` to avoid theme flash. Renders inside `Header`, not as a fixed-position floating control.
+- `GuidePanel`: per-tool side panel with tier-gated static content (`config/guide/<tool>.json`) plus a free-form input that fuzzy-matches FAQs, falls through to `/api/guide` when no static match is found. Mounted by every generation page; visible only when the per-page `guideOpen` state flips it open. See §11.
+- `CoachmarkTour`: per-tool first-visit page tour that anchors to `data-tour="..."` attributes. Per-user-per-tool dismissal state in `localStorage['cm_<username>_<tool>']`. Restartable from `GuidePanel` via the `cm-restart` window event.
+- Pages: each mode (`/chat`, `/image`, `/video`, `/music`, `/code`) is a single `'use client'` page that fetches once, manages its own state, and posts to its API route. No global state library. Each page tags its key regions with `data-tour="<id>"` attributes for the tour, and passes a `<button data-tour="guide-btn">` into `Header.actions`.
 - `useGenerationProgress`: shared progress UI hook for long-running generations (mostly video).
 
 ## 8. Configuration
@@ -226,7 +232,71 @@ Notable fields and invariants:
 - `scripts/backfill-media-to-r2.ts` re-uploads legacy media into R2 for environments migrating from the pre-R2 era.
 - `prisma/scripts/move-to-public-ai.ts` is the canonical pattern for one-off ops scripts (env-loaded, separate Prisma client, exit codes).
 
-## 10. Boundaries: what this app deliberately does *not* do
+## 10. Learning Guide and onboarding
+
+The kiosk's audience often includes patrons who have never used a generative-AI tool. Two complementary surfaces lower that floor without bloating the chrome of the generation pages.
+
+### 10.1 `GuidePanel`
+
+A side panel mounted on every generation page, opened by a header button. State machine:
+
+```
+tier-select → entry-point → ┬→ what-is-it
+                            ├→ use-cases → getting-started ────┐
+                            │                  ↘                │
+                            │                   open-question ──┤
+                            └→ faq-categories → faq-list →     ──→ faq-answer
+                                                                    (free-form input)
+```
+
+The "tier" — the user's stated experience level — is the dominant axis. It is stored in `localStorage['guide_tier']` (`"1" | "2" | "3"`), read once on first open, and mirrored into the panel-header chip ("New to tech ✎" etc.) so the user can change it at any time. The chip pulses once after first selection to draw attention to its existence.
+
+**Static content** lives in `config/guide/<tool>.json` (chat, code, image, video, music). The schema:
+
+```ts
+{
+  whatIsIt:   { tier1, tier2, tier3 },          // free text, "\n\n" → bubble break
+  useCases:   [{ id, label, gettingStarted: { intro, examplePrompt, tips[], cautions[] } | null }],
+  faqs:       { concept, practical, criticalUse }      // each is [{ q, a }]
+}
+```
+
+The last use-case in every file (`gettingStarted: null`) is the open-input fallback ("I have something else in mind"). Authored copy is sourced verbatim from PDFs; do not paraphrase.
+
+**Free-form input** is allowed on every screen except `tier-select`. On submit:
+
+1. Fuzzy-match against `useCases` (score ≥ 0.25). On hit → render that use-case's getting-started bundle.
+2. Else fuzzy-match against the union of all FAQs (score ≥ 0.35). On hit → render the answer.
+3. Else → call `/api/guide` with the question, tool, and tier. Render bubble-by-bubble.
+
+The fuzzy matcher (a) normalizes intent-framing wrappers (`I don't know what X is` → `X`), (b) tokenizes against a hand-tuned 60-word stop list, (c) **rejects orphan tokens** — if a query token doesn't appear anywhere in the FAQ corpus the question is by construction beyond the static content and is routed to the live model, and (d) does a **two-pass score**: question-text first (disambiguates between FAQs whose answers share vocabulary), combined-text fallback. These specific behaviors exist because they were debugged into the matcher to fix false positives ("I don't know what a JPEG is" matching the file-format FAQ; "Is PNG the same as JPEG?" matching the JPEG FAQ via incidental shared words).
+
+**Bubble cadence**: bot bubbles are queued through `setTimeout(500ms)` chains with a typing-dots indicator between them. Both static and live answers split on `\n\n` so multi-paragraph content reads as several short messages.
+
+### 10.2 `/api/guide`
+
+`POST /api/guide` body: `{ question, tool, tier: 1|2|3 }`.
+
+- Auth: `requireActiveSession` + `requireApproved` (same gate as every generation route).
+- Per-library NanoGPT key via `getNanogptKey(library)`.
+- Model: `modelConfig.chat.model` (the chat tool's model — small, fast, conversational).
+- System prompt is composed from `TOOL_DESCRIPTIONS[tool]` + `TIER_LABELS[tier]` + `TIER_GUIDANCE[tier]`. The tier guidance is what actually changes the response complexity — Tier 1 forces plain-English with everyday analogies, Tier 3 allows AI-specific terminology.
+- An off-topic guard in the system prompt instructs the model to politely deflect to the matching tool's own guide if the question isn't about the current tool.
+- **Stateless.** No conversation history is sent. Each call is one question + one answer. (Multi-turn follow-up is a known gap, deferred.)
+- **Not credit-deducted.** The route does not call `deductCredits`/`logUsage`. This is intentional for the current scale; revisit if usage grows enough to be worth measuring.
+
+The non-streaming `chatComplete()` helper in `lib/nanogpt.ts` is used here (and only here) — the response is short enough that streaming adds complexity for no gain.
+
+### 10.3 `CoachmarkTour`
+
+Per-tool first-visit page tour. Anchors to elements via `data-tour="<id>"` attributes — a deliberate decoupling so the page markup can be rearranged without touching the tour content.
+
+- Tour content lives inside `CoachmarkTour.tsx` as `TOURS: Record<tool, Step[]>`. Each step has `{ target, title, body, pos }`.
+- Storage key `cm_<username>_<tool>` (or `cm_anon_<tool>` for guests). Once dismissed, never reappears for that user-on-that-tool unless explicitly restarted.
+- Restart channel: `GuidePanel` removes the storage key and dispatches a `cm-restart` `CustomEvent` on `window`; `CoachmarkTour` listens, resets state, and replays.
+- Visual: four-rect backdrop carving a hole around the target, a glowing ring around the hole, and a fixed-position tooltip clamped to the viewport.
+
+## 11. Boundaries: what this app deliberately does *not* do
 
 - **No payments.** Credits are an internal abstraction over weekly grants; there is no purchase flow.
 - **No PII.** Username + library + bcrypt password hash + bcrypt security-answer hash. No emails, names, or phone numbers.

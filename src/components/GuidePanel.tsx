@@ -165,10 +165,19 @@ function fuzzyMatch(query: string, faqs: FAQ[]): FAQ | null {
   return best && best.score >= 0.35 ? best.faq : null;
 }
 
+const MAX_INPUT_WORDS = 25;
+const SOFT_WARN_WORDS = 20;
+
+function countWords(s: string): number {
+    const trimmed = s.trim();
+    if (!trimmed) return 0;
+    return trimmed.split(/\s+/).filter(Boolean).length;
+}
+
 function fuzzyMatchUseCase(query: string, useCases: UseCase[]): UseCase | null {
   const qTokens = tokenize(normalizeQuery(query));
   if (!qTokens.length) return null;
-  let best: { uc: UseCase; score: number } | null = null;
+  let best: { uc: UseCase; score: number; hits: number } | null = null;
   for (const uc of useCases) {
     if (!uc.gettingStarted) continue;
     const gs = uc.gettingStarted;
@@ -176,9 +185,15 @@ function fuzzyMatchUseCase(query: string, useCases: UseCase[]): UseCase | null {
     const ucTokenSet = new Set(tokenize(text));
     const hits = qTokens.filter(t => ucTokenSet.has(t)).length;
     const score = hits / qTokens.length;
-    if (!best || score > best.score) best = { uc, score };
+    if (!best || score > best.score) best = { uc, score, hits };
   }
-  return best && best.score >= 0.25 ? best.uc : null;
+  if (!best || best.score < 0.25) return null;
+  // Require at least 2 overlapping tokens for multi-token queries — a single
+  // common word like "image" or "code" coincidentally hitting a use-case body
+  // is not a real match. Single-token queries get a free pass since they have
+  // only one possible hit.
+  if (qTokens.length > 1 && best.hits < 2) return null;
+  return best.uc;
 }
 
 
@@ -195,6 +210,7 @@ export default function GuidePanel({ tool, isOpen }: GuidePanelProps) {
   const [highlightBadge, setHighlightBadge] = useState(false);
   const [highlightInput, setHighlightInput] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
+  const [liveLimitReached, setLiveLimitReached] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const initializedRef = useRef(false);
@@ -360,8 +376,12 @@ export default function GuidePanel({ tool, isOpen }: GuidePanelProps) {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ question, tool, tier }),
       });
-      if (!res.ok) throw new Error('Guide request failed');
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.message || body.error || 'Guide request failed');
+      }
       const data = await res.json();
+      if (data.limitReached) setLiveLimitReached(true);
       const segments = splitIntoBubbles(data.response || '');
       setIsThinking(false);
       for (let i = 0; i < segments.length; i++) {
@@ -385,6 +405,7 @@ export default function GuidePanel({ tool, isOpen }: GuidePanelProps) {
     e.preventDefault();
     const q = freeInput.trim();
     if (!q) return;
+    if (countWords(q) > MAX_INPUT_WORDS) return;  // hard block; UI also disables submit
     setFreeInput('');
 
     if (screen === 'open-question') {
@@ -413,8 +434,7 @@ export default function GuidePanel({ tool, isOpen }: GuidePanelProps) {
         setScreen('faq-answer');
         return;
       }
-      setMessages(prev => [...prev, { role: 'user', content: q }]);
-      await callLiveGuide(q);
+      await routeToLiveOrLimit(q);
       setScreen('faq-answer');
       return;
     }
@@ -442,15 +462,30 @@ export default function GuidePanel({ tool, isOpen }: GuidePanelProps) {
         ...segments.map(s => ({ role: 'bot' as const, content: s }))
       );
     } else {
-      setMessages(prev => [...prev, { role: 'user', content: q }]);
-      await callLiveGuide(q);
+      await routeToLiveOrLimit(q);
     }
     setScreen('faq-answer');
+  }
+
+  // Falls back to the live model — but if the per-session live-exchange limit
+  // has already been reached, render the librarian-redirect locally instead of
+  // hitting the API (the server would just bounce it anyway).
+  async function routeToLiveOrLimit(q: string) {
+    if (liveLimitReached) {
+      await add(
+        { role: 'user', content: q },
+        { role: 'bot', content: "You've used your live questions for this session. FAQs, tips and use cases above are still available for your reference. For additional help, ask a librarian." }
+      );
+      return;
+    }
+    setMessages(prev => [...prev, { role: 'user', content: q }]);
+    await callLiveGuide(q);
   }
 
   function resetTier() {
     localStorage.removeItem(TIER_LS_KEY);
     setTier(null);
+    setLiveLimitReached(false);
     setMessages([{ role: 'bot', content: 'Which of these best describes you?' }]);
     setScreen('tier-select');
     initializedRef.current = true;
@@ -632,18 +667,37 @@ export default function GuidePanel({ tool, isOpen }: GuidePanelProps) {
         </div>
       </div>
 
-      {screen !== 'tier-select' && (
-        <form className="guide-panel-input" onSubmit={handleFreeInputSubmit}>
-          <input
-            ref={inputRef}
-            className={`guide-input${highlightInput ? ' guide-input--highlight' : ''}`}
-            value={freeInput}
-            onChange={e => setFreeInput(e.target.value)}
-            placeholder={screen === 'open-question' ? 'Describe what you have in mind...' : 'Type a question...'}
-          />
-          <button type="submit" className="guide-send-btn" disabled={!freeInput.trim()}>➤</button>
-        </form>
-      )}
+      {screen !== 'tier-select' && (() => {
+        const wordCount = countWords(freeInput);
+        const tooLong = wordCount > MAX_INPUT_WORDS;
+        const nearLimit = wordCount >= SOFT_WARN_WORDS && !tooLong;
+        return (
+          <>
+            {liveLimitReached && (
+              <div className="guide-limit-banner">
+                You've used your live questions for this session. FAQs, tips and use cases above are still available for your reference. For additional help, ask a librarian.
+              </div>
+            )}
+            <form className="guide-panel-input" onSubmit={handleFreeInputSubmit}>
+              <input
+                ref={inputRef}
+                className={`guide-input${highlightInput ? ' guide-input--highlight' : ''}`}
+                value={freeInput}
+                onChange={e => setFreeInput(e.target.value)}
+                placeholder={screen === 'open-question' ? 'Describe what you have in mind...' : 'Type a question...'}
+              />
+              <button type="submit" className="guide-send-btn" disabled={!freeInput.trim() || tooLong}>➤</button>
+            </form>
+            {(nearLimit || tooLong) && (
+              <div className={`guide-word-count${tooLong ? ' guide-word-count--error' : ' guide-word-count--warn'}`}>
+                {tooLong
+                  ? `Too long (${wordCount} words). Please shorten — ${MAX_INPUT_WORDS} word limit.`
+                  : `${wordCount} / ${MAX_INPUT_WORDS} words — keep it short`}
+              </div>
+            )}
+          </>
+        );
+      })()}
     </div>
   );
 }

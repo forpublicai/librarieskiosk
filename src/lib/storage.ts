@@ -285,6 +285,16 @@ export async function objectExists(key: string): Promise<boolean> {
 
 // ---------- Signed URL / delete ----------
 
+// Build a Content-Disposition header value safely.
+// CRLF, quotes, backslashes, or control chars in the filename can either break
+// the header or enable header injection. Strip them from the ASCII fallback,
+// and use RFC 5987 `filename*=UTF-8''<percent-encoded>` for non-ASCII safety.
+function buildAttachmentDisposition(filename: string): string {
+    const ascii = filename.replace(/[\x00-\x1f\x7f"\\]/g, '_') || 'download';
+    const encoded = encodeURIComponent(filename);
+    return `attachment; filename="${ascii}"; filename*=UTF-8''${encoded}`;
+}
+
 export async function generateSignedGetUrl(
     key: string,
     ttlSeconds?: number,
@@ -295,7 +305,7 @@ export async function generateSignedGetUrl(
     const ttl = ttlSeconds ?? env.signedUrlTtlSeconds;
     const commandInput: Parameters<typeof GetObjectCommand>[0] = { Bucket: env.bucket, Key: key };
     if (options?.downloadFilename) {
-        commandInput.ResponseContentDisposition = `attachment; filename="${options.downloadFilename}"`;
+        commandInput.ResponseContentDisposition = buildAttachmentDisposition(options.downloadFilename);
     }
     return getSignedUrl(client, new GetObjectCommand(commandInput), { expiresIn: ttl });
 }

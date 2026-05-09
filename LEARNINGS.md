@@ -74,6 +74,10 @@ Generated PNGs are 1–4 MB; AVIF q60 is ~85% smaller and indistinguishable for 
 
 `uploadFromUrl` enforces HTTPS, DNS lookup with private-IP rejection (IPv4 + IPv6 incl. `::ffff:` v4-mapped), `redirect: 'manual'` with at most one hop, content-length pre-check, content-type allow list, and never forwards auth/cookies. **Why:** taking a URL from an external service and fetching it server-side is a textbook SSRF. Cloud metadata endpoints (`169.254.169.254`) are reachable from naive `fetch` calls. **How to apply:** any new "fetch this URL on the server and store it" feature must reuse `safeFetchBuffer` (or its public wrappers `uploadFromUrl` / `fetchBytesFromUrl`). Do not handroll a `fetch` for this.
 
+### Forced-attachment downloads from cross-origin presigned URLs require `ResponseContentDisposition` in the *signed* URL
+
+The HTML `<a download="...">` attribute is ignored when the response comes from a different origin without a matching `Content-Disposition: attachment` header — clicking the link opens the file in a new tab instead of downloading it. For S3/R2 presigned URLs, the only way to attach `Content-Disposition` is to set `ResponseContentDisposition` on the `GetObjectCommand` *before* signing — appending it as a query string after the fact breaks the signature. **Why:** this was the entire reason the old `<a download>` pattern silently failed for image/video/audio downloads; the file would render in the browser instead of saving. **How to apply:** any "download this from R2" feature should call `generateSignedGetUrl(key, ttl, { downloadFilename })`. If you need a different disposition or filename per request, do not cache the URL — generate a fresh signed URL per click, since the cache key would have to include the disposition.
+
 ## Data model
 
 ### Prisma's `prisma-client` (v7) generator outputs to `src/generated/prisma`
@@ -97,6 +101,28 @@ Theme is set by `localStorage['theme']` but read before React mounts via a tiny 
 ### `'use client'` is a leaf decision, not a tree decision
 
 Pages are mostly `'use client'` because they're heavily interactive, but `lib/` and route handlers stay server-side. Don't reach for `'use client'` at the top of a layout to "make children easier" — push it down to the leaves and keep server boundaries crisp.
+
+### Anchor visual overlays via `data-*` attributes, not CSS classes or refs
+
+The first-visit page tour (`CoachmarkTour`) finds its targets via `document.querySelector('[data-tour="..."]')`. The mapping between tour-step config and DOM elements is decoupled from the page markup: pages can be restructured, classes renamed, components swapped — the tour keeps working as long as a sensibly-shaped element still carries the data attribute. **Why:** class-based targeting breaks every time the design system tightens; ref-based targeting forces tour content to be embedded inside the page component instead of in a single config. **How to apply:** any cross-cutting overlay (tours, A/B-test highlights, analytics anchors) should join to the DOM via a dedicated `data-*` attribute, not through styling or component refs.
+
+### Header `actions` slot is the canonical extension point — don't fork the component
+
+Per-page chrome (the Learning Guide button, future per-page helpers) goes through `<Header actions={...} />`. There is no `<Header2>` and there shouldn't be — the cost of a parallel header component is that the two drift in spacing, theme, and accessibility. **Why:** every shared layout component on this surface eventually grows page-specific buttons; a slot keeps the component shared while letting each page own its own affordance. **How to apply:** when you need page-specific UI in shared chrome, add a `ReactNode` slot prop to the existing component before reaching for a new one.
+
+## AI-assisted UI surfaces
+
+### Static content first, live model as the long-tail backstop
+
+For any "explain this" surface that runs on metered model calls, the right default is curated static content with the live model only invoked when the user clearly asks something the static content doesn't cover. The Learning Guide ships hand-authored JSON for every tool; the live `/api/guide` route only fires when fuzzy-matching against the FAQs and use-cases finds nothing. **Why:** static content is free, deterministic, and authored by people who know the product — the model is the cleanup crew, not the front line. The reverse default ("live model with optional static fallback") burns credits answering questions the team has already answered better, and ships answers that drift session-to-session. **How to apply:** any onboarding, help, or "what is this" surface should start as static content; add a live-model fallback only after you can point at the specific class of question the static content can't reasonably cover.
+
+### FAQ matchers need a two-pass score, not just a combined-text score
+
+When matching a user query against `[{q, a}, ...]`, score against `q` *first*, and only fall back to `q + a` combined if the question-only pass produces no result above threshold. **Why:** combined-text scoring lets vocabulary that incidentally appears in an *answer* outweigh the actual question intent — the original bug was "I don't know what a JPEG is" matching the *file format* FAQ instead of the *what is JPEG* FAQ, because the file-format answer mentioned "JPEG" once and the JPEG-definition question's answer mentioned it many times. Question-only matching disambiguates cleanly because each FAQ's question is a unique handle. **How to apply:** for any small-corpus retrieval over `(label, body)` pairs, score against the label first; treat the body as a tiebreaker.
+
+### Reject "orphan tokens" before fuzzy-matching anything
+
+Before scoring a query against any corpus, build the union of tokens that appear anywhere in the corpus and check that *every* meaningful query token is present in that union. If even one is missing, return no match. **Why:** a query whose tokens partially overlap the corpus by accident ("Is PNG the same as JPEG?" matched the JPEG FAQ via "same") will always score above zero; a strict threshold is not enough. The orphan check is a cheap one-liner that catches "you're asking about something we don't cover" much more reliably than tuning the score floor. **How to apply:** any fuzzy/keyword retrieval that has a "no match → fall back to live model / search / ..." path should orphan-check first. The orphan check is also a free partial spell-check signal.
 
 ## Documentation
 

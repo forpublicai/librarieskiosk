@@ -1933,3 +1933,30 @@ textarea.input {
   opacity: 0.35;
   cursor: not-allowed;
 }
+
+.guide-word-count {
+  font-size: 0.7rem;
+  padding: 4px 14px 8px;
+  text-align: right;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+}
+
+.guide-word-count--warn {
+  color: var(--accent-orange);
+}
+
+.guide-word-count--error {
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+.guide-limit-banner {
+  margin: 8px 12px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-secondary);
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
