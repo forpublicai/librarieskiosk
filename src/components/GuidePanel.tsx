@@ -2,11 +2,6 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/components/AuthProvider';
-import chatContent from '../../config/guide/chat.json';
-import musicContent from '../../config/guide/music.json';
-import imageContent from '../../config/guide/image.json';
-import videoContent from '../../config/guide/video.json';
-import codeContent from '../../config/guide/code.json';
 
 type Tier = 1 | 2 | 3;
 type FaqCategory = 'concept' | 'practical' | 'criticalUse';
@@ -51,12 +46,16 @@ interface GuidePanelProps {
   isOpen: boolean;
 }
 
-const CONTENT_MAP: Record<string, GuideContent> = {
-  chat: chatContent as GuideContent,
-  music: musicContent as GuideContent,
-  image: imageContent as GuideContent,
-  video: videoContent as GuideContent,
-  code: codeContent as GuideContent,
+// Dynamic-import loaders, one per tool. Each is a separate code-split chunk
+// the bundler emits lazily — the JSON for a tool only ships to the browser
+// after the user opens the guide panel on that tool's page. Avoids bundling
+// ~30KB of guide content into every page that just imports `GuidePanel`.
+const CONTENT_LOADERS: Record<string, () => Promise<{ default: unknown }>> = {
+  chat: () => import('../../config/guide/chat.json'),
+  music: () => import('../../config/guide/music.json'),
+  image: () => import('../../config/guide/image.json'),
+  video: () => import('../../config/guide/video.json'),
+  code: () => import('../../config/guide/code.json'),
 };
 
 const TIER_LS_KEY = 'guide_tier';
@@ -197,9 +196,30 @@ function fuzzyMatchUseCase(query: string, useCases: UseCase[]): UseCase | null {
 }
 
 
+// Outer wrapper: lazy-loads the JSON for `tool` on first open, then delegates
+// to the implementation component once content is available. Splitting it
+// this way lets the implementation rely on `content: GuideContent` (non-null)
+// without sprinkling guards through every handler.
 export default function GuidePanel({ tool, isOpen }: GuidePanelProps) {
+  const [content, setContent] = useState<GuideContent | null>(null);
+
+  useEffect(() => {
+    if (!isOpen || content) return;
+    const load = CONTENT_LOADERS[tool];
+    if (!load) return;
+    let cancelled = false;
+    load()
+      .then((mod) => { if (!cancelled) setContent(mod.default as GuideContent); })
+      .catch((err) => console.error(`Failed to load guide content for tool="${tool}"`, err));
+    return () => { cancelled = true; };
+  }, [isOpen, tool, content]);
+
+  if (!content) return null;
+  return <GuidePanelInner content={content} tool={tool} isOpen={isOpen} />;
+}
+
+function GuidePanelInner({ content, tool, isOpen }: GuidePanelProps & { content: GuideContent }) {
   const { user, token } = useAuth();
-  const content = CONTENT_MAP[tool];
   const [messages, setMessages] = useState<Message[]>([]);
   const [screen, setScreen] = useState<Screen>('tier-select');
   const [tier, setTier] = useState<Tier | null>(null);
@@ -313,9 +333,36 @@ export default function GuidePanel({ tool, isOpen }: GuidePanelProps) {
     setScreen('entry-point');
   }
 
-  async function handleUseCaseSelect(uc: UseCase) {
+  // Render a use-case's "getting started" bundle (intro, copyable prompt,
+  // tips, cautions). Shared by `handleUseCaseSelect` (button click) and
+  // `handleFreeInputSubmit` (fuzzy match on typed text).
+  async function renderUseCase(uc: UseCase, userText: string) {
     setVisitedUseCases(prev => { const s = new Set(prev); s.add(uc.id); return s; });
+    const gs = uc.gettingStarted!;
+    const msgs: Message[] = [
+      { role: 'user', content: userText },
+      { role: 'bot', content: gs.intro },
+      { role: 'bot', content: 'Try this prompt in the tool:', copyable: gs.examplePrompt },
+    ];
+    if (gs.tips.length) msgs.push({ role: 'bot', content: 'Tips:\n' + gs.tips.map(t => `• ${t}`).join('\n') });
+    if (gs.cautions.length) msgs.push({ role: 'bot', content: 'Keep in mind:\n' + gs.cautions.map(c => `• ${c}`).join('\n') });
+    await add(...msgs);
+  }
+
+  // Render an FAQ answer split into bubbles. Shared by `handleFaqSelect`
+  // (clicking a question in the list) and `handleFreeInputSubmit` (fuzzy
+  // match on typed text).
+  async function renderFaqAnswer(faq: FAQ, userText: string) {
+    const segments = splitIntoBubbles(faq.a);
+    await add(
+      { role: 'user', content: userText },
+      ...segments.map(s => ({ role: 'bot' as const, content: s }))
+    );
+  }
+
+  async function handleUseCaseSelect(uc: UseCase) {
     if (!uc.gettingStarted) {
+      setVisitedUseCases(prev => { const s = new Set(prev); s.add(uc.id); return s; });
       await add(
         { role: 'user', content: uc.label },
         { role: 'bot', content: "Describe what you have in mind in the text box below, and I'll guide you." }
@@ -324,22 +371,10 @@ export default function GuidePanel({ tool, isOpen }: GuidePanelProps) {
       setHighlightInput(true);
       setTimeout(() => setHighlightInput(false), 2800);
       setTimeout(() => inputRef.current?.focus(), 50);
-    } else {
-      const gs = uc.gettingStarted;
-      const msgs: Message[] = [
-        { role: 'user', content: uc.label },
-        { role: 'bot', content: gs.intro },
-        { role: 'bot', content: 'Try this prompt in the tool:', copyable: gs.examplePrompt },
-      ];
-      if (gs.tips.length) {
-        msgs.push({ role: 'bot', content: 'Tips:\n' + gs.tips.map(t => `• ${t}`).join('\n') });
-      }
-      if (gs.cautions.length) {
-        msgs.push({ role: 'bot', content: 'Keep in mind:\n' + gs.cautions.map(c => `• ${c}`).join('\n') });
-      }
-      await add(...msgs);
-      setScreen('getting-started');
+      return;
     }
+    await renderUseCase(uc, uc.label);
+    setScreen('getting-started');
   }
 
   async function handleFaqCategorySelect(cat: FaqCategory) {
@@ -352,11 +387,7 @@ export default function GuidePanel({ tool, isOpen }: GuidePanelProps) {
   }
 
   async function handleFaqSelect(faq: FAQ) {
-    const segments = splitIntoBubbles(faq.a);
-    await add(
-      { role: 'user', content: faq.q },
-      ...segments.map(s => ({ role: 'bot' as const, content: s }))
-    );
+    await renderFaqAnswer(faq, faq.q);
     setScreen('faq-answer');
   }
 
@@ -408,59 +439,17 @@ export default function GuidePanel({ tool, isOpen }: GuidePanelProps) {
     if (countWords(q) > MAX_INPUT_WORDS) return;  // hard block; UI also disables submit
     setFreeInput('');
 
-    if (screen === 'open-question') {
-      const ucMatch = fuzzyMatchUseCase(q, content.useCases);
-      if (ucMatch?.gettingStarted) {
-        setVisitedUseCases(prev => { const s = new Set(prev); s.add(ucMatch.id); return s; });
-        const gs = ucMatch.gettingStarted;
-        const msgs: Message[] = [
-          { role: 'user', content: q },
-          { role: 'bot', content: gs.intro },
-          { role: 'bot', content: 'Try this prompt in the tool:', copyable: gs.examplePrompt },
-        ];
-        if (gs.tips.length) msgs.push({ role: 'bot', content: 'Tips:\n' + gs.tips.map(t => `• ${t}`).join('\n') });
-        if (gs.cautions.length) msgs.push({ role: 'bot', content: 'Keep in mind:\n' + gs.cautions.map(c => `• ${c}`).join('\n') });
-        await add(...msgs);
-        setScreen('getting-started');
-        return;
-      }
-      const faqMatch = fuzzyMatch(q, allFaqs);
-      if (faqMatch) {
-        const segments = splitIntoBubbles(faqMatch.a);
-        await add(
-          { role: 'user', content: q },
-          ...segments.map(s => ({ role: 'bot' as const, content: s }))
-        );
-        setScreen('faq-answer');
-        return;
-      }
-      await routeToLiveOrLimit(q);
-      setScreen('faq-answer');
-      return;
-    }
-
+    // Match order: use-case → FAQ → live model. The `open-question` screen and
+    // the other screens went through the same chain — collapsed here.
     const ucMatch = fuzzyMatchUseCase(q, content.useCases);
     if (ucMatch?.gettingStarted) {
-      setVisitedUseCases(prev => { const s = new Set(prev); s.add(ucMatch.id); return s; });
-      const gs = ucMatch.gettingStarted;
-      const msgs: Message[] = [
-        { role: 'user', content: q },
-        { role: 'bot', content: gs.intro },
-        { role: 'bot', content: 'Try this prompt in the tool:', copyable: gs.examplePrompt },
-      ];
-      if (gs.tips.length) msgs.push({ role: 'bot', content: 'Tips:\n' + gs.tips.map(t => `• ${t}`).join('\n') });
-      if (gs.cautions.length) msgs.push({ role: 'bot', content: 'Keep in mind:\n' + gs.cautions.map(c => `• ${c}`).join('\n') });
-      await add(...msgs);
+      await renderUseCase(ucMatch, q);
       setScreen('getting-started');
       return;
     }
     const faqMatch = fuzzyMatch(q, allFaqs);
     if (faqMatch) {
-      const segments = splitIntoBubbles(faqMatch.a);
-      await add(
-        { role: 'user', content: q },
-        ...segments.map(s => ({ role: 'bot' as const, content: s }))
-      );
+      await renderFaqAnswer(faqMatch, q);
     } else {
       await routeToLiveOrLimit(q);
     }
@@ -602,8 +591,6 @@ export default function GuidePanel({ tool, isOpen }: GuidePanelProps) {
         return null;
     }
   }
-
-  if (!content) return null;
 
   return (
     <div className={`guide-panel${isOpen ? ' guide-panel--open' : ''}`}>

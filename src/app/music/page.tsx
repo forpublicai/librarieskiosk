@@ -6,7 +6,7 @@ import { useAuth } from '@/components/AuthProvider';
 import Header from '@/components/Header';
 import GuidePanel from '@/components/GuidePanel';
 import CoachmarkTour from '@/components/CoachmarkTour';
-import { refreshMediaUrl } from '@/lib/mediaClient';
+import { refreshMediaUrl, downloadMedia } from '@/lib/mediaClient';
 import { useGenerationProgress, formatElapsed } from '@/hooks/useGenerationProgress';
 import { loadGuestState, saveGuestState } from '@/lib/guestSession';
 
@@ -103,34 +103,13 @@ export default function MusicPage() {
         if (fresh?.url) setAudioUrl(fresh.url);
     }, [currentSessionId, token]);
 
-    const handleDownload = useCallback(async () => {
-        if (!audioUrl) return;
-        if (currentSessionId && token) {
-            try {
-                const res = await fetch(
-                    `/api/media-sessions/${currentSessionId}/url?download=true`,
-                    { headers: { Authorization: `Bearer ${token}` } }
-                );
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data.url) { window.location.href = data.url; return; }
-                }
-            } catch { /* fall through */ }
-        }
-        // Fallback for legacy/guest URLs: blob download
-        try {
-            const res = await fetch(audioUrl);
-            const blob = await res.blob();
-            const objectUrl = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = objectUrl;
-            a.download = 'generated-track.mp3';
-            a.click();
-            URL.revokeObjectURL(objectUrl);
-        } catch {
-            window.open(audioUrl, '_blank');
-        }
-    }, [audioUrl, currentSessionId, token]);
+    const handleDownload = useCallback(() => downloadMedia({
+        sessionId: currentSessionId,
+        token,
+        fallbackUrl: audioUrl,
+        fallbackFilename: 'generated-track.mp3',
+        mode: 'music',
+    }), [audioUrl, currentSessionId, token]);
 
     const handleGenerate = async (e: FormEvent) => {
         e.preventDefault();

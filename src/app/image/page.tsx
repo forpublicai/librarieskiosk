@@ -6,7 +6,7 @@ import { useAuth } from '@/components/AuthProvider';
 import Header from '@/components/Header';
 import GuidePanel from '@/components/GuidePanel';
 import CoachmarkTour from '@/components/CoachmarkTour';
-import { refreshMediaUrl } from '@/lib/mediaClient';
+import { refreshMediaUrl, downloadMedia } from '@/lib/mediaClient';
 import { useGenerationProgress, formatElapsed } from '@/hooks/useGenerationProgress';
 import { loadGuestState, saveGuestState } from '@/lib/guestSession';
 
@@ -98,33 +98,13 @@ export default function ImagePage() {
         if (fresh?.url) setImageUrl(fresh.url);
     }, [currentSessionId, token]);
 
-    const handleDownload = useCallback(async () => {
-        if (!imageUrl) return;
-        if (currentSessionId && token) {
-            try {
-                const res = await fetch(
-                    `/api/media-sessions/${currentSessionId}/url?download=true`,
-                    { headers: { Authorization: `Bearer ${token}` } }
-                );
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data.url) { window.location.href = data.url; return; }
-                }
-            } catch { /* fall through */ }
-        }
-        try {
-            const res = await fetch(imageUrl);
-            const blob = await res.blob();
-            const objectUrl = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = objectUrl;
-            a.download = 'generated-image.png';
-            a.click();
-            URL.revokeObjectURL(objectUrl);
-        } catch {
-            window.open(imageUrl, '_blank');
-        }
-    }, [imageUrl, currentSessionId, token]);
+    const handleDownload = useCallback(() => downloadMedia({
+        sessionId: currentSessionId,
+        token,
+        fallbackUrl: imageUrl,
+        fallbackFilename: 'generated-image.png',
+        mode: 'image',
+    }), [imageUrl, currentSessionId, token]);
 
     const refreshSessionItemUrl = useCallback(
         async (id: string) => {

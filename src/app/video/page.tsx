@@ -6,7 +6,7 @@ import { useAuth } from '@/components/AuthProvider';
 import Header from '@/components/Header';
 import GuidePanel from '@/components/GuidePanel';
 import CoachmarkTour from '@/components/CoachmarkTour';
-import { refreshMediaUrl } from '@/lib/mediaClient';
+import { refreshMediaUrl, downloadMedia } from '@/lib/mediaClient';
 import { useGenerationProgress, formatElapsed } from '@/hooks/useGenerationProgress';
 import { loadGuestState, saveGuestState } from '@/lib/guestSession';
 
@@ -108,33 +108,13 @@ export default function VideoPage() {
         if (fresh?.url) setVideoUrl(fresh.url);
     }, [currentSessionId, token]);
 
-    const handleDownload = useCallback(async () => {
-        if (!videoUrl) return;
-        if (currentSessionId && token) {
-            try {
-                const res = await fetch(
-                    `/api/media-sessions/${currentSessionId}/url?download=true`,
-                    { headers: { Authorization: `Bearer ${token}` } }
-                );
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data.url) { window.location.href = data.url; return; }
-                }
-            } catch { /* fall through */ }
-        }
-        try {
-            const res = await fetch(videoUrl);
-            const blob = await res.blob();
-            const objectUrl = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = objectUrl;
-            a.download = 'generated-video.mp4';
-            a.click();
-            URL.revokeObjectURL(objectUrl);
-        } catch {
-            window.open(videoUrl, '_blank');
-        }
-    }, [videoUrl, currentSessionId, token]);
+    const handleDownload = useCallback(() => downloadMedia({
+        sessionId: currentSessionId,
+        token,
+        fallbackUrl: videoUrl,
+        fallbackFilename: 'generated-video.mp4',
+        mode: 'video',
+    }), [videoUrl, currentSessionId, token]);
 
     const pollStatus = async (id: string) => {
         try {

@@ -120,6 +120,7 @@ const EXT_BY_MIME: Record<string, string> = {
     'image/jpeg': 'jpg',
     'image/jpg': 'jpg',
     'image/webp': 'webp',
+    'image/avif': 'avif',
     'image/gif': 'gif',
     'audio/mpeg': 'mp3',
     'audio/mp3': 'mp3',
@@ -160,6 +161,83 @@ function mimeMatchesGlob(mime: string, glob: string): boolean {
     return normalized === glob.toLowerCase();
 }
 
+// ---------- Retry policy ----------
+
+// Sentinel thrown from inside fetch wrappers when an HTTP response status is
+// transient (5xx, 429, 408). `withRetry` recognises this and treats it as a
+// retryable failure. We don't need to expose this externally.
+class RetryableHttpError extends Error {
+    readonly status: number;
+    constructor(status: number, message: string) {
+        super(message);
+        this.name = 'RetryableHttpError';
+        this.status = status;
+    }
+}
+
+function isTransientStorageError(err: unknown): boolean {
+    if (err instanceof RetryableHttpError) return true;
+    if (typeof err !== 'object' || err === null) return false;
+
+    const e = err as {
+        $metadata?: { httpStatusCode?: number };
+        name?: string;
+        code?: string;
+        message?: string;
+        cause?: { code?: string; message?: string };
+    };
+
+    // AWS SDK error envelope — retry on 5xx / 429 / 408, treat other HTTP errors as permanent.
+    const sdkStatus = e.$metadata?.httpStatusCode;
+    if (typeof sdkStatus === 'number') {
+        return sdkStatus >= 500 || sdkStatus === 429 || sdkStatus === 408;
+    }
+
+    // Node fetch network errors (TypeError 'fetch failed', UND_ERR_*, ECONN*, etc.)
+    const causeCode = e.cause?.code ?? '';
+    const causeMsg = e.cause?.message ?? '';
+    const msg = e.message ?? '';
+    if (e.name === 'TypeError' && /fetch failed|network/i.test(msg)) return true;
+    if (/^(UND_ERR_|ECONN|ETIMED|EHOSTUNREACH|EAI_AGAIN|ENETUNREACH)/i.test(causeCode)) return true;
+    if (/ECONNRESET|ETIMEDOUT|EAI_AGAIN|EHOSTUNREACH|socket hang up|network/i.test(causeMsg)) return true;
+    if (/ECONNRESET|ETIMEDOUT|EAI_AGAIN|EHOSTUNREACH|socket hang up/i.test(msg)) return true;
+
+    return false;
+}
+
+interface RetryOptions {
+    retries?: number;
+    baseDelayMs?: number;
+    label?: string;
+}
+
+// Retry a function on transient network/HTTP failures with exponential backoff.
+// `retries: 2` → up to 3 total attempts. Backoff: ~500ms, ~1000ms (with jitter).
+// On non-transient errors (e.g. SSRF refusal, 4xx, validation), throws immediately.
+async function withRetry<T>(fn: () => Promise<T>, options: RetryOptions = {}): Promise<T> {
+    const retries = options.retries ?? 2;
+    const baseDelay = options.baseDelayMs ?? 500;
+    const label = options.label ?? 'storage';
+
+    let lastErr: unknown;
+    for (let attempt = 0; attempt <= retries; attempt++) {
+        try {
+            return await fn();
+        } catch (err) {
+            lastErr = err;
+            const transient = isTransientStorageError(err);
+            if (attempt >= retries || !transient) throw err;
+            const delay = baseDelay * Math.pow(2, attempt) + Math.random() * 250;
+            console.warn(
+                `[${label}] transient failure on attempt ${attempt + 1}/${retries + 1}, retrying in ${Math.round(delay)}ms:`,
+                err instanceof Error ? err.message : err
+            );
+            await new Promise((resolve) => setTimeout(resolve, delay));
+        }
+    }
+    throw lastErr;
+}
+
 // ---------- Upload helpers ----------
 
 function sha256Hex(buffer: Buffer): string {
@@ -182,20 +260,27 @@ export async function uploadBuffer(
         );
     }
 
-    await client.send(
-        new PutObjectCommand({
-            Bucket: env.bucket,
-            Key: key,
-            Body: buffer,
-            ContentType: contentType,
-            ContentLength: buffer.byteLength,
-            CacheControl: options.cacheControl ?? DEFAULT_CACHE_CONTROL,
-            ContentDisposition: options.contentDisposition ?? defaultContentDisposition(key),
-            Metadata: {
-                checksum,
-                ...(options.metadata ?? {}),
-            },
-        })
+    // Retry on R2 5xx / 429 / transient network failures. PutObject is
+    // idempotent (same key, same bytes), so a retried success is byte-for-byte
+    // equivalent to a clean first-try success.
+    await withRetry(
+        () =>
+            client.send(
+                new PutObjectCommand({
+                    Bucket: env.bucket,
+                    Key: key,
+                    Body: buffer,
+                    ContentType: contentType,
+                    ContentLength: buffer.byteLength,
+                    CacheControl: options.cacheControl ?? DEFAULT_CACHE_CONTROL,
+                    ContentDisposition: options.contentDisposition ?? defaultContentDisposition(key),
+                    Metadata: {
+                        checksum,
+                        ...(options.metadata ?? {}),
+                    },
+                })
+            ),
+        { label: 'r2.putObject' }
     );
 
     return {
@@ -289,7 +374,7 @@ export async function objectExists(key: string): Promise<boolean> {
 // CRLF, quotes, backslashes, or control chars in the filename can either break
 // the header or enable header injection. Strip them from the ASCII fallback,
 // and use RFC 5987 `filename*=UTF-8''<percent-encoded>` for non-ASCII safety.
-function buildAttachmentDisposition(filename: string): string {
+export function buildAttachmentDisposition(filename: string): string {
     const ascii = filename.replace(/[\x00-\x1f\x7f"\\]/g, '_') || 'download';
     const encoded = encodeURIComponent(filename);
     return `attachment; filename="${ascii}"; filename*=UTF-8''${encoded}`;
@@ -404,15 +489,32 @@ async function safeFetchBuffer(
 
     await assertPublicHost(parsed.hostname);
 
-    const response = await fetch(parsed.toString(), {
-        method: 'GET',
-        redirect: 'manual',
-        // Do NOT forward auth or cookies
-        headers: {
-            Accept: expectedMimeGlob || '*/*',
-            'User-Agent': 'publicai-library-kiosk/1.0',
+    // Retry the network call (and only the network call) on transient failures.
+    // Validation work above is deterministic — no point repeating it.
+    // The fetch + body read are split so the body read can also retry, but the
+    // body read for a successful response happens outside the retry block to
+    // avoid double-reading. We promote retryable HTTP statuses (5xx/429/408)
+    // to thrown RetryableHttpError so withRetry can recognise them.
+    const response = await withRetry(
+        async () => {
+            const r = await fetch(parsed.toString(), {
+                method: 'GET',
+                redirect: 'manual',
+                // Do NOT forward auth or cookies
+                headers: {
+                    Accept: expectedMimeGlob || '*/*',
+                    'User-Agent': 'publicai-library-kiosk/1.0',
+                },
+            });
+            if (r.status >= 500 || r.status === 429 || r.status === 408) {
+                // Drain the body so the socket can be returned to the pool.
+                try { await r.arrayBuffer(); } catch { /* ignore */ }
+                throw new RetryableHttpError(r.status, `Upstream fetch failed: ${r.status} ${r.statusText}`);
+            }
+            return r;
         },
-    });
+        { label: `fetch ${parsed.host}` }
+    );
 
     // Handle manual redirects
     if (response.status >= 300 && response.status < 400) {

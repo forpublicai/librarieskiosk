@@ -4,7 +4,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { requireAuth, isAuthResult } from '@/lib/auth';
 import { getMediaReadUrl } from '@/lib/mediaUrlCache';
-import { generateSignedGetUrl } from '@/lib/storage';
+import { generateSignedGetUrl, extensionForMime } from '@/lib/storage';
+import type { MediaMode } from '@/lib/storage';
 
 /**
  * GET /api/media-sessions/[id]/url
@@ -38,6 +39,7 @@ export async function GET(
             objectKey: true,
             thumbnailKey: true,
             resultUrl: true,
+            sourceProviderUrl: true,
             storageStatus: true,
         },
     });
@@ -49,8 +51,51 @@ export async function GET(
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
+    const isDownload = request.nextUrl.searchParams.get('download') === 'true';
+
+    // Download intent: return either a direct presigned R2 URL with attachment
+    // disposition baked in (free path), or point the client at the server-side
+    // download proxy (`/api/media-sessions/<id>/download`) which streams the
+    // bytes through the kiosk server. The `direct` flag tells the client which
+    // path to take.
+    if (isDownload) {
+        const mode = session.mode as MediaMode;
+        const ext = extensionForMime(session.mimeType ?? '', mode);
+        const filename = `generated-${session.mode}.${ext}`;
+
+        if (session.storageStatus === 'UPLOADED' && session.objectKey) {
+            const url = await generateSignedGetUrl(session.objectKey, undefined, {
+                downloadFilename: filename,
+            });
+            return NextResponse.json({
+                url,
+                direct: true,
+                expiresAt: new Date(Date.now() + 3600 * 1000).toISOString(),
+                mimeType: session.mimeType,
+                mode: session.mode,
+                filename,
+            });
+        }
+
+        if (session.resultUrl || session.sourceProviderUrl) {
+            return NextResponse.json({
+                url: `/api/media-sessions/${session.id}/download`,
+                direct: false,
+                mimeType: session.mimeType,
+                mode: session.mode,
+                filename,
+            });
+        }
+
+        return NextResponse.json(
+            { error: 'Media not available', storageStatus: session.storageStatus },
+            { status: 409 }
+        );
+    }
+
+    // Preview intent (default): existing behavior — return a non-attachment
+    // signed URL for in-page <img>/<audio>/<video>.
     if (session.storageStatus !== 'UPLOADED' || !session.objectKey) {
-        // Legacy row with a provider URL is still usable (will expire eventually)
         if (session.resultUrl) {
             return NextResponse.json({
                 url: session.resultUrl,
@@ -63,40 +108,20 @@ export async function GET(
             });
         }
         return NextResponse.json(
-            {
-                error: 'Media not available',
-                storageStatus: session.storageStatus,
-            },
+            { error: 'Media not available', storageStatus: session.storageStatus },
             { status: 409 }
         );
     }
 
-    const isDownload = request.nextUrl.searchParams.get('download') === 'true';
-
-    let url: string;
-    let expiresAt: string | null = null;
-    let isPublic = false;
-
-    if (isDownload) {
-        const ext = session.mimeType?.split('/')[1]?.split(';')[0] ?? 'bin';
-        const filename = `generated-${session.mode}.${ext}`;
-        url = await generateSignedGetUrl(session.objectKey, undefined, { downloadFilename: filename });
-        expiresAt = new Date(Date.now() + 3600 * 1000).toISOString();
-    } else {
-        const resolved = await getMediaReadUrl(session.objectKey);
-        url = resolved.url;
-        expiresAt = resolved.expiresAt ? String(resolved.expiresAt) : null;
-        isPublic = resolved.public ?? false;
-    }
-
+    const resolved = await getMediaReadUrl(session.objectKey);
     const thumbnail = session.thumbnailKey
         ? await getMediaReadUrl(session.thumbnailKey).catch(() => null)
         : null;
 
     return NextResponse.json({
-        url,
-        expiresAt,
-        public: isPublic,
+        url: resolved.url,
+        expiresAt: resolved.expiresAt ? String(resolved.expiresAt) : null,
+        public: resolved.public ?? false,
         thumbnailUrl: thumbnail?.url ?? null,
         mimeType: session.mimeType,
         mode: session.mode,
