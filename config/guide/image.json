@@ -36,7 +36,7 @@
           "If the first result isn't quite right, tweak one element — the color palette, the mood, or the layout description — and generate again."
         ],
         "cautions": [
-          "The image tool generates flat image files that cannot be edited after download. If your marketing material needs specific text — like a phone number, address, or price — use the generated image as a visual base and add text using a free design tool like canva.com.",
+          "The image tool generates flat image files that cannot be edited after download. If your marketing material needs specific text — like a phone number, address, or price — use the generated image as a visual base and add text using a free design tool like https://canva.com.",
           "Review the image carefully before using it publicly. AI-generated visuals can sometimes include distorted text or unusual details that need to be caught before publishing."
         ]
       }

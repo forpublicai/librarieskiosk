@@ -42,16 +42,22 @@ export function useGenerationProgress({
     const startedAtRef = useRef<number | null>(null);
 
     useEffect(() => {
-        if (!active) {
+        let resetTimer: ReturnType<typeof setTimeout> | null = null;
+        const reset = () => {
             setElapsedSec(0);
             setMessageIndex(0);
+        };
+
+        if (!active) {
             startedAtRef.current = null;
-            return;
+            resetTimer = setTimeout(reset, 0);
+            return () => {
+                if (resetTimer) clearTimeout(resetTimer);
+            };
         }
 
         startedAtRef.current = Date.now();
-        setElapsedSec(0);
-        setMessageIndex(0);
+        resetTimer = setTimeout(reset, 0);
 
         const elapsedTick = setInterval(() => {
             if (startedAtRef.current == null) return;
@@ -63,13 +69,14 @@ export function useGenerationProgress({
         }, Math.max(intervalSec * 1000, 500));
 
         return () => {
+            if (resetTimer) clearTimeout(resetTimer);
             clearInterval(elapsedTick);
             clearInterval(messageTick);
         };
     }, [active, messages.length, intervalSec]);
 
     return {
-        elapsedSec,
+        elapsedSec: active ? elapsedSec : 0,
         message: messages.length > 0 ? messages[messageIndex % messages.length] : '',
     };
 }

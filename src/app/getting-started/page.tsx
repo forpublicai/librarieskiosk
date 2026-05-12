@@ -1,18 +1,22 @@
 import Link from 'next/link';
+import ThemeToggle from '@/components/ThemeToggle';
 
 export default function GettingStartedPage() {
   return (
     <div className="info-page">
       <header className="info-topbar">
-        <a href="/">
+        <Link href="/">
           <img src="/images/lib-logo.png" alt="Public AI" className="info-topbar-logo" />
-        </a>
+        </Link>
         <nav className="info-topbar-nav">
-          <a href="/getting-started" className="active">Get Started</a>
-          <a href="/resources">Resources</a>
-          <a href="/faqs">FAQs</a>
+          <Link href="/getting-started" className="active">Get Started</Link>
+          <Link href="/resources">Resources</Link>
+          <Link href="/faqs">FAQs</Link>
         </nav>
-        <a href="/" className="info-topbar-back">← Back to Sign In</a>
+        <div className="info-topbar-actions">
+          <Link href="/" className="info-topbar-back">← Back to Sign In</Link>
+          <ThemeToggle />
+        </div>
       </header>
 
       <main className="info-content">
@@ -25,7 +29,7 @@ export default function GettingStartedPage() {
 
         {/* What you can do */}
         <section className="info-section">
-          <p className="info-section-title">What's Inside</p>
+          <p className="info-section-title">What&apos;s Inside</p>
           <div className="info-feature-grid">
             <div className="info-feature-card">
               <span className="info-feature-card-icon">💬</span>

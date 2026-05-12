@@ -1,9 +1,11 @@
 'use client';
 
+import Link from 'next/link';
 import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
 import { SECURITY_QUESTIONS } from '@/lib/security';
+import FloatingThemeToggle from '@/components/FloatingThemeToggle';
 
 const LIBRARIES = [
     'Pottsboro, TX',
@@ -86,6 +88,7 @@ export default function SignupPage() {
 
     return (
         <div className="login-container">
+            <FloatingThemeToggle />
             <div className="login-card">
                 <div style={{ textAlign: 'center', marginBottom: '40px' }}>
                     <img src="/images/logo.svg" alt="Public AI" className="login-logo-img" />
@@ -212,13 +215,9 @@ export default function SignupPage() {
                         fontWeight: 'bold',
                         marginTop: '32px'
                     }}>
-                        <a
-                            href="/"
-                            onClick={(e) => { e.preventDefault(); router.push('/'); }}
-                            style={{ textDecoration: 'underline' }}
-                        >
+                        <Link href="/" style={{ textDecoration: 'underline' }}>
                             GO TO LOGIN
-                        </a>
+                        </Link>
                     </p>
                 </form>
             </div>

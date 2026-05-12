@@ -7,7 +7,7 @@ import { deductCredits, logUsage, calculateCredits, InsufficientCreditsError } f
 import { requireApproved } from '@/lib/status';
 import { isR2Enabled } from '@/lib/env';
 import { persistImageResult } from '@/lib/mediaPersistence';
-import modelConfig from '../../../../config/models.json';
+import modelConfig from '@/config/models.json';
 
 export async function POST(request: NextRequest) {
     const authResult = await requireActiveSession(request);

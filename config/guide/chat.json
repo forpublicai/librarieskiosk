@@ -53,7 +53,7 @@
           "Not sure where to start? Try: \"What are the most important things to know about [topic]?\""
         ],
         "cautions": [
-          "The tool can be wrong, especially on topics that change frequently — current events, laws, medical advice, or financial information. Always verify important facts using a trusted source, try factcheck.org, or ask a librarian.",
+          "The tool can be wrong, especially on topics that change frequently — current events, laws, medical advice, or financial information. Always verify important facts using a trusted source, try https://factcheck.org, or ask a librarian.",
           "Do not share personal details like your full name, address, or medical history when asking health-related questions. Keep questions general — \"what are the symptoms of diabetes?\" rather than sharing your own medical records."
         ]
       }
@@ -199,7 +199,7 @@
     "criticalUse": [
       {
         "q": "Can I trust what the chat tool tells me?",
-        "a": "Not always. The tool can sound confident even when it is wrong. It can make up facts, give outdated information, or misunderstand your question. Always double-check anything important — especially health, legal, money, or current events — using a trusted source like factcheck.org or by asking a librarian."
+        "a": "Not always. The tool can sound confident even when it is wrong. It can make up facts, give outdated information, or misunderstand your question. Always double-check anything important — especially health, legal, money, or current events — using a trusted source like https://factcheck.org or by asking a librarian."
       },
       {
         "q": "What information should I never type into the chat?",

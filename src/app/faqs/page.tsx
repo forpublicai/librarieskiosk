@@ -1,6 +1,8 @@
 'use client';
 
+import Link from 'next/link';
 import { useState } from 'react';
+import ThemeToggle from '@/components/ThemeToggle';
 
 interface FAQItem {
   q: string;
@@ -101,15 +103,18 @@ export default function FAQsPage() {
   return (
     <div className="info-page">
       <header className="info-topbar">
-        <a href="/">
+        <Link href="/">
           <img src="/images/lib-logo.png" alt="Public AI" className="info-topbar-logo" />
-        </a>
+        </Link>
         <nav className="info-topbar-nav">
-          <a href="/getting-started">Get Started</a>
-          <a href="/resources">Resources</a>
-          <a href="/faqs" className="active">FAQs</a>
+          <Link href="/getting-started">Get Started</Link>
+          <Link href="/resources">Resources</Link>
+          <Link href="/faqs" className="active">FAQs</Link>
         </nav>
-        <a href="/" className="info-topbar-back">← Back to Sign In</a>
+        <div className="info-topbar-actions">
+          <Link href="/" className="info-topbar-back">← Back to Sign In</Link>
+          <ThemeToggle />
+        </div>
       </header>
 
       <main className="info-content">

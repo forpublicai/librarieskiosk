@@ -5,7 +5,7 @@ import { requireActiveSession, isAuthResult } from '@/lib/auth';
 import { chatStream, getNanogptKey } from '@/lib/nanogpt';
 import { logUsage } from '@/lib/credits';
 import { requireApproved } from '@/lib/status';
-import modelConfig from '../../../../config/models.json';
+import modelConfig from '@/config/models.json';
 
 export async function POST(request: NextRequest) {
     const authResult = await requireActiveSession(request);

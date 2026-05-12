@@ -11,7 +11,7 @@ async function main() {
         where: {
             OR: [
                 { username: 'masteradmin' },
-                { role: 'MASTER_ADMIN' as any }
+                { role: 'MASTER_ADMIN' as never }
             ]
         }
     });

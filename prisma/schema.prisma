@@ -46,6 +46,7 @@ model User {
   mediaSessions       MediaSession[]
   creditRequests      CreditRequest[]
   sessions            ActiveSession[]
+  guideExchanges      GuideExchange[]
 }
 
 model Library {
@@ -69,6 +70,19 @@ model ActiveSession {
 
   @@index([library, lastActivity])
   @@index([userId])
+}
+
+model GuideExchange {
+  jti       String   @id
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      Role
+  count     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([updatedAt])
 }
 
 model Conversation {

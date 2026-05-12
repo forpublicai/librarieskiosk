@@ -3,12 +3,15 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { requireAuth, isAuthResult } from '@/lib/auth';
+import { getDownloadProxyAllowedHosts, DownloadProxyConfigError } from '@/lib/env';
 import {
     generateSignedGetUrl,
     fetchBytesFromUrl,
     extensionForMime,
     defaultMimeForMode,
+    mimeGlobForMode,
     buildAttachmentDisposition,
+    DownloadHostNotAllowedError,
     type MediaMode,
 } from '@/lib/storage';
 
@@ -86,7 +89,9 @@ export async function GET(
     }
 
     try {
-        const { buffer, contentType } = await fetchBytesFromUrl(fallbackUrl, `${mode}/*`);
+        const { buffer, contentType } = await fetchBytesFromUrl(fallbackUrl, mimeGlobForMode(mode), {
+            allowedHosts: getDownloadProxyAllowedHosts(),
+        });
         return new NextResponse(new Uint8Array(buffer), {
             headers: {
                 'Content-Type': contentType || mime,
@@ -97,6 +102,12 @@ export async function GET(
         });
     } catch (err) {
         console.error('Patron download proxy failed', err);
+        if (err instanceof DownloadHostNotAllowedError) {
+            return NextResponse.json({ error: err.message }, { status: 403 });
+        }
+        if (err instanceof DownloadProxyConfigError) {
+            return NextResponse.json({ error: err.message }, { status: 500 });
+        }
         return NextResponse.json({ error: 'Download failed' }, { status: 502 });
     }
 }

@@ -19,6 +19,13 @@ export class R2ConfigError extends Error {
     }
 }
 
+export class DownloadProxyConfigError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = 'DownloadProxyConfigError';
+    }
+}
+
 export interface R2Env {
     accountId: string;
     endpoint: string;
@@ -52,6 +59,16 @@ function readNumber(name: string, fallback: number): number {
     return n;
 }
 
+function normalizeHost(raw: string): string {
+    const trimmed = raw.trim().toLowerCase();
+    if (!trimmed) return '';
+    try {
+        return new URL(trimmed).hostname.replace(/\.$/, '');
+    } catch {
+        return trimmed.replace(/\.$/, '');
+    }
+}
+
 /**
  * Returns true if the `USE_R2_PERSISTENCE` flag is enabled.
  * Does NOT validate the rest of the R2 config — call `getR2Env()` for that.
@@ -82,6 +99,24 @@ export function getR2Env(): R2Env {
         publicBaseUrl: process.env.R2_PUBLIC_BASE_URL || undefined,
     };
     return cached;
+}
+
+export function getDownloadProxyAllowedHosts(): Set<string> {
+    const raw = process.env.DOWNLOAD_PROXY_ALLOWED_HOSTS;
+    if (!raw) {
+        throw new DownloadProxyConfigError(
+            'DOWNLOAD_PROXY_ALLOWED_HOSTS is required for proxied downloads. Add a comma-separated list of provider/CDN hostnames to .env and restart the server.'
+        );
+    }
+
+    const hosts = raw.split(',').map(normalizeHost).filter(Boolean);
+    if (!hosts.length) {
+        throw new DownloadProxyConfigError(
+            'DOWNLOAD_PROXY_ALLOWED_HOSTS must include at least one hostname for proxied downloads.'
+        );
+    }
+
+    return new Set(hosts);
 }
 
 /**

@@ -130,7 +130,8 @@ User (1) ─┬─ (N) UsageLog
           ├─ (N) Conversation       (chat & code; messages: Json)
           ├─ (N) MediaSession       (image, music, video; R2-backed)
           ├─ (N) CreditRequest      (patron → admin asks for credits)
-          └─ (N) ActiveSession      (patron only; jti unique)
+          ├─ (N) ActiveSession      (patron only; jti unique)
+          └─ (N) GuideExchange      (guide quota; jti primary key)
 
 Library                            (no FK from User; matched by name string)
 ```
@@ -146,6 +147,7 @@ Notable fields and invariants:
 - **MediaSession.resultUrl** is legacy; new rows store nothing here. R2 lookups go via `objectKey + getMediaReadUrl`.
 - **Conversation.messages** is `Json` containing `[{role, content}, ...]`. Stored verbatim; chat code never replays them as a structured array on the server.
 - **ActiveSession.jti** is unique and matches the `jti` claim in the patron's JWT. Heartbeat / requireActiveSession look up by `jti`.
+- **GuideExchange.jti** is the durable per-auth-session counter for live Learning Guide questions. It covers patrons and guests, increments through an atomic guarded `updateMany`, and is lazily pruned after 24h.
 
 ## 5. Request flows
 
@@ -190,11 +192,11 @@ Notable fields and invariants:
 ## 6. Storage layer
 
 - **`lib/storage.ts`**: S3 SDK wrapper for R2. Lazy client. `forcePathStyle: true` (R2 requires it). Object keys `media/{mode}/{userId}/{yyyy}/{mm}/{uuid}.{ext}` — `userId` is sanitized; UUID guarantees uniqueness within the same month-bucket. `generateSignedGetUrl(key, ttl?, { downloadFilename? })`: when `downloadFilename` is set, the signed URL bakes `ResponseContentDisposition: attachment; filename="..."` into the *signature* — that header has to be part of the signed query, not appended client-side.
-- **SSRF guard** for `uploadFromUrl`: HTTPS only, DNS lookup before fetch with private-IP rejection (IPv4 + IPv6 incl. `::ffff:` v4-mapped), `redirect: 'manual'` with max 1 hop, content-length pre-check, content-type allow list, no forwarded auth/cookies.
+- **SSRF guard** for `uploadFromUrl` / `fetchBytesFromUrl`: HTTPS only, DNS lookup before fetch with private-IP rejection (IPv4 + IPv6 incl. `::ffff:` v4-mapped), `redirect: 'manual'` with max 1 hop, content-length pre-check, content-type allow list, no forwarded auth/cookies. Download proxy callers also pass `DOWNLOAD_PROXY_ALLOWED_HOSTS`; the original URL and every redirect target must be on the allowlist.
 - **`lib/imagePipeline.ts`**: sharp pipeline → AVIF full (q60) + thumbnail (max 320px, q45). Failure falls back to original PNG.
 - **`lib/mediaPersistence.ts`**: orchestrator between routes and storage. Each `persistXxxResult` writes a `MediaSession` even on failure (UI still gets *something*). Best-effort cleanup of half-uploaded objects.
 - **`lib/mediaUrlCache.ts`**: read-URL resolution. Public base URL → cacheable URL (preferred when set); else memoized signed URL with 5-min refresh margin. Per-pod memo, no shared cache needed (objects are immutable).
-- **Forced-attachment download path**: `GET /api/media-sessions/[id]/url?download=true` calls `generateSignedGetUrl` with a `downloadFilename` and bypasses the URL cache (the cached URL doesn't have `Content-Disposition: attachment` baked in). Generation pages call this when the user clicks Download; falling back to a blob fetch only for legacy/guest cases that don't have a sessionId. Without the forced disposition, R2 cross-origin presigned URLs render in the browser instead of downloading because the `<a download>` hint is ignored cross-origin.
+- **Forced-attachment download path**: `GET /api/media-sessions/[id]/url?download=true` calls `generateSignedGetUrl` with a `downloadFilename` and bypasses the URL cache (the cached URL doesn't have `Content-Disposition: attachment` baked in). Generation pages call this when the user clicks Download; falling back to a blob fetch only for legacy/guest cases that don't have a sessionId. Without the forced disposition, R2 cross-origin presigned URLs render in the browser instead of downloading because the `<a download>` hint is ignored cross-origin. Patron and guest proxy fallbacks both require `mode` so the MIME allowlist maps `image → image/*`, `music → audio/*`, and `video → video/*`.
 - **Video failure fallback**: `MediaSession.sourceProviderUrl` is the provider's original URL, written by `finalizeVideoUpload` on both the atomic claim and the failure handler. If R2 upload fails, `/api/media-sessions` returns it as `legacyUrl` so the patron's history item still plays for as long as the provider URL stays alive.
 
 ## 7. Frontend
@@ -205,9 +207,9 @@ Notable fields and invariants:
   - On mount: if a token exists, calls `/api/auth/me`; on 401, logs out.
   - 10-minute inactivity timer (mouse/keyboard/touch/scroll); fires `logout()`.
   - 1-minute heartbeat (PATRONs only) — only pings if `hadActivityRef` was set since the last tick. Idle kiosks let their server session lapse naturally.
-  - Logout flow: best-effort `/api/auth/cleanup` (guest only) + `/api/auth/logout` + clears local state + `clearAllGuestState()`.
+  - Logout flow: best-effort `/api/auth/cleanup` (guest only) + `/api/auth/logout` + clears local state + `clearAllGuestState()`. Guest logout also clears the current token-scoped guide-tier key so shared guest accounts don't leak guide state.
 - `Header`: shows credit badge, optional `actions` slot for per-page chrome (used by the Learning Guide button), `<ThemeToggle>`, sign-out. The `actions` prop is the canonical extension point — never reach for a parallel `<Header2>`.
-- `ThemeToggle`: light/dark toggle persisted in `localStorage['theme']`. SSR-safe initial class set by an inline `<script>` in `layout.tsx` to avoid theme flash. Renders inside `Header`, not as a fixed-position floating control.
+- `ThemeToggle`: light/dark toggle persisted in `localStorage['theme']`. SSR-safe initial class set by an inline `<script>` in `layout.tsx` to avoid theme flash. Renders in the visible chrome for each page family: `Header` on generation pages, info-page topbars, dashboard header, and a small floating wrapper only on pre-auth screens with no chrome.
 - `GuidePanel`: per-tool side panel with tier-gated static content (`config/guide/<tool>.json`) plus a free-form input that fuzzy-matches FAQs, falls through to `/api/guide` when no static match is found. Mounted by every generation page; visible only when the per-page `guideOpen` state flips it open. See §11.
 - `CoachmarkTour`: per-tool first-visit page tour that anchors to `data-tour="..."` attributes. Per-user-per-tool dismissal state in `localStorage['cm_<username>_<tool>']`. Restartable from `GuidePanel` via the `cm-restart` window event.
 - Pages: each mode (`/chat`, `/image`, `/video`, `/music`, `/code`) is a single `'use client'` page that fetches once, manages its own state, and posts to its API route. No global state library. Each page tags its key regions with `data-tour="<id>"` attributes for the tour, and passes a `<button data-tour="guide-btn">` into `Header.actions`.
@@ -249,7 +251,7 @@ tier-select → entry-point → ┬→ what-is-it
                                                                     (free-form input)
 ```
 
-The "tier" — the user's stated experience level — is the dominant axis. It is stored in `localStorage['guide_tier']` (`"1" | "2" | "3"`), read once on first open, and mirrored into the panel-header chip ("New to tech ✎" etc.) so the user can change it at any time. The chip pulses once after first selection to draw attention to its existence.
+The "tier" — the user's stated experience level — is the dominant axis. It is stored in namespaced localStorage keys: `guide_tier_user_<id>` for patrons/admins and `guide_tier_guest_<token-fragment>` for guests. The legacy unscoped `guide_tier` key is removed on guide mount/logout. The tier is read once on first open and mirrored into the panel-header chip ("New to tech ✎" etc.) so the user can change it at any time. The chip pulses once after first selection to draw attention to its existence.
 
 **Static content** lives in `config/guide/<tool>.json` (chat, code, image, video, music). The schema:
 
@@ -278,12 +280,14 @@ The fuzzy matcher (a) normalizes intent-framing wrappers (`I don't know what X i
 `POST /api/guide` body: `{ question, tool, tier: 1|2|3 }`.
 
 - Auth: `requireActiveSession` + `requireApproved` (same gate as every generation route).
-- Per-library NanoGPT key via `getNanogptKey(library)`.
+- Generic NanoGPT key via `getGenericNanogptKey()`, intentionally keeping onboarding spend off individual library billing keys.
 - Model: `modelConfig.chat.model` (the chat tool's model — small, fast, conversational).
+- `tool` is allowlisted to `chat | code | image | video | music` before prompt construction or quota reservation.
 - System prompt is composed from `TOOL_DESCRIPTIONS[tool]` + `TIER_LABELS[tier]` + `TIER_GUIDANCE[tier]`. The tier guidance is what actually changes the response complexity — Tier 1 forces plain-English with everyday analogies, Tier 3 allows AI-specific terminology.
 - An off-topic guard in the system prompt instructs the model to politely deflect to the matching tool's own guide if the question isn't about the current tool.
 - **Stateless.** No conversation history is sent. Each call is one question + one answer. (Multi-turn follow-up is a known gap, deferred.)
-- **Not credit-deducted.** The route does not call `deductCredits`/`logUsage`. This is intentional for the current scale; revisit if usage grows enough to be worth measuring.
+- **Not credit-deducted.** The route does not call `deductCredits`. Patron successes still write `UsageLog` rows with `mode: 'guide'` and `creditsUsed: 0` for visibility; guests do not write usage logs.
+- **Rate-limited per auth session.** `GuideExchange` is keyed by JWT `jti`; the route reserves a slot before calling NanoGPT with an atomic guarded increment. The 6th question returns the librarian redirect without a model call. Signing out and back in creates a new JWT and therefore a fresh guide quota.
 
 The non-streaming `chatComplete()` helper in `lib/nanogpt.ts` is used here (and only here) — the response is short enough that streaming adds complexity for no gain.
 

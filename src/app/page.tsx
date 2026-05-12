@@ -3,6 +3,7 @@
 import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
+import FloatingThemeToggle from '@/components/FloatingThemeToggle';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
@@ -46,6 +47,7 @@ export default function LoginPage() {
 
   return (
     <div className="landing-root">
+      <FloatingThemeToggle />
       <div className="landing-main">
         {/* Left: branding + nav */}
         <div className="landing-hero-inner">

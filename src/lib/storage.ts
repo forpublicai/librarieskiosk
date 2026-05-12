@@ -6,6 +6,7 @@ import {
     GetObjectCommand,
     DeleteObjectCommand,
     HeadObjectCommand,
+    type GetObjectCommandInput,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { createHash, randomUUID } from 'crypto';
@@ -150,6 +151,10 @@ export function extensionForMime(mime: string, mode: MediaMode): string {
 
 export function defaultMimeForMode(mode: MediaMode): string {
     return mode === 'image' ? 'image/png' : mode === 'music' ? 'audio/mpeg' : 'video/mp4';
+}
+
+export function mimeGlobForMode(mode: MediaMode): string {
+    return mode === 'image' ? 'image/*' : mode === 'music' ? 'audio/*' : 'video/*';
 }
 
 function mimeMatchesGlob(mime: string, glob: string): boolean {
@@ -335,9 +340,10 @@ export async function uploadFromDataUrl(
  */
 export async function fetchBytesFromUrl(
     sourceUrl: string,
-    expectedMimeGlob?: string
+    expectedMimeGlob?: string,
+    options: FetchBytesOptions = {}
 ): Promise<{ buffer: Buffer; contentType: string }> {
-    return safeFetchBuffer(sourceUrl, expectedMimeGlob);
+    return safeFetchBuffer(sourceUrl, expectedMimeGlob, options);
 }
 
 export function bufferFromDataUrl(dataUrl: string): { buffer: Buffer; contentType: string } {
@@ -388,7 +394,7 @@ export async function generateSignedGetUrl(
     const env = getR2Env();
     const client = getR2Client();
     const ttl = ttlSeconds ?? env.signedUrlTtlSeconds;
-    const commandInput: Parameters<typeof GetObjectCommand>[0] = { Bucket: env.bucket, Key: key };
+    const commandInput: GetObjectCommandInput = { Bucket: env.bucket, Key: key };
     if (options?.downloadFilename) {
         commandInput.ResponseContentDisposition = buildAttachmentDisposition(options.downloadFilename);
     }
@@ -406,6 +412,29 @@ export async function deleteObject(key: string): Promise<void> {
 // ---------- SSRF-safe fetch ----------
 
 const MAX_REDIRECT_HOPS = 1;
+
+export interface FetchBytesOptions {
+    allowedHosts?: Set<string>;
+}
+
+export class DownloadHostNotAllowedError extends Error {
+    constructor(hostname: string) {
+        super(`Download host is not allowed: ${hostname}`);
+        this.name = 'DownloadHostNotAllowedError';
+    }
+}
+
+function normalizeHostname(hostname: string): string {
+    return hostname.toLowerCase().replace(/\.$/, '');
+}
+
+function assertAllowedHost(hostname: string, allowedHosts?: Set<string>): void {
+    if (!allowedHosts) return;
+    const normalized = normalizeHostname(hostname);
+    if (!allowedHosts.has(normalized)) {
+        throw new DownloadHostNotAllowedError(normalized);
+    }
+}
 
 function isPrivateIpv4(ip: string): boolean {
     const parts = ip.split('.').map((p) => parseInt(p, 10));
@@ -472,6 +501,7 @@ async function assertPublicHost(hostname: string): Promise<void> {
 async function safeFetchBuffer(
     rawUrl: string,
     expectedMimeGlob?: string,
+    options: FetchBytesOptions = {},
     redirectHops = 0
 ): Promise<{ buffer: Buffer; contentType: string }> {
     const env = getR2Env();
@@ -487,6 +517,7 @@ async function safeFetchBuffer(
         throw new Error(`Refused fetch: only https: is allowed, got ${parsed.protocol}`);
     }
 
+    assertAllowedHost(parsed.hostname, options.allowedHosts);
     await assertPublicHost(parsed.hostname);
 
     // Retry the network call (and only the network call) on transient failures.
@@ -526,7 +557,7 @@ async function safeFetchBuffer(
             throw new Error(`Refused fetch: exceeded ${MAX_REDIRECT_HOPS} redirect hops`);
         }
         const nextUrl = new URL(location, parsed).toString();
-        return safeFetchBuffer(nextUrl, expectedMimeGlob, redirectHops + 1);
+        return safeFetchBuffer(nextUrl, expectedMimeGlob, options, redirectHops + 1);
     }
 
     if (!response.ok) {

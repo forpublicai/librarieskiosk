@@ -2,7 +2,14 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth, isAuthResult } from '@/lib/auth';
-import { fetchBytesFromUrl, buildAttachmentDisposition } from '@/lib/storage';
+import { getDownloadProxyAllowedHosts, DownloadProxyConfigError } from '@/lib/env';
+import {
+    fetchBytesFromUrl,
+    buildAttachmentDisposition,
+    mimeGlobForMode,
+    DownloadHostNotAllowedError,
+    type MediaMode,
+} from '@/lib/storage';
 
 /**
  * POST /api/media-sessions/download/proxy
@@ -24,9 +31,8 @@ import { fetchBytesFromUrl, buildAttachmentDisposition } from '@/lib/storage';
  * must be authenticated (any role); the kiosk-gate cookie also gates this
  * endpoint via `middleware.ts`.
  *
- * Body: { url: string, filename: string, mode?: 'image' | 'music' | 'video' }
- * The `mode` (if provided) tightens the content-type allowlist on the fetch
- * (e.g. mode='image' → only `image/*` responses accepted).
+ * Body: { url: string, filename: string, mode: 'image' | 'music' | 'video' }
+ * The `mode` tightens the content-type allowlist on the fetch.
  */
 
 interface ProxyBody {
@@ -39,6 +45,10 @@ function sanitizeFilename(name: string): string {
     // Cap length and strip path separators to keep the filename a leaf name.
     const trimmed = name.trim().slice(0, 200);
     return trimmed.replace(/[\\/]/g, '_') || 'download';
+}
+
+function isMediaMode(mode: unknown): mode is MediaMode {
+    return mode === 'image' || mode === 'music' || mode === 'video';
 }
 
 export async function POST(request: NextRequest) {
@@ -56,16 +66,17 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'url and filename are required' }, { status: 400 });
     }
 
+    if (!isMediaMode(body.mode)) {
+        return NextResponse.json({ error: 'mode must be image, music, or video' }, { status: 400 });
+    }
+
     const filename = sanitizeFilename(body.filename);
-    const mode = typeof body.mode === 'string' ? body.mode : null;
-    const expectedMimeGlob =
-        mode === 'image' ? 'image/*'
-        : mode === 'music' ? 'audio/*'
-        : mode === 'video' ? 'video/*'
-        : undefined;
+    const expectedMimeGlob = mimeGlobForMode(body.mode);
 
     try {
-        const { buffer, contentType } = await fetchBytesFromUrl(body.url, expectedMimeGlob);
+        const { buffer, contentType } = await fetchBytesFromUrl(body.url, expectedMimeGlob, {
+            allowedHosts: getDownloadProxyAllowedHosts(),
+        });
         return new NextResponse(new Uint8Array(buffer), {
             headers: {
                 'Content-Type': contentType || 'application/octet-stream',
@@ -76,6 +87,12 @@ export async function POST(request: NextRequest) {
         });
     } catch (err) {
         console.error('Guest download proxy failed', err);
+        if (err instanceof DownloadHostNotAllowedError) {
+            return NextResponse.json({ error: err.message }, { status: 403 });
+        }
+        if (err instanceof DownloadProxyConfigError) {
+            return NextResponse.json({ error: err.message }, { status: 500 });
+        }
         const message = err instanceof Error ? err.message : 'Download failed';
         return NextResponse.json({ error: message }, { status: 502 });
     }

@@ -4,6 +4,8 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
 import CreditBadge from '@/components/CreditBadge';
+import FloatingThemeToggle from '@/components/FloatingThemeToggle';
+import ThemeToggle from '@/components/ThemeToggle';
 
 const modes = [
     {
@@ -67,6 +69,7 @@ export default function DashboardPage() {
     if (!isGuest && user.status === 'PENDING') {
         return (
             <div className="login-container">
+                <FloatingThemeToggle />
                 <div className="login-card" style={{ textAlign: 'center' }}>
                     <h2 style={{ marginBottom: '20px', fontSize: '1.5rem', fontWeight: 'bold', textTransform: 'uppercase' }}>Waiting for Approval</h2>
                     <p style={{ color: 'var(--text-secondary)', marginBottom: '32px' }}>
@@ -82,6 +85,7 @@ export default function DashboardPage() {
     if (!isGuest && user.status === 'BANNED') {
         return (
             <div className="login-container">
+                <FloatingThemeToggle />
                 <div className="login-card" style={{ textAlign: 'center' }}>
                     <h2 style={{ marginBottom: '20px', fontSize: '1.5rem', fontWeight: 'bold', textTransform: 'uppercase' }}>Account Suspended</h2>
                     <p style={{ color: 'var(--text-secondary)', marginBottom: '32px' }}>
@@ -107,6 +111,7 @@ export default function DashboardPage() {
                             My Account
                         </button>
                     )}
+                    <ThemeToggle />
                     <button className="back-btn" onClick={logout}>{isGuest ? 'Exit' : 'Sign Out'}</button>
                 </div>
             </header>

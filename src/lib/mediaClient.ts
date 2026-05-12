@@ -121,7 +121,7 @@ export function invalidateCachedMediaUrl(sessionId: string): void {
  *          we fetch that endpoint with auth; it streams the bytes back from
  *          the provider URL on the session row.
  *        - Guest whose provider URL is CORS-blocked → we POST to
- *          `/api/media-sessions/download/proxy` with the URL + filename; it
+ *          `/api/media-sessions/download/proxy` with the URL, filename, and mode; it
  *          fetches via the SSRF-safe `fetchBytesFromUrl` and streams back.
  *      In both proxy cases we get a blob and trigger `<a download>` on the
  *      client.
@@ -134,8 +134,8 @@ export async function downloadMedia(params: {
     token: string | null;
     fallbackUrl: string | null;
     fallbackFilename: string;
-    /** Optional — tightens the proxy's content-type allowlist for guests. */
-    mode?: 'image' | 'music' | 'video';
+    /** Tightens the proxy's content-type allowlist for guests. */
+    mode: 'image' | 'music' | 'video';
 }): Promise<void> {
     const { sessionId, token, fallbackUrl, fallbackFilename, mode } = params;
 

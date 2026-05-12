@@ -2,8 +2,24 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/components/AuthProvider';
+import {
+  countWords,
+  guideTierKey,
+  LEGACY_GUIDE_TIER_KEY,
+  LIBRARIAN_REDIRECT,
+  MAX_INPUT_WORDS,
+  SOFT_WARN_WORDS,
+  TIER_LABELS,
+  TIER_SHORT_LABELS,
+  type GuideTier,
+} from '@/lib/guideConstants';
+import {
+  fuzzyMatch,
+  fuzzyMatchUseCase,
+  splitIntoBubbles,
+} from '@/lib/guideMatch';
+import { splitGuideTextLinks } from '@/lib/guideLinks';
 
-type Tier = 1 | 2 | 3;
 type FaqCategory = 'concept' | 'practical' | 'criticalUse';
 type Screen =
   | 'tier-select'
@@ -35,6 +51,8 @@ interface GuideContent {
   faqs: { concept: FAQ[]; practical: FAQ[]; criticalUse: FAQ[] };
 }
 
+type StartedUseCase = UseCase & { gettingStarted: NonNullable<UseCase['gettingStarted']> };
+
 interface Message {
   role: 'bot' | 'user';
   content: string;
@@ -51,25 +69,11 @@ interface GuidePanelProps {
 // after the user opens the guide panel on that tool's page. Avoids bundling
 // ~30KB of guide content into every page that just imports `GuidePanel`.
 const CONTENT_LOADERS: Record<string, () => Promise<{ default: unknown }>> = {
-  chat: () => import('../../config/guide/chat.json'),
-  music: () => import('../../config/guide/music.json'),
-  image: () => import('../../config/guide/image.json'),
-  video: () => import('../../config/guide/video.json'),
-  code: () => import('../../config/guide/code.json'),
-};
-
-const TIER_LS_KEY = 'guide_tier';
-
-const TIER_LABELS: Record<Tier, string> = {
-  1: "I'm new to technology and AI tools",
-  2: "I use technology regularly but haven't explored AI tools yet",
-  3: "I've tried AI tools and want to learn how to use them more effectively",
-};
-
-const TIER_SHORT_LABELS: Record<Tier, string> = {
-  1: "New to tech",
-  2: "Tech-savvy",
-  3: "AI Explorer",
+  chat: () => import('@/config/guide/chat.json'),
+  music: () => import('@/config/guide/music.json'),
+  image: () => import('@/config/guide/image.json'),
+  video: () => import('@/config/guide/video.json'),
+  code: () => import('@/config/guide/code.json'),
 };
 
 const FAQ_CATEGORY_LABELS: Record<FaqCategory, string> = {
@@ -78,121 +82,90 @@ const FAQ_CATEGORY_LABELS: Record<FaqCategory, string> = {
   criticalUse: 'What should I know about safety and trust?',
 };
 
-function splitIntoBubbles(text: string): string[] {
-  return text.split(/\n\n+/).map(s => s.trim()).filter(Boolean);
-}
-
-const URL_RE = /\bhttps?:\/\/[^\s,)]+|[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\.(?:org|com|edu|gov|net|io|ai)(?:\/[^\s,)]*)?/g;
-
 function renderText(text: string): React.ReactNode {
-  const parts: React.ReactNode[] = [];
-  let last = 0;
-  let m: RegExpExecArray | null;
-  URL_RE.lastIndex = 0;
-  while ((m = URL_RE.exec(text)) !== null) {
-    if (m.index > last) parts.push(text.slice(last, m.index));
-    const raw = m[0];
-    const href = /^https?:\/\//.test(raw) ? raw : `https://${raw}`;
-    parts.push(<a key={m.index} href={href} target="_blank" rel="noopener noreferrer" className="guide-link">{raw}</a>);
-    last = m.index + raw.length;
+  return (
+    <>
+      {splitGuideTextLinks(text).map((part, idx) => (
+        part.type === 'link'
+          ? <a key={idx} href={part.href} target="_blank" rel="noopener noreferrer" className="guide-link">{part.text}</a>
+          : part.text
+      ))}
+    </>
+  );
+}
+
+function hasGettingStarted(uc: UseCase): uc is StartedUseCase {
+  return Boolean(uc.gettingStarted);
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string');
+}
+
+function isFaqArray(value: unknown): value is FAQ[] {
+  return Array.isArray(value) && value.every((item) => {
+    if (!item || typeof item !== 'object') return false;
+    const candidate = item as Record<string, unknown>;
+    return typeof candidate.q === 'string' && typeof candidate.a === 'string';
+  });
+}
+
+function isGuideContent(value: unknown): value is GuideContent {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Record<string, unknown>;
+  const whatIsIt = candidate.whatIsIt as Record<string, unknown> | undefined;
+  const faqs = candidate.faqs as Record<string, unknown> | undefined;
+
+  if (
+    !whatIsIt ||
+    typeof whatIsIt.tier1 !== 'string' ||
+    typeof whatIsIt.tier2 !== 'string' ||
+    typeof whatIsIt.tier3 !== 'string'
+  ) {
+    return false;
   }
-  if (last < text.length) parts.push(text.slice(last));
-  return parts.length === 0 ? text : <>{parts}</>;
+
+  if (!Array.isArray(candidate.useCases)) return false;
+  const useCasesValid = candidate.useCases.every((item) => {
+    if (!item || typeof item !== 'object') return false;
+    const uc = item as Record<string, unknown>;
+    if (typeof uc.id !== 'string' || typeof uc.label !== 'string') return false;
+    if (uc.gettingStarted === null) return true;
+    if (!uc.gettingStarted || typeof uc.gettingStarted !== 'object') return false;
+    const gs = uc.gettingStarted as Record<string, unknown>;
+    return (
+      typeof gs.intro === 'string' &&
+      typeof gs.examplePrompt === 'string' &&
+      isStringArray(gs.tips) &&
+      isStringArray(gs.cautions)
+    );
+  });
+  if (!useCasesValid || !faqs) return false;
+
+  return (
+    isFaqArray(faqs.concept) &&
+    isFaqArray(faqs.practical) &&
+    isFaqArray(faqs.criticalUse)
+  );
 }
 
-const FUZZY_STOP = new Set([
-  // structural / grammatical
-  'the','a','an','is','it','i','do','can','my','me','to','of','in','for',
-  'what','how','why','when','does','should','will','are','be','have','this',
-  'that','with','get','use','if','but','not','and','or','as','at','about',
-  'could','would','might','also','even','still','already','yet','too','its',
-  // intent framing — common in questions but topically meaningless
-  'know','understand','think','want','need','help','tell','find','learn',
-  'try','figure','explain','show','describe','mean','means','define','said',
-  'dont','cant','wont','doesnt','isnt','arent','didnt','wasnt','havent',
-  // filler / softeners
-  'just','really','maybe','perhaps','like','sort','kind','bit','way',
-  'please','hi','hello','hey','okay','yeah','yes','sure','right','actually',
-]);
-
-function tokenize(s: string) {
-  return s.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter(w => w.length > 2 && !FUZZY_STOP.has(w));
-}
-
-// Strip common intent-framing wrappers so "I don't know what X is" → "X"
-function normalizeQuery(q: string): string {
-  return q
-    .replace(/i\s+don'?t\s+know\s+(what|how|why|if|whether)\s+/gi, '')
-    .replace(/i\s+(don'?t|do\s+not)\s+understand\s+/gi, '')
-    .replace(/can\s+you\s+\w+\s+(me\s+)?(about\s+)?/gi, '')
-    .replace(/help\s+me\s+\w+\s+/gi, '')
-    .replace(/tell\s+me\s+(about\s+)?/gi, '')
-    .replace(/what\s+does\s+(.+?)\s+mean\??$/gi, '$1')
-    .replace(/explain\s+(.+?)\s+to\s+me\??$/gi, '$1')
-    .replace(/how\s+do\s+i\s+/gi, '')
-    .replace(/i\s+want\s+to\s+(know|learn|understand)\s+(about\s+)?/gi, '')
-    .trim();
-}
-
-function fuzzyMatch(query: string, faqs: FAQ[]): FAQ | null {
-  const qTokens = tokenize(normalizeQuery(query));
-  if (!qTokens.length) return null;
-
-  // If the query contains a token that doesn't appear anywhere in the FAQ corpus,
-  // the question references something beyond the static content — let the live guide handle it.
-  const corpusTokens = new Set(faqs.flatMap(f => [...tokenize(f.q), ...tokenize(f.a)]));
-  if (qTokens.some(t => !corpusTokens.has(t))) return null;
-
-  // Pass 1: match against question text only — prefers the FAQ the user is asking about
-  let best: { faq: FAQ; score: number } | null = null;
-  for (const faq of faqs) {
-    const faqQTokenSet = new Set(tokenize(faq.q));
-    const hits = qTokens.filter(t => faqQTokenSet.has(t)).length;
-    const score = hits / qTokens.length;
-    if (!best || score > best.score) best = { faq, score };
-  }
-  if (best && best.score >= 0.35) return best.faq;
-
-  // Pass 2: fall back to combined question + answer matching
-  best = null;
-  for (const faq of faqs) {
-    const faqTokenSet = new Set(tokenize(faq.q + ' ' + faq.a));
-    const hits = qTokens.filter(t => faqTokenSet.has(t)).length;
-    const score = hits / qTokens.length;
-    if (!best || score > best.score) best = { faq, score };
-  }
-  return best && best.score >= 0.35 ? best.faq : null;
-}
-
-const MAX_INPUT_WORDS = 25;
-const SOFT_WARN_WORDS = 20;
-
-function countWords(s: string): number {
-    const trimmed = s.trim();
-    if (!trimmed) return 0;
-    return trimmed.split(/\s+/).filter(Boolean).length;
-}
-
-function fuzzyMatchUseCase(query: string, useCases: UseCase[]): UseCase | null {
-  const qTokens = tokenize(normalizeQuery(query));
-  if (!qTokens.length) return null;
-  let best: { uc: UseCase; score: number; hits: number } | null = null;
-  for (const uc of useCases) {
-    if (!uc.gettingStarted) continue;
-    const gs = uc.gettingStarted;
-    const text = [uc.label, gs.intro, gs.examplePrompt, ...gs.tips, ...gs.cautions].join(' ');
-    const ucTokenSet = new Set(tokenize(text));
-    const hits = qTokens.filter(t => ucTokenSet.has(t)).length;
-    const score = hits / qTokens.length;
-    if (!best || score > best.score) best = { uc, score, hits };
-  }
-  if (!best || best.score < 0.25) return null;
-  // Require at least 2 overlapping tokens for multi-token queries — a single
-  // common word like "image" or "code" coincidentally hitting a use-case body
-  // is not a real match. Single-token queries get a free pass since they have
-  // only one possible hit.
-  if (qTokens.length > 1 && best.hits < 2) return null;
-  return best.uc;
+function GuideContentError({ isOpen }: { isOpen: boolean }) {
+  return (
+    <div className={`guide-panel${isOpen ? ' guide-panel--open' : ''}`}>
+      <div className="guide-panel-header">
+        <span className="guide-panel-title">Learning Guide</span>
+      </div>
+      <div className="guide-panel-body">
+        <div className="guide-panel-messages">
+          <div className="guide-message guide-message--bot">
+            <div className="guide-message-content">
+              <span className="guide-message-text">Guide content failed to load.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 
@@ -202,18 +175,34 @@ function fuzzyMatchUseCase(query: string, useCases: UseCase[]): UseCase | null {
 // without sprinkling guards through every handler.
 export default function GuidePanel({ tool, isOpen }: GuidePanelProps) {
   const [content, setContent] = useState<GuideContent | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const load = CONTENT_LOADERS[tool];
 
   useEffect(() => {
-    if (!isOpen || content) return;
-    const load = CONTENT_LOADERS[tool];
-    if (!load) return;
+    if (!isOpen || content || loadFailed || !load) return;
     let cancelled = false;
     load()
-      .then((mod) => { if (!cancelled) setContent(mod.default as GuideContent); })
-      .catch((err) => console.error(`Failed to load guide content for tool="${tool}"`, err));
+      .then((mod) => {
+        if (cancelled) return;
+        if (!isGuideContent(mod.default)) {
+          console.error(`Invalid guide content shape for tool="${tool}"`, mod.default);
+          setLoadFailed(true);
+          return;
+        }
+        setContent(mod.default);
+      })
+      .catch((err) => {
+        console.error(`Failed to load guide content for tool="${tool}"`, err);
+        if (!cancelled) setLoadFailed(true);
+      });
     return () => { cancelled = true; };
-  }, [isOpen, tool, content]);
+  }, [isOpen, tool, content, loadFailed, load]);
 
+  if (!load) {
+    console.error(`No guide content loader configured for tool="${tool}"`);
+    return <GuideContentError isOpen={isOpen} />;
+  }
+  if (loadFailed) return <GuideContentError isOpen={isOpen} />;
   if (!content) return null;
   return <GuidePanelInner content={content} tool={tool} isOpen={isOpen} />;
 }
@@ -222,7 +211,7 @@ function GuidePanelInner({ content, tool, isOpen }: GuidePanelProps & { content:
   const { user, token } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [screen, setScreen] = useState<Screen>('tier-select');
-  const [tier, setTier] = useState<Tier | null>(null);
+  const [tier, setTier] = useState<GuideTier | null>(null);
   const [selectedFaqCategory, setSelectedFaqCategory] = useState<FaqCategory | null>(null);
   const [visitedUseCases, setVisitedUseCases] = useState<Set<string>>(new Set());
   const [freeInput, setFreeInput] = useState('');
@@ -234,20 +223,22 @@ function GuidePanelInner({ content, tool, isOpen }: GuidePanelProps & { content:
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const initializedRef = useRef(false);
+  const tierStorageKey = guideTierKey(user, token);
 
   const allFaqs = content
     ? [...content.faqs.concept, ...content.faqs.practical, ...content.faqs.criticalUse]
     : [];
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
   }, [messages, isThinking]);
 
   useEffect(() => {
     if (!isOpen || initializedRef.current || !content) return;
     initializedRef.current = true;
-    const saved = localStorage.getItem(TIER_LS_KEY);
-    const t = saved && ['1', '2', '3'].includes(saved) ? (Number(saved) as Tier) : null;
+    localStorage.removeItem(LEGACY_GUIDE_TIER_KEY);
+    const saved = localStorage.getItem(tierStorageKey);
+    const t = saved && ['1', '2', '3'].includes(saved) ? (Number(saved) as GuideTier) : null;
     if (t) {
       setTier(t);
       setMessages([{ role: 'bot', content: 'Welcome back! What would you like help with today?' }]);
@@ -256,7 +247,7 @@ function GuidePanelInner({ content, tool, isOpen }: GuidePanelProps & { content:
       setMessages([{ role: 'bot', content: "Hi! Before we start, which of these best describes you?" }]);
       setScreen('tier-select');
     }
-  }, [isOpen, content]);
+  }, [isOpen, content, tierStorageKey]);
 
   function add(...msgs: Message[]): Promise<void> {
     const userMsgs = msgs.filter(m => m?.role === 'user');
@@ -285,8 +276,8 @@ function GuidePanelInner({ content, tool, isOpen }: GuidePanelProps & { content:
     });
   }
 
-  async function handleTierSelect(t: Tier) {
-    localStorage.setItem(TIER_LS_KEY, String(t));
+  async function handleTierSelect(t: GuideTier) {
+    localStorage.setItem(tierStorageKey, String(t));
     setTier(t);
     await add(
       { role: 'user', content: TIER_LABELS[t] },
@@ -336,9 +327,9 @@ function GuidePanelInner({ content, tool, isOpen }: GuidePanelProps & { content:
   // Render a use-case's "getting started" bundle (intro, copyable prompt,
   // tips, cautions). Shared by `handleUseCaseSelect` (button click) and
   // `handleFreeInputSubmit` (fuzzy match on typed text).
-  async function renderUseCase(uc: UseCase, userText: string) {
+  async function renderUseCase(uc: StartedUseCase, userText: string) {
     setVisitedUseCases(prev => { const s = new Set(prev); s.add(uc.id); return s; });
-    const gs = uc.gettingStarted!;
+    const gs = uc.gettingStarted;
     const msgs: Message[] = [
       { role: 'user', content: userText },
       { role: 'bot', content: gs.intro },
@@ -361,7 +352,7 @@ function GuidePanelInner({ content, tool, isOpen }: GuidePanelProps & { content:
   }
 
   async function handleUseCaseSelect(uc: UseCase) {
-    if (!uc.gettingStarted) {
+    if (!hasGettingStarted(uc)) {
       setVisitedUseCases(prev => { const s = new Set(prev); s.add(uc.id); return s; });
       await add(
         { role: 'user', content: uc.label },
@@ -415,20 +406,22 @@ function GuidePanelInner({ content, tool, isOpen }: GuidePanelProps & { content:
       if (data.limitReached) setLiveLimitReached(true);
       const segments = splitIntoBubbles(data.response || '');
       setIsThinking(false);
-      for (let i = 0; i < segments.length; i++) {
-        setMessages(prev => [...prev, { role: 'bot', content: segments[i] }]);
-        if (i < segments.length - 1) {
-          setIsThinking(true);
-          await new Promise<void>(resolve => setTimeout(resolve, 500));
-          setIsThinking(false);
-        }
+      if (!segments.length) {
+        console.error('Guide request returned an empty response');
+        await add({
+          role: 'bot',
+          content: "I wasn't able to answer that right now. Try rephrasing, or explore the FAQ options above.",
+        });
+        return;
       }
-    } catch {
+      await add(...segments.map((segment) => ({ role: 'bot' as const, content: segment })));
+    } catch (err) {
+      console.error('Guide request failed:', err);
       setIsThinking(false);
-      setMessages(prev => [...prev, {
+      await add({
         role: 'bot',
         content: "I wasn't able to answer that right now. Try rephrasing, or explore the FAQ options above.",
-      }]);
+      });
     }
   }
 
@@ -442,7 +435,7 @@ function GuidePanelInner({ content, tool, isOpen }: GuidePanelProps & { content:
     // Match order: use-case → FAQ → live model. The `open-question` screen and
     // the other screens went through the same chain — collapsed here.
     const ucMatch = fuzzyMatchUseCase(q, content.useCases);
-    if (ucMatch?.gettingStarted) {
+    if (ucMatch && hasGettingStarted(ucMatch)) {
       await renderUseCase(ucMatch, q);
       setScreen('getting-started');
       return;
@@ -463,7 +456,7 @@ function GuidePanelInner({ content, tool, isOpen }: GuidePanelProps & { content:
     if (liveLimitReached) {
       await add(
         { role: 'user', content: q },
-        { role: 'bot', content: "You've used your live questions for this session. FAQs, tips and use cases above are still available for your reference. For additional help, ask a librarian." }
+        { role: 'bot', content: LIBRARIAN_REDIRECT }
       );
       return;
     }
@@ -472,7 +465,8 @@ function GuidePanelInner({ content, tool, isOpen }: GuidePanelProps & { content:
   }
 
   function resetTier() {
-    localStorage.removeItem(TIER_LS_KEY);
+    localStorage.removeItem(tierStorageKey);
+    localStorage.removeItem(LEGACY_GUIDE_TIER_KEY);
     setTier(null);
     setLiveLimitReached(false);
     setMessages([{ role: 'bot', content: 'Which of these best describes you?' }]);
@@ -487,9 +481,11 @@ function GuidePanelInner({ content, tool, isOpen }: GuidePanelProps & { content:
   }
 
   function renderOptions() {
+    const otherUseCase = content.useCases.find(uc => !uc.gettingStarted);
+
     switch (screen) {
       case 'tier-select':
-        return ([1, 2, 3] as Tier[]).map(t => (
+        return ([1, 2, 3] as GuideTier[]).map(t => (
           <button key={t} className="guide-option-btn" onClick={() => handleTierSelect(t)}>
             {TIER_LABELS[t]}
           </button>
@@ -542,7 +538,11 @@ function GuidePanelInner({ content, tool, isOpen }: GuidePanelProps & { content:
           <>
             <button className="guide-option-btn" onClick={handleWhatCanIDo}>Explore another use</button>
             <button className="guide-option-btn" onClick={handleGoToFaqs}>Other key questions (FAQs)</button>
-            <button className="guide-option-btn" onClick={() => handleUseCaseSelect(content.useCases.find(uc => !uc.gettingStarted)!)}>I have something else in mind</button>
+            {otherUseCase && (
+              <button className="guide-option-btn" onClick={() => handleUseCaseSelect(otherUseCase)}>
+                I have something else in mind
+              </button>
+            )}
             <button className="guide-option-btn guide-option-btn--secondary" onClick={handleMainMenu}>↩ Main menu</button>
           </>
         );
@@ -625,10 +625,10 @@ function GuidePanelInner({ content, tool, isOpen }: GuidePanelProps & { content:
                 <span className="guide-message-text">{renderText(msg.content)}</span>
                 {msg.copyable && (
                   <div className="guide-copy-block">
-                    <div className="guide-copy-prompt">"{msg.copyable}"</div>
+                    <div className="guide-copy-prompt">&quot;{msg.copyable}&quot;</div>
                     <button
                       className={`guide-copy-btn${copiedIdx === i ? ' guide-copy-btn--copied' : ''}`}
-                      onClick={() => handleCopy(msg.copyable!, i)}
+                      onClick={() => msg.copyable && handleCopy(msg.copyable, i)}
                     >
                       {copiedIdx === i ? '✓ Copied!' : '⎘ Copy prompt'}
                     </button>
@@ -662,7 +662,7 @@ function GuidePanelInner({ content, tool, isOpen }: GuidePanelProps & { content:
           <>
             {liveLimitReached && (
               <div className="guide-limit-banner">
-                You've used your live questions for this session. FAQs, tips and use cases above are still available for your reference. For additional help, ask a librarian.
+                {LIBRARIAN_REDIRECT}
               </div>
             )}
             <form className="guide-panel-input" onSubmit={handleFreeInputSubmit}>

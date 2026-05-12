@@ -74,6 +74,10 @@ Generated PNGs are 1–4 MB; AVIF q60 is ~85% smaller and indistinguishable for 
 
 `uploadFromUrl` enforces HTTPS, DNS lookup with private-IP rejection (IPv4 + IPv6 incl. `::ffff:` v4-mapped), `redirect: 'manual'` with at most one hop, content-length pre-check, content-type allow list, and never forwards auth/cookies. **Why:** taking a URL from an external service and fetching it server-side is a textbook SSRF. Cloud metadata endpoints (`169.254.169.254`) are reachable from naive `fetch` calls. **How to apply:** any new "fetch this URL on the server and store it" feature must reuse `safeFetchBuffer` (or its public wrappers `uploadFromUrl` / `fetchBytesFromUrl`). Do not handroll a `fetch` for this.
 
+### Proxied downloads need a hostname allowlist, not just SSRF checks
+
+SSRF defenses keep the server from fetching private networks, but they do not say which public hosts are legitimate. The media download proxy accepts provider URLs and must pass `DOWNLOAD_PROXY_ALLOWED_HOSTS` into `fetchBytesFromUrl`; the helper checks the original host and every redirect target before reading bytes. **Why:** an arbitrary public HTTPS host can serve malware, enormous files, or misleading MIME types even if it is not private infrastructure. Redirects matter because an allowed provider URL can bounce to an untrusted CDN or attacker-controlled host. **How to apply:** any route that fetches user- or DB-sourced URLs for direct browser download needs both SSRF protection and an explicit public-host allowlist.
+
 ### Forced-attachment downloads from cross-origin presigned URLs require `ResponseContentDisposition` in the *signed* URL
 
 The HTML `<a download="...">` attribute is ignored when the response comes from a different origin without a matching `Content-Disposition: attachment` header — clicking the link opens the file in a new tab instead of downloading it. For S3/R2 presigned URLs, the only way to attach `Content-Disposition` is to set `ResponseContentDisposition` on the `GetObjectCommand` *before* signing — appending it as a query string after the fact breaks the signature. **Why:** this was the entire reason the old `<a download>` pattern silently failed for image/video/audio downloads; the file would render in the browser instead of saving. **How to apply:** any "download this from R2" feature should call `generateSignedGetUrl(key, ttl, { downloadFilename })`. If you need a different disposition or filename per request, do not cache the URL — generate a fresh signed URL per click, since the cache key would have to include the disposition.
@@ -97,6 +101,10 @@ The kiosk client sends `/api/auth/heartbeat` every 60s — but only if the user 
 ### SSR-safe theme via inline `<script>` in `<head>`
 
 Theme is set by `localStorage['theme']` but read before React mounts via a tiny inline `<script>` in `layout.tsx` that sets `document.documentElement.dataset.theme`. **Why:** without this, dark-mode users see a white flash on every navigation. **How to apply:** any state that affects first paint and lives in `localStorage` needs an inline script in the `<head>`. Don't try to do it in a React effect.
+
+### Shared-kiosk localStorage must be scoped to the user or auth session
+
+Any localStorage key that affects an authenticated workflow can leak state between patrons on the same kiosk if it is global. The Learning Guide tier uses `guide_tier_user_<id>` for patrons/admins and `guide_tier_guest_<token-fragment>` for guests; the old unscoped key is removed. **Why:** logging out does not clear all browser storage, and guest accounts are shared per library, so username-level keys are still shared for guests. **How to apply:** when adding localStorage state on a kiosk surface, choose the narrowest stable key: account ID for durable per-account preferences, JWT/session fragment for guest or per-visit state, and only use global keys for truly device-wide preferences like theme.
 
 ### `'use client'` is a leaf decision, not a tree decision
 

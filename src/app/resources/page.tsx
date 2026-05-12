@@ -1,16 +1,22 @@
+import Link from 'next/link';
+import ThemeToggle from '@/components/ThemeToggle';
+
 export default function ResourcesPage() {
   return (
     <div className="info-page">
       <header className="info-topbar">
-        <a href="/">
+        <Link href="/">
           <img src="/images/lib-logo.png" alt="Public AI" className="info-topbar-logo" />
-        </a>
+        </Link>
         <nav className="info-topbar-nav">
-          <a href="/getting-started">Get Started</a>
-          <a href="/resources" className="active">Resources</a>
-          <a href="/faqs">FAQs</a>
+          <Link href="/getting-started">Get Started</Link>
+          <Link href="/resources" className="active">Resources</Link>
+          <Link href="/faqs">FAQs</Link>
         </nav>
-        <a href="/" className="info-topbar-back">← Back to Sign In</a>
+        <div className="info-topbar-actions">
+          <Link href="/" className="info-topbar-back">← Back to Sign In</Link>
+          <ThemeToggle />
+        </div>
       </header>
 
       <div className="under-construction">

@@ -53,19 +53,19 @@ If the user asks you to execute on a plan, these are the steps to take.
 
 These are the decisions that were made (often interactively, over multiple iterations) during the work and that future milestones should treat as constraints unless explicitly revisited.
 
-1. **Three audience tiers, not one.** Patrons identify themselves as `Tier 1` (new to tech), `Tier 2` (tech-savvy, AI-new) or `Tier 3` (AI explorer). All on-screen and live explanations switch language, jargon, and depth based on the chosen tier. The choice is per-browser via `localStorage['guide_tier']` and editable from a chip in the panel header.
+1. **Three audience tiers, not one.** Patrons identify themselves as `Tier 1` (new to tech), `Tier 2` (tech-savvy, AI-new) or `Tier 3` (AI explorer). All on-screen and live explanations switch language, jargon, and depth based on the chosen tier. The choice is persisted per patron/admin account and per guest auth token via namespaced localStorage keys, and editable from a chip in the panel header.
 2. **Static content is canonical; the live model fills gaps.** Every tool ships hand-written copy in `config/guide/<tool>.json`. The live model is only invoked when the user types a free-form question that doesn't match any FAQ or use-case. Static content is sourced verbatim from authored PDFs (Music, Image, Video Static Content; Chat and Code to follow). Wording is not paraphrased.
 3. **Three-dot menu and the explicit Download button must both work** for music and video. The audio/video elements keep their browser-native controls; the explicit `Download` button is the *primary* affordance. Confirmed by the user that both paths work.
 4. **Forced-download header on the API.** A query param `?download=true` on `/api/media-sessions/[id]/url` produces a presigned URL with `Content-Disposition: attachment; filename="..."`. The client prefers this over the legacy blob-fetch path because the latter triggers a CORS preflight against R2 that some kiosk browsers block.
 5. **Coachmark tour is per-user, per-tool, persistent.** Storage key `cm_<username>_<tool>`, value `'true'` once dismissed. A guest's tour state is keyed under `cm_anon_<tool>`. The tour is restartable from the Learning Guide's "↺ Restart page tour" link.
-6. **Theme toggle lives in the header**, not as a fixed-position floating control. Removed from `layout.tsx`; added inside `<Header>` to the right of the credit badge. CSS shrunk to 32×32 to match other header chrome.
+6. **Theme toggle lives in the visible page chrome.** Removed from `layout.tsx`; added inside `<Header>` to the right of the credit badge for generation pages, inside the info-page topbar for public info pages, inside the dashboard header, and as a compact floating control only on pre-auth screens that have no chrome. CSS shrunk to 32×32 to match other header controls.
 7. **Headers expose an `actions` slot.** The Learning Guide button is per-page, not global, so `<Header>` accepts an `actions: React.ReactNode` prop. Each generation page passes its own button. This is the canonical extension point for any future per-page header chrome.
 8. **Guide chats are stateless.** No history is persisted server-side or in the DB. The `/api/guide` route takes one question and one tier and returns one response. Following questions are independent calls.
 9. **Off-topic deflection in the live guide system prompt.** If the user asks a question that isn't about the current tool, the live guide is instructed to politely refuse, point at the matching tool's own guide, and ask if there's anything about *this* tool to help with.
 10. **Bubble splitting on `\n\n`.** Both static and live answers are split on blank lines into multiple sequential bubbles separated by ~500ms typing animation. The model's system prompt explicitly asks for blank-line-separated paragraphs.
 11. **Live guide uses the generic `NANOGPT_API_KEY`**, not the per-library key. The guide is an onboarding feature, not a creative-generation feature; its spend should not draw against any one library's pool or appear on a library's NanoGPT bill.
-12. **Live guide is rate-bounded per call and per session.** Each call is capped at 25 input words (hard reject), and the response is tier-aware: Tier 1 → 80 words / `max_tokens: 110`, Tier 2 → 60 / 85, Tier 3 → 50 / 65. The session is capped at 5 live exchanges; once reached, the server short-circuits with a "ask a librarian" redirect and never calls the model.
-13. **Live guide does not deduct credits.** Patron exchanges write a `UsageLog` row with `mode: 'guide'`, `creditsUsed: 0` (visibility only). Guest exchanges are tracked in an in-memory `Map<jti, count>` (best-effort across cold starts; word/token caps are the real cost ceiling). The guide is fundamentally onboarding — charging patrons for asking how the kiosk works was rejected.
+12. **Live guide is rate-bounded per call and per session.** Each call is capped at 25 input words (hard reject), and the response is tier-aware: Tier 1 → 80 words / `max_tokens: 110`, Tier 2 → 60 / 85, Tier 3 → 50 / 70. The session is capped at 5 live exchanges; once reached, the server short-circuits with a "ask a librarian" redirect and never calls the model.
+13. **Live guide does not deduct credits.** Patron exchanges write a `UsageLog` row with `mode: 'guide'`, `creditsUsed: 0` (visibility only). Patrons and guests share the same durable per-auth-session quota counter in `GuideExchange`, keyed by JWT `jti`. The guide is fundamentally onboarding — charging patrons for asking how the kiosk works was rejected.
 14. **Live guide topic scope is intentionally broad.** The system prompt names file formats, art styles, prompting techniques, and underlying concepts as in-scope per tool — not just the tool's UI. This is in response to the JPEG-vs-PNG deflection bug; the original "only answer questions about <tool>" wording was too strict.
 15. **Download proxy is fallback-only.** Patron + UPLOADED R2 row goes through a direct presigned URL (free, R2-to-browser). Guest + permissive-CORS provider goes through a direct blob fetch (free). The server-side proxy only fires when those two free paths can't apply — patron with a failed R2 upload, or guest with a CORS-blocked provider. Bandwidth posture is "the kiosk pays only when there's no free option."
 16. **R2 uploads retry on transient failures.** `withRetry` wraps both `client.send(PutObjectCommand)` and the provider `fetch()` in `safeFetchBuffer`. 2 retries (3 attempts total), ~500ms then ~1000ms backoff with jitter. Retries on 5xx/429/408 and Node fetch network errors; not on 4xx, SSRF refusals, validation errors, or MIME mismatches. Logged with `[r2.putObject]` / `[fetch <host>]` labels so monitoring can grep for them.
@@ -171,7 +171,7 @@ Threshold (0.35) was tuned empirically. Lower → too many false positives. High
 
 #### Tier persistence and reset
 
-- `localStorage['guide_tier']` stores `"1" | "2" | "3"`.
+- `localStorage['guide_tier_user_<id>']` stores `"1" | "2" | "3"` for patrons/admins. `localStorage['guide_tier_guest_<token-fragment>']` stores the same for a single guest auth token. The legacy unscoped `guide_tier` key is removed on guide mount/logout.
 - Read on first open of the panel; bypass `tier-select` if a valid tier is present.
 - The header chip ("New to tech ✎" etc.) is the reset affordance — clicking it removes the localStorage entry and reopens the wizard.
 - One-time highlight pulse on the chip after the user picks a tier so they discover the chip exists. Same mechanism (a separate `--highlight` modifier with a CSS keyframe) is used to draw attention to the input on `open-question`.
@@ -184,12 +184,13 @@ Threshold (0.35) was tuned empirically. Lower → too many false positives. High
 - **API key**: `getGenericNanogptKey()` — the generic `NANOGPT_API_KEY`, not the per-library key. Keeps the onboarding feature off any individual library's NanoGPT account.
 - **Model**: `modelConfig.chat.model`. Chosen because it's already proven on this kiosk surface and is not video/image/code-specialized.
 - **Input cap (server-enforced)**: 25 words. Hard reject with HTTP 400 + `error: 'Question too long'`. The client (`GuidePanel`) also shows a live counter and disables submit past the cap; this is defense in depth.
-- **Output cap (server-enforced)**: tier-aware. `TIER_CAPS[tier]` gives both a word limit (instructed in the system prompt) and a `max_tokens` (hard ceiling on the API call). Tier 1 → 80 words / 110 tokens, Tier 2 → 60 / 85, Tier 3 → 50 / 65.
+- **Output cap (server-enforced)**: tier-aware. `TIER_CAPS[tier]` gives both a word limit (instructed in the system prompt) and a `max_tokens` (hard ceiling on the API call). Tier 1 → 80 words / 110 tokens, Tier 2 → 60 / 85, Tier 3 → 50 / 70.
 - **Per-session exchange limit**: 5. Counter source:
-  - Patron: `prisma.usageLog.count({ where: { userId, mode: 'guide', createdAt: { gt: user.lastLoginAt } } })`. Durable across pod restarts.
-  - Guest: in-memory `Map<jti, count>` at module scope. Best-effort across cold starts; the word + max_tokens caps are the real cost ceiling.
-  - When the count is already ≥5 on entry, the route returns `{ response: <librarian-redirect>, limitReached: true, exchangesUsed, exchangesLimit }` without calling the model. No UsageLog row is written for the bounce.
-- **UsageLog on success**: patrons get `mode: 'guide'`, `model`, `prompt` (truncated), `creditsUsed: 0`. Guests do not write UsageLog (consistent with "guests are ephemeral"); only the in-memory counter increments.
+  - `GuideExchange` row keyed by JWT `jti`, used for both patrons and guests. The route creates the row if needed, then atomically claims a slot with `updateMany({ where: { jti, count: { lt: 5 } }, data: { count: { increment: 1 } } })`.
+  - The claim happens before the model call. Provider failures after NanoGPT is called still consume the reserved opportunity.
+  - Rows are lazily pruned after 24 hours; JWTs expire after 8 hours, so this leaves headroom without needing a dedicated cron.
+  - When the guarded claim updates 0 rows, the route returns `{ response: <librarian-redirect>, limitReached: true, exchangesUsed, exchangesLimit }` without calling the model. No UsageLog row is written for the bounce.
+- **UsageLog on success**: patrons get `mode: 'guide'`, `model`, `prompt` (truncated), `creditsUsed: 0`. Guests do not write UsageLog (consistent with "guests are ephemeral"); their quota is still counted in `GuideExchange`.
 - **System prompt** has four pieces:
   - `TOOL_DESCRIPTIONS[tool]` — e.g. "Image Generator tool — an AI tool that creates images from text descriptions".
   - `TIER_LABELS[tier]` — reproduced verbatim so the model can refer to the user's self-description.
@@ -235,7 +236,7 @@ guest click ─┐
 
 - **`/api/media-sessions/[id]/url?download=true`** (existing route, modified) — now returns `{ url, direct: true|false }` instead of just `{ url }`. For UPLOADED rows: `direct: true` plus a presigned R2 URL with `Content-Disposition: attachment` baked into the signature via `ResponseContentDisposition`. For non-UPLOADED rows with a `resultUrl` or `sourceProviderUrl`: `direct: false` and `url: '/api/media-sessions/<id>/download'`. The `filename` (derived from the row's mime via `extensionForMime`) is included so the client can use it on the proxy path.
 - **`/api/media-sessions/[id]/download`** (new patron proxy) — `GET`. Ownership-checked. For UPLOADED rows: `NextResponse.redirect(<presigned R2>)`. For non-UPLOADED rows with a provider URL: fetches the bytes via SSRF-safe `fetchBytesFromUrl`, streams them back with `Content-Disposition: attachment`. The kiosk pays Vercel bandwidth only on this branch.
-- **`/api/media-sessions/download/proxy`** (new guest proxy) — `POST`. Body: `{ url, filename, mode? }`. Requires auth (any role). Uses `fetchBytesFromUrl` with a `mode`-derived content-type allowlist (`image/*` / `audio/*` / `video/*`). Streams back with `Content-Disposition: attachment`. Used for guest cases since guests don't have MediaSession rows.
+- **`/api/media-sessions/download/proxy`** (new guest proxy) — `POST`. Body: `{ url, filename, mode }`. Requires auth (any role). Uses `fetchBytesFromUrl` with a required `mode`-derived content-type allowlist (`image/*` / `audio/*` / `video/*`) and `DOWNLOAD_PROXY_ALLOWED_HOSTS`, checked on the original URL and every redirect target. Streams back with `Content-Disposition: attachment`. Used for guest cases since guests don't have MediaSession rows.
 
 **Helper (`src/lib/mediaClient.ts`):**
 
@@ -305,11 +306,11 @@ Refactored to a dynamic-import loader map + a wrapper/inner component split:
 
 ```ts
 const CONTENT_LOADERS: Record<string, () => Promise<{ default: unknown }>> = {
-  chat:  () => import('../../config/guide/chat.json'),
-  music: () => import('../../config/guide/music.json'),
-  image: () => import('../../config/guide/image.json'),
-  video: () => import('../../config/guide/video.json'),
-  code:  () => import('../../config/guide/code.json'),
+  chat:  () => import('@/config/guide/chat.json'),
+  music: () => import('@/config/guide/music.json'),
+  image: () => import('@/config/guide/image.json'),
+  video: () => import('@/config/guide/video.json'),
+  code:  () => import('@/config/guide/code.json'),
 };
 
 export default function GuidePanel({ tool, isOpen }) {
@@ -350,7 +351,7 @@ Insights gained while building this milestone, plus things that should be improv
 
 ### Resolved during the hardening pass (originally on this backlog)
 
-- ~~**Live guide answers are not credit-deducted / logged.**~~ Patrons now write `UsageLog` rows with `mode: 'guide'`, `creditsUsed: 0`. Guests are tracked via in-memory `Map<jti, count>`. Decision: no credit deduction — the guide is onboarding, not a creative tool.
+- ~~**Live guide answers are not credit-deducted / logged.**~~ Patrons now write `UsageLog` rows with `mode: 'guide'`, `creditsUsed: 0`. Patrons and guests are rate-limited through durable `GuideExchange` rows keyed by JWT `jti`. Decision: no credit deduction — the guide is onboarding, not a creative tool.
 - ~~**`handleDownload` duplicated across image / music / video pages.**~~ Extracted into a single `downloadMedia()` helper in `src/lib/mediaClient.ts`.
 - ~~**`handleFreeInputSubmit` ran the same use-case → FAQ → live-guide pipeline twice.**~~ Branches collapsed; helpers (`renderUseCase`, `renderFaqAnswer`) extracted.
 - ~~**All 5 guide JSON files bundled into every generation page.**~~ Now dynamic-imported per tool — Subsystem 11.
@@ -363,9 +364,7 @@ Insights gained while building this milestone, plus things that should be improv
 - **Single-question stateless live guide.** Multi-turn follow-up ("can you explain that more simply?") is not supported. This is intentional for now (keeps state simple) but is the most likely thing a Tier 1 patron will want — it should be revisited if user testing surfaces it.
 - **No analytics on which static FAQs are read vs. which questions go to the live model.** A lightweight client-side ping on FAQ open / use-case open / live-guide invocation would tell us where the static content is too thin.
 - **Coachmark target rect doesn't auto-update on layout changes other than resize.** If a tour step's target element scrolls or is otherwise repositioned without a window resize, the ring drifts. Acceptable for the kiosk's current pages (no virtualized lists) but a future content-rich page would need an `IntersectionObserver` or a per-frame poll.
-- **`FUZZY_STOP` and `URL_RE` are GuidePanel-local.** If we ever build a second fuzzy-matched surface, both should move to a `lib/guide/fuzzy.ts` module with shared tests.
-- **The guide tier is per-browser, not per-user.** A patron logging in on a different kiosk gets the wizard again. Acceptable for the kiosk model (browsers are dedicated devices), but if a persistent login surface ever materializes, this should move to `User.guideTier`.
-- **Guest exchange counter is per-instance.** Vercel cold starts reset the in-memory `Map<jti, count>`, so a determined guest could exceed the 5-exchange cap by waiting for the lambda to spin down. Acceptable for kiosk threat model + bounded by word/token caps, but worth promoting to a durable store (Redis / KV / a `MediaSession`-style row) if guest abuse ever materializes.
+- **The guide tier is still browser-local storage, not a server-side user field.** Namespacing prevents kiosk-user leakage, but a patron logging in on a different kiosk gets the wizard again. If a persistent login surface ever materializes, this should move to `User.guideTier`.
 - **AVIF on download for guests vs. patrons.** Patrons get AVIF (transcoded server-side in `imagePipeline`); guests get whatever the provider sent (currently PNG). Three options were discussed (accept the split + word the FAQ around it; transcode in the guest proxy; transcode at generation time). Deferred pending team alignment.
 - **Background reaper for `MediaSession.storageStatus = 'FAILED'`.** The R2 upload retry catches most transient failures, and the download proxy serves any that still slip through, but a weekly cron that re-attempts FAILED rows with a still-live `sourceProviderUrl` would let those sessions transition to UPLOADED and benefit from the free direct path on subsequent clicks.
 - **Code page has nested layout containers.** `gen-container > code-container` with inline `flex: 1` on the inner. Smelly but contained — flagged for a future page-layout pass.
@@ -377,7 +376,7 @@ The plan was implemented over multiple sessions on `arpita-explore`; this sectio
 
 1. **Static analysis**: `npx tsc --noEmit` passes; no untyped JSON imports, no `any` in `GuidePanel.tsx` or `CoachmarkTour.tsx`. The guide content JSON files are typed via the `GuideContent` interface and used through `as GuideContent` casts.
 2. **Build**: `npm run build` succeeds with no Next.js client/server boundary errors. The most fragile boundary is `GuidePanel`'s static JSON imports — they must not pull `'server-only'` modules transitively.
-3. **`/api/guide` smoke test**: posting `{ question: "what is a prompt?", tool: "image", tier: 1 }` with a valid bearer token returns a 200 with a non-empty `response` field whose content is at a Tier-1 reading level. Posting without auth returns 401. Posting with `tool: "weather"` (an unknown tool) still returns a 200 because `TOOL_DESCRIPTIONS` falls back to a generic descriptor — this is intentional.
+3. **`/api/guide` smoke test**: posting `{ question: "what is a prompt?", tool: "image", tier: 1 }` with a valid bearer token returns a 200 with a non-empty `response` field whose content is at a Tier-1 reading level. Posting without auth returns 401. Posting with `tool: "weather"` returns 400 before a quota slot or model call is attempted.
 4. **Fuzzy match unit checks** (manual at the moment, should be automated in a follow-up):
    - `"I don't know what a JPEG is"` returns the `What is a JPEG file?` FAQ in the image guide.
    - `"JPEG means?"` returns the same.
