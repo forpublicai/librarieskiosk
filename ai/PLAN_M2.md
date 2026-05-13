@@ -102,7 +102,8 @@ src/app/video/page.tsx                         guide panel + coachmarks + chips 
 src/components/Header.tsx                      actions prop + ThemeToggle in right side
 src/lib/mediaPersistence.ts                    finalizeVideoUpload writes resultUrl on claim + on failure
 src/lib/guideLinks.ts                          bare-domain detection (.com/.org/.net/.edu/.gov → clickable links)
-src/lib/guideMatch.ts                          fuzzyMatch→fuzzyMatchFaqs; exact-match-first + word-count tiebreaker in both functions; DEFINITIONAL_RE guard; two-token minimum; normStr helper
+src/lib/guideMatch.ts                          Major rewrite: fuzzyMatch→fuzzyMatchFaqs; Porter-style stem; 2-char tokens; non-alnum→space; meta-help stop words; exact-match-first; DEFINITIONAL_RE guard with "what's" and "way to" carve-outs; narrower use-case scoring corpus; question-class tiebreaker; two-token minimum
+src/lib/guideMatch.test.ts                     Expanded: tokenizer/stemmer/normalizeQuery unit tests; FAQ exact-match, definitional, regular paths; use-case definitional carve-out
 src/lib/guidePrompt.ts                         unified intent-detecting system prompt; split useCaseWordLimit/faqWordLimit in TIER_CAPS
 src/lib/nanogpt.ts                             new exported chatComplete() (non-streaming) for /api/guide
 src/lib/storage.ts                             generateSignedGetUrl options.downloadFilename
@@ -161,14 +162,29 @@ Free-form input is allowed on every screen except `tier-select`. On submit:
 
 Located in `src/lib/guideMatch.ts`. Refinements that came out of testing:
 
-1. **Query normalization**: strip intent-framing wrappers ("I don't know what X is" → "X", "What does X mean?" → "X", "Tell me about X" → "X") before tokenizing. Also strips how-to phrasing so the core intent reaches the matcher: "best/good/easiest way of/to X" → "X", and "what is the best/good/easiest way to X" → "X". See `normalizeQuery()`.
-2. **Stop-word list**: a hand-tuned list of 60+ words covering structural grammar, intent framing, and conversational fillers. See `FUZZY_STOP`.
-3. **Orphan-token check**: build the union of tokens that appear anywhere in the FAQ corpus (questions + answers). If *any* query token is missing from the corpus, the question is by definition about something the static content doesn't cover — return `null` and let the live model handle it. This was the fix for "Is PNG the same as JPEG?" incorrectly matching the JPEG FAQ.
-4. **Two-pass scoring** (`fuzzyMatchFaqs`): first pass scores against question text only; if no result above threshold, fall back to question + answer combined. This was the fix for "I don't know what a JPEG is" matching the *file format* FAQ instead of the *what is JPEG* FAQ — the question-only pass disambiguates between FAQs whose answers happen to share vocabulary.
-5. **Exact match first**: before any token scoring, both `fuzzyMatchFaqs` and `fuzzyMatchUseCase` check for a normalized string match (`normStr`) against the question/label. An exact hit is returned immediately without scoring. This ensures "what is art style?" matches "What is art style?" rather than a shorter FAQ that happens to share tokens.
-6. **Word-count tiebreaker**: when two candidates score equally, both functions prefer the shorter question/label (fewer raw words). Shorter means more focused on the query terms rather than incidentally containing them.
-7. **Definitional guard** (`DEFINITIONAL_RE`): queries starting with "what is/are", "how does", "why is/does", etc. are blocked from `fuzzyMatchUseCase` entirely (they are never use-case intents). Exception: "what is the best/good/easiest way to X" is excluded from the guard — it is a how-to intent, not a definition, and should reach the use-case matcher. In `fuzzyMatchFaqs` definitional queries are subject to a stricter rule: all query tokens must appear in the FAQ *question text* (not the answer), preventing answer-text bleed. This was the fix for "what is music style" matching a criticalUse FAQ whose answer happened to mention "style".
-8. **Minimum two token hits for multi-token queries**: for queries with more than one meaningful token, a single-token overlap is not enough to declare a match in either function. This prevents high-frequency domain words (e.g. "music", "image") from matching unrelated FAQs or use cases by accident.
+1. **Query normalization**: strip intent-framing wrappers ("I don't know what X is" → "X", "What does X mean?" → "X", "Tell me about X" → "X", "how do I X" → "X") before tokenizing. Also strips how-to phrasing so the core intent reaches the matcher: "best/good/easiest way of/to X" → "X", and "what is the best/good/easiest way to X" → "X" (longer pattern stripped first). See `normalizeQuery()`.
+
+2. **Tokenization**: lowercase, replace non-alphanumeric with space (so "AI-generated" splits into `ai` + `generated` and "what's" splits into `what` + `s`), drop tokens of length < 2 and stop words, then stem. Minimum length is 2 so meaningful acronyms like "AI", "MP3", "ID" survive.
+
+3. **Stop-word list**: ~95 hand-tuned words covering structural grammar, intent framing, conversational fillers, contraction leftovers (`whats`, `thats`), and meta-help words (`guidance`, `advice`, `support`, `assistance`, `tips`, `feedback`, `recommendations`, `suggestions`) — these are framing terms, never the topic of a question. See `FUZZY_STOP`.
+
+4. **Light Porter-style stemmer**: collapses morphological variants to a shared base so query and corpus tokens match regardless of verb form. Strips suffixes in priority order: `-ies → -y` (tries → try), `-ing` (writing → writ), `-ed` with y-mutation (downloaded → download; tried → try), `-s` plurals (chained), `-ion` (generation → generat), trailing `-e` (write → writ). Min-length guards prevent over-stemming short words (`thing`, `being` stay intact). See `stem()`.
+
+5. **Orphan-token check**: build the union of tokens that appear anywhere in the FAQ/use-case corpus. If *any* query token is missing, return `null` and let the live model handle it. Short queries (< 4 tokens) require a perfect corpus match; queries of 4+ tokens allow 1 unknown. For use cases, the orphan-check corpus is the *full* corpus (label + intro + prompt + tips + cautions) so vocabulary is broadly recognised, even though scoring uses a narrower slice.
+
+6. **Two-pass scoring** (`fuzzyMatchFaqs`): first pass scores against question text only; if no result above threshold, fall back to question + answer combined. The first pass disambiguates between FAQs whose answers happen to share vocabulary.
+
+7. **Narrower use-case scoring corpus**: `fuzzyMatchUseCase` scores against `label + intro + examplePrompt` only — *not* tips and cautions. The latter contain generic execution words ("Make sure to...", "Be careful when...") that pollute scoring without describing what the use case is about. Tips/cautions still contribute to the orphan-check corpus (point 5) so a query word that only appears there is still considered known.
+
+8. **Exact match first**: before any token scoring, both `fuzzyMatchFaqs` and `fuzzyMatchUseCase` check for a normalised-string match (`normStr`) against the FAQ question / use-case label. An exact hit is returned immediately. This ensures "what is art style?" matches "What is art style?" rather than a shorter FAQ that happens to share tokens.
+
+9. **Definitional guard** (`DEFINITIONAL_RE`): queries starting with "what is/are", "what's", "how does", "why is/does", etc. are blocked from `fuzzyMatchUseCase` entirely — they are never use-case intents. Exception: "what is the best/good/easiest way to X" is excluded from the guard, since it is a how-to intent in disguise. In `fuzzyMatchFaqs`, definitional queries are subject to a stricter rule: all query tokens must appear in the FAQ *question text* (not the answer), preventing answer-text bleed. On ties in the definitional path, prefer the shorter (more focused) question. This was the fix for "what is music style" matching a FAQ whose answer happened to mention "style".
+
+10. **Question-class tiebreaker** (regular `fuzzyMatchFaqs` passes): when two FAQs tie on token score, prefer the one whose question shape matches the query's. Classes: `procedural` (How, Can, Do, Should...), `descriptive` (What, Which, Where...), `reasoning` (Why), `other`. A procedural query like "How do I download my image?" matches "Can I download or save my generated image?" (procedural) over "What file format is the downloaded image?" (descriptive), even though both score equally on token overlap. If classes also tie, fall through to authored list order. See `classifyQuestion()`.
+
+11. **Label-length tiebreaker** (`fuzzyMatchUseCase`): on score ties, prefer the use case with the shorter label (more focused intent). Use-case labels are short and authored to be distinct, so this rarely fires but is a sane fallback.
+
+12. **Minimum two token hits for multi-token queries**: for queries with more than one meaningful token, a single-token overlap is not enough to declare a match in either function. This prevents high-frequency domain words (e.g. "music", "image") from matching unrelated FAQs or use cases by accident.
 
 Thresholds: `fuzzyMatchFaqs` requires score ≥ 0.35; `fuzzyMatchUseCase` requires score ≥ 0.25. Both were tuned empirically.
 
