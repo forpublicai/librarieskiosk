@@ -62,6 +62,8 @@ export function normalizeQuery(q: string): string {
         .replace(/what\s+does\s+(.+?)\s+mean\??$/gi, '$1')
         .replace(/explain\s+(.+?)\s+to\s+me\??$/gi, '$1')
         .replace(/how\s+do\s+i\s+/gi, '')
+        .replace(/(?:best|good|better|easiest|simplest|fastest|quickest|right|proper|correct|effective)\s+way\s+(?:of|to)\s+/gi, '')
+        .replace(/what(?:'s|\s+is|\s+are)\s+(?:a\s+|the\s+)?(?:best|good|better|easiest|simplest|fastest|quickest|right|proper|correct|effective)\s+way\s+to\s+/gi, '')
         .replace(/i\s+want\s+to\s+(know|learn|understand)\s+(about\s+)?/gi, '')
         .trim();
 }
@@ -73,7 +75,8 @@ function normStr(s: string): string {
 
 // Definitional/explanatory queries are never use-case intents — route them to FAQ/live model.
 // "how do I" is excluded: normalizeQuery strips it, and it legitimately maps to use cases.
-const DEFINITIONAL_RE = /^\s*(what\s+(is|are|was|were)|how\s+does|how\s+do(?!\s+i\b)|why\s+(is|are|does|do)|when\s+(is|are|does|do)|who\s+(is|are))\s+/i;
+// "what is the best/good/easiest way to X" is excluded: it's a how-to intent, not a definition.
+const DEFINITIONAL_RE = /^\s*(what\s+(is|are|was|were)(?!\s+(?:a\s+|the\s+)?(?:best|good|better|easiest|simplest|fastest|quickest|right|proper|correct|effective)\s+way\s+to\b)|how\s+does|how\s+do(?!\s+i\b)|why\s+(is|are|does|do)|when\s+(is|are|does|do)|who\s+(is|are))\s+/i;
 
 export function fuzzyMatchFaqs(query: string, faqs: GuideMatchFAQ[]): GuideMatchFAQ | null {
     const qTokens = tokenize(normalizeQuery(query));
