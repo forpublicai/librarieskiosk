@@ -29,7 +29,7 @@
       "label": "Produce creative video content for personal projects or social media",
       "gettingStarted": {
         "intro": "Think about what you want your video to convey — a mood, a moment, or a visual idea. Here's an example to get you started:",
-        "examplePrompt": "A [subject] [doing something] in [setting], [mood or lighting], [style if you have one in mind]",
+        "examplePrompt": "A [subject] [doing something] in [setting], [mood or lighting], [style if you have one in mind].",
         "tips": [
           "For example: \"A person walking through a sunlit forest in autumn, leaves falling slowly, cinematic and warm.\"",
           "Think about what you're creating it for. A personal project might be a memory you want to capture visually, a creative experiment, or something to share with family and friends. For social media, think about the mood or energy that fits the platform — calm and atmospheric for Instagram, fun and energetic for TikTok.",
@@ -48,7 +48,7 @@
       "label": "Create promotional or marketing videos for a small business or event",
       "gettingStarted": {
         "intro": "Describe the scene or visual you want to represent your business or event. Here's an example to get you started:",
-        "examplePrompt": "A [scene or product visual] for a [type of business or event], [mood or energy], [style]",
+        "examplePrompt": "A [scene or product visual] for a [type of business or event], [mood or energy], [style].",
         "tips": [
           "For example: \"A close-up of freshly baked pastries on a wooden counter, warm morning light, inviting and cozy\" or \"A lively outdoor market scene with colorful stalls and people browsing, bright and energetic.\"",
           "Think about what feeling you want your promotional video to create — warmth and trust for a local service business, energy and excitement for an event, clean and professional for a product. Build that feeling into your description.",
@@ -70,37 +70,29 @@
     }
   ],
   "faqs": {
-    "concept": [
-      {
-        "q": "What is AI?",
-        "a": "AI stands for Artificial Intelligence. It refers to computer programs that can do things that normally require human thinking — like answering questions, writing text, or creating images. The tools on this kiosk are all powered by AI."
-      },
-      {
-        "q": "What is a large language model (LLM)?",
-        "a": "A large language model is a type of AI that learned from reading a huge amount of text — books, articles, and websites. That's how it learned to understand and respond to your questions in plain language. Think of it as a very well-read assistant."
-      },
-      {
-        "q": "What is open source?",
-        "a": "Open source means the technology behind the tool is publicly available — not owned or locked away by one company. It's a bit like a recipe that anyone can read, use, or improve. The video tool on this kiosk uses an open source model."
-      },
-      {
-        "q": "What is a prompt?",
-        "a": "A prompt is simply what you type into the tool — your description of the video clip you want to create. The clearer and more detailed your prompt, the closer the result will be to what you had in mind. For example: \"a drone shot of a tropical island with calm turquoise water\" or \"a candle flickering on a wooden table in a dark room, warm golden light.\""
-      },
-      {
-        "q": "What is AI-generated video?",
-        "a": "An AI-generated video is a short clip created entirely by a computer program based on your text description. No camera, actors, or editing software is involved — the tool interprets your words and produces a moving image from scratch. The results are short clips, typically a few seconds long, that can look surprisingly realistic depending on what you ask for."
-      },
+    "criticalUse": [
       {
         "q": "How does the video tool create clips from text?",
         "a": "The tool was trained on a large amount of video footage and descriptions. When you type a prompt, it uses what it learned to generate a clip that matches your words as closely as it can. It doesn't use existing footage — it creates something entirely new each time based on patterns it learned during training."
       },
       {
-        "q": "How is this different from editing an existing video?",
-        "a": "This tool creates brand new video footage from scratch based on your description — you are not uploading or modifying anything that already exists. It is a creation tool, not an editing tool. If you want to trim, cut, or add effects to an existing video, you would need a separate video editing application."
+        "q": "Can I generate videos of real people?",
+        "a": "You can describe general types of people — \"a person walking through a park\" — but you should not attempt to generate realistic videos of specific real, identifiable people without their permission. Creating videos that could be mistaken for real footage of real people raises serious ethical and legal concerns."
+      },
+      {
+        "q": "Can AI video be mistaken for real footage?",
+        "a": "Yes — AI-generated video can look convincing enough that viewers may not realize it was computer-generated. Be transparent about how your video was made if you share it with others, especially in professional or public contexts. Using AI-generated video to mislead people — for example, presenting a generated clip as real news footage — is considered dishonest and can have serious consequences."
+      },
+      {
+        "q": "Are there types of videos I should not generate?",
+        "a": "Yes. Do not generate videos that are violent, sexually explicit, hateful, or that could be used to deceive or harm others. Do not generate videos designed to look like real news footage or that depict real people in misleading situations. This is a public tool and responsible use is expected of everyone."
       }
     ],
     "practical": [
+      {
+        "q": "How is this different from editing an existing video?",
+        "a": "This tool creates brand new video footage from scratch based on your description — you are not uploading or modifying anything that already exists. It is a creation tool, not an editing tool. If you want to trim, cut, or add effects to an existing video, you would need a separate video editing application."
+      },
       {
         "q": "What should I include in my video description?",
         "a": "Describe the main subject, what is happening, the setting, and the mood or lighting. For example: \"a golden retriever running through a field of flowers on a sunny day, slow motion, warm light.\" The more detail you include about what is moving and what the scene looks like, the better the result will be."
@@ -114,6 +106,10 @@
         "a": "AI video generation is still an evolving technology and does not always interpret prompts perfectly. Complex scenes, specific movements, or detailed compositions can be hard for the tool to reproduce accurately. If the result is off, simplify your description and focus on one or two key elements rather than trying to describe everything at once."
       },
       {
+        "q": "What happens if I don't like the result?",
+        "a": "Adjust your description and generate again. Try adding more detail about the movement, the setting, or the mood. Small changes to your prompt can produce noticeably different results. Keep your previous generations in the History panel so you can compare and identify what worked best."
+      },
+      {
         "q": "How long can my video clip be?",
         "a": "You can generate clips between 3 and 15 seconds long using the duration slider. Start with shorter clips while you are experimenting — they use fewer credits and generate faster. Once you are happy with the style and content, you can try a longer duration."
       },
@@ -123,29 +119,37 @@
       },
       {
         "q": "Can I download or save my generated video?",
-        "a": "Yes — once your clip is generated it will appear on screen. You can download it by clicking the \"Download Video\" button below the player, or by clicking the three-dot menu on the right side of the video player and selecting \"Download.\" Your previous creations also appear in the History panel on the left so you can revisit them during your session."
+        "a": "Yes — once your clip is generated it will appear on screen. You can download it by clicking the \"Download Video\" button below the player. Your previous creations also appear in the History panel on the left so you can revisit them during your session and download them if needed."
+      },
+      {
+        "q": "What file format is the downloaded video?",
+        "a": "Your downloaded video will be in the MP4 format."
+      }
+    ],
+    "concept": [
+      {
+        "q": "What is AI?",
+        "a": "AI stands for Artificial Intelligence. It refers to computer programs designed to do things that normally require human intelligence — like learning, reasoning, and problem-solving. The tools on this kiosk are all powered by AI.\n- Learn more about AI here: https://cloud.google.com/learn/what-is-artificial-intelligence\n- Find definitions for key AI terms here: https://aipedagogy.org/guide/key-terms/"
+      },
+      {
+        "q": "What is a large language model (LLM)?",
+        "a": "A large language model is a type of AI model that is trained on a massive amount of text – books, articles, and websites. That's how it learns to understand and respond to your questions in plain language.\nYou can find definitions for key AI terms here: https://aipedagogy.org/guide/key-terms/"
+      },
+      {
+        "q": "What is open source?",
+        "a": "If a technology is defined as 'open source', that means the technology is not owned or locked away by one company but is publicly available for anyone to study and modify to make it more useful for themselves and everyone else. It's a bit like a recipe that anyone can read, use, or improve. The tools on this kiosk use open source models.\nYou can find more about 'open source' here: https://opensource.org/osd"
+      },
+      {
+        "q": "What is a prompt?",
+        "a": "A prompt is the input text you type into the AI-powered tool. The prompt often describes what you are looking for, but may also give specific instructions about style, tone, or format. For example: \"a drone shot of a tropical island with calm turquoise water\" or \"a candle flickering on a wooden table in a dark room, warm golden light.\" The clearer and more detailed your prompt, the closer the result will be to what you had in mind.\nYou can find definitions for key AI terms here: https://aipedagogy.org/guide/key-terms/"
+      },
+      {
+        "q": "What is AI-generated video?",
+        "a": "An AI-generated video is a short clip created entirely by an AI program based on your text description. No camera, actors, or editing software is involved — the tool interprets your words and produces a moving image from scratch."
       },
       {
         "q": "What is an MP4 file?",
-        "a": "An MP4 is one of the most common video file formats. It is how most videos are stored and shared digitally. You can play an MP4 on almost any device — phone, tablet, or computer — and it can be shared by email, uploaded to social media, or inserted into a presentation. Think of it the same way you would a video you record on your phone."
-      },
-      {
-        "q": "What happens if I don't like the result?",
-        "a": "Adjust your description and generate again. Try adding more detail about the movement, the setting, or the mood. Small changes to your prompt can produce noticeably different results. Keep your previous generations in the History panel so you can compare and identify what worked best."
-      }
-    ],
-    "criticalUse": [
-      {
-        "q": "Can I generate videos of real people?",
-        "a": "You can describe general types of people — \"a person walking through a park\" — but you should not attempt to generate realistic videos of specific real, identifiable people without their permission. Creating videos that could be mistaken for real footage of real people raises serious ethical and legal concerns."
-      },
-      {
-        "q": "Can AI video be mistaken for real footage?",
-        "a": "Yes — AI-generated video can look convincing enough that viewers may not realize it was computer-generated. Be transparent about how your video was made if you share it with others, especially in professional or public contexts. Using AI-generated video to mislead people — for example, presenting a generated clip as real news footage — is considered dishonest and can have serious consequences."
-      },
-      {
-        "q": "Are there types of videos I should not generate?",
-        "a": "Yes. Do not generate videos that are violent, sexually explicit, hateful, or that could be used to deceive or harm others. Do not generate videos designed to look like real news footage or that depict real people in misleading situations. This is a public tool and responsible use is expected of everyone."
+        "a": "An MP4 is one of the most common video file formats. It is how most videos are stored and shared digitally. You can play an MP4 on almost any device — phone, tablet, or computer — and it can be shared by email, uploaded to social media, or inserted into a presentation.\nYou can read more about the MP4 format here: https://www.adobe.com/creativecloud/filetypes/video/container/mp4.html"
       }
     ]
   }

@@ -101,6 +101,9 @@ src/app/music/page.tsx                         guide panel + coachmarks + chips 
 src/app/video/page.tsx                         guide panel + coachmarks + chips + handleDownload + history fallback
 src/components/Header.tsx                      actions prop + ThemeToggle in right side
 src/lib/mediaPersistence.ts                    finalizeVideoUpload writes resultUrl on claim + on failure
+src/lib/guideLinks.ts                          bare-domain detection (.com/.org/.net/.edu/.gov → clickable links)
+src/lib/guideMatch.ts                          stem(), orphan-token check in fuzzyMatchUseCase, extra stop words
+src/lib/guidePrompt.ts                         unified intent-detecting system prompt; split useCaseWordLimit/faqWordLimit in TIER_CAPS
 src/lib/nanogpt.ts                             new exported chatComplete() (non-streaming) for /api/guide
 src/lib/storage.ts                             generateSignedGetUrl options.downloadFilename
 ```
@@ -125,9 +128,9 @@ interface GuideContent {
     } | null;                                                  // null = "I have something else in mind"
   }>;
   faqs: {
-    concept:     Array<{ q: string; a: string }>;             // "What is this and how does it work?"
-    practical:   Array<{ q: string; a: string }>;             // "How do I use it?"
     criticalUse: Array<{ q: string; a: string }>;             // "What should I know about safety and trust?"
+    practical:   Array<{ q: string; a: string }>;             // "How do I use it?"
+    concept:     Array<{ q: string; a: string }>;             // "What is this and how does it work?"
   };
 }
 ```
@@ -156,7 +159,7 @@ Free-form input is allowed on every screen except `tier-select`. On submit:
 
 #### Fuzzy matching algorithm
 
-Located in `src/components/GuidePanel.tsx`. Two refinements that came out of testing:
+Located in `src/lib/guideMatch.ts`. Two refinements that came out of testing:
 
 1. **Query normalization**: strip intent-framing wrappers ("I don't know what X is" → "X", "What does X mean?" → "X", "Tell me about X" → "X") before tokenizing. See `normalizeQuery()`.
 2. **Stop-word list**: a hand-tuned list of 60+ words covering structural grammar, intent framing, and conversational fillers. See `FUZZY_STOP`.
@@ -184,7 +187,7 @@ Threshold (0.35) was tuned empirically. Lower → too many false positives. High
 - **API key**: `getGenericNanogptKey()` — the generic `NANOGPT_API_KEY`, not the per-library key. Keeps the onboarding feature off any individual library's NanoGPT account.
 - **Model**: `modelConfig.chat.model`. Chosen because it's already proven on this kiosk surface and is not video/image/code-specialized.
 - **Input cap (server-enforced)**: 25 words. Hard reject with HTTP 400 + `error: 'Question too long'`. The client (`GuidePanel`) also shows a live counter and disables submit past the cap; this is defense in depth.
-- **Output cap (server-enforced)**: tier-aware. `TIER_CAPS[tier]` gives both a word limit (instructed in the system prompt) and a `max_tokens` (hard ceiling on the API call). Tier 1 → 80 words / 110 tokens, Tier 2 → 60 / 85, Tier 3 → 50 / 70.
+- **Output cap (server-enforced)**: tier-aware. `TIER_CAPS[tier]` gives separate word limits for use-case and FAQ responses plus a `max_tokens` ceiling. Tier 1 → 100 use-case / 80 FAQ words / 140 tokens, Tier 2 → 80 / 60 / 112, Tier 3 → 70 / 50 / 98.
 - **Per-session exchange limit**: 5. Counter source:
   - `GuideExchange` row keyed by JWT `jti`, used for both patrons and guests. The route creates the row if needed, then atomically claims a slot with `updateMany({ where: { jti, count: { lt: 5 } }, data: { count: { increment: 1 } } })`.
   - The claim happens before the model call. Provider failures after NanoGPT is called still consume the reserved opportunity.
@@ -360,7 +363,7 @@ Insights gained while building this milestone, plus things that should be improv
 
 ### Backlog (deferred, not blocking)
 
-- **Guide content for Chat and Code** — the user is providing PDFs progressively. `chat.json` and `code.json` exist with placeholder/draft copy and need a verbatim pass against the still-pending PDFs. The image, video, and music JSON files have already been verbatim-aligned against their PDFs.
+- ~~**Guide content for Chat and Code**~~ — All five guide JSON files (`chat.json`, `code.json`, `image.json`, `music.json`, `video.json`) have been verbatim-aligned against the user-supplied PDFs. FAQ category order standardised to `criticalUse → practical → concept` across all files and in `GuidePanel`'s `allFaqs` union and category button rendering.
 - **Single-question stateless live guide.** Multi-turn follow-up ("can you explain that more simply?") is not supported. This is intentional for now (keeps state simple) but is the most likely thing a Tier 1 patron will want — it should be revisited if user testing surfaces it.
 - **No analytics on which static FAQs are read vs. which questions go to the live model.** A lightweight client-side ping on FAQ open / use-case open / live-guide invocation would tell us where the static content is too thin.
 - **Coachmark target rect doesn't auto-update on layout changes other than resize.** If a tour step's target element scrolls or is otherwise repositioned without a window resize, the ring drifts. Acceptable for the kiosk's current pages (no virtualized lists) but a future content-rich page would need an `IntersectionObserver` or a per-frame poll.
@@ -412,7 +415,7 @@ Filled retrospectively from the live state of `arpita-explore`.
 - **Guide JSON code-split**: Network tab on the Image page shows a single `image*.json` chunk fetched on first guide open, no chat/code/music/video JSON. Switching tools (e.g. opening Music page) loads `music*.json` on first open there.
 - **Handler dedup**: `handleFreeInputSubmit` is now 14 lines instead of 60+. `renderUseCase` and `renderFaqAnswer` are reused by `handleUseCaseSelect` / `handleFaqSelect`. Behavior identical (each path verified by clicking through).
 
-Outstanding: chat.json and code.json are awaiting verbatim alignment with the user-supplied PDFs (PDFs not yet provided).
+All five guide JSON files are now verbatim-aligned against the user-supplied PDFs. `guideLinks.ts` extended to detect bare domains (`.com`, `.org`, `.net`, `.edu`, `.gov`) as clickable links in addition to full `https?://` URLs — bare domains get `https://` prepended to their `href` at render time. `guideMatch.ts` updated with a `stem()` function (strip trailing plural `s`), an orphan-token check in `fuzzyMatchUseCase` (matching the FAQ guard), and additional stop words. `guidePrompt.ts` updated with a unified intent-detecting system prompt and separate `useCaseWordLimit` / `faqWordLimit` fields in `TIER_CAPS`.
 
 ## USER VALIDATION SUGGESTIONS
 

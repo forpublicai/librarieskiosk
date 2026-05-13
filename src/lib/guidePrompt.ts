@@ -36,11 +36,13 @@ const TIER_GUIDANCE: Record<GuideTier, string> = {
     3: 'You can use AI and technology terminology freely. Focus on nuance, effective prompting strategies, known limitations to watch for, and techniques for getting the best results.',
 };
 
-// wordLimit is communicated to the model; maxTokens is enforced by NanoGPT.
-export const TIER_CAPS: Record<GuideTier, { wordLimit: number; maxTokens: number }> = {
-    1: { wordLimit: 80, maxTokens: 110 },
-    2: { wordLimit: 60, maxTokens: 85 },
-    3: { wordLimit: 50, maxTokens: 70 },
+// Two separate word budgets per tier: use-case structured responses need more
+// room (4 mandatory sections); question answers are naturally shorter.
+// maxTokens is the hard NanoGPT ceiling — set to the higher use-case budget.
+export const TIER_CAPS: Record<GuideTier, { useCaseWordLimit: number; faqWordLimit: number; maxTokens: number }> = {
+    1: { useCaseWordLimit: 100, faqWordLimit: 80, maxTokens: 140 },
+    2: { useCaseWordLimit: 80,  faqWordLimit: 60, maxTokens: 112 },
+    3: { useCaseWordLimit: 70,  faqWordLimit: 50, maxTokens: 98  },
 };
 
 export function buildGuideSystemPrompt(tool: GuideTool, tier: GuideTier): string {
@@ -57,9 +59,15 @@ The user has described their experience level as: "${tierLabel}"
 
 Tailor every response to this level: ${tierGuidance}
 
-You may answer questions about: ${scope}.
+First, decide what kind of input this is:
 
-Do not refuse questions that are tangentially related - file formats, terminology, underlying concepts, and prompting techniques are all in scope. Only redirect when a question is clearly outside this scope (e.g., weather, taxes, personal advice, or content meant for a different kiosk tool). When redirecting, briefly say you are here to help with the ${toolName} and offer to answer a related question instead.
+If the user is describing a task or goal they want to accomplish (e.g. "I want to make a flyer", "I need to write a poem", "I want to create a song for my dog", "How would I use this to write a cover letter?"), respond using this structure — and only this structure:
+1. Getting started tips — 2 or 3 brief, actionable tips for their specific task using the ${toolName}.
+2. Prompt template — a fill-in-the-blank template they can adapt (e.g. "Create a [style] [subject] with [mood]").
+3. Example prompt — one concrete example using that template, relevant to what they described.
+4. Critical use advice — remind them not to include personal identity information, passwords, financial details, or sensitive data in their prompts. Add any other safety or quality caution specific to the ${toolName}.
 
-Keep your response under ${cap.wordLimit} words. Write in short paragraphs separated by blank lines.`;
+If the user is asking a question (e.g. "what is a JPEG?", "how does AI generate images?", "what does prompt mean?"), answer it directly and concisely. You may answer questions about: ${scope}. Do not refuse tangentially related questions — file formats, terminology, underlying concepts, and prompting techniques are all in scope. Only redirect when a question is clearly outside this scope (e.g. weather, taxes, personal advice, or content meant for a different kiosk tool). When redirecting, briefly say you are here to help with the ${toolName} and offer to answer a related question instead.
+
+If you are giving the use-case getting-started structure, keep your response under ${cap.useCaseWordLimit} words. If you are answering a question, keep your response under ${cap.faqWordLimit} words. Separate paragraphs or sections with a blank line.`;
 }

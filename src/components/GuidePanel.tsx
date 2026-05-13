@@ -226,7 +226,7 @@ function GuidePanelInner({ content, tool, isOpen }: GuidePanelProps & { content:
   const tierStorageKey = guideTierKey(user, token);
 
   const allFaqs = content
-    ? [...content.faqs.concept, ...content.faqs.practical, ...content.faqs.criticalUse]
+    ? [...content.faqs.criticalUse, ...content.faqs.practical, ...content.faqs.concept]
     : [];
 
   useEffect(() => {
@@ -388,6 +388,9 @@ function GuidePanelInner({ content, tool, isOpen }: GuidePanelProps & { content:
       { role: 'bot', content: 'Go ahead — type your question below.' }
     );
     setScreen('faq-answer');
+    setHighlightInput(true);
+    setTimeout(() => setHighlightInput(false), 2800);
+    setTimeout(() => inputRef.current?.focus(), 50);
   }
 
   async function callLiveGuide(question: string) {
@@ -550,7 +553,7 @@ function GuidePanelInner({ content, tool, isOpen }: GuidePanelProps & { content:
       case 'faq-categories':
         return (
           <>
-            {(['concept', 'practical', 'criticalUse'] as FaqCategory[]).map(cat => (
+            {(['criticalUse', 'practical', 'concept'] as FaqCategory[]).map(cat => (
               <button key={cat} className="guide-option-btn" onClick={() => handleFaqCategorySelect(cat)}>
                 {FAQ_CATEGORY_LABELS[cat]}
               </button>

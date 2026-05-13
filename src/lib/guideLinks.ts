@@ -3,7 +3,8 @@ export type GuideTextPart =
     | { type: 'link'; text: string; href: string };
 
 export function splitGuideTextLinks(text: string): GuideTextPart[] {
-    const urlRe = /\bhttps?:\/\/[^\s,)]+/g;
+    // Matches full URLs (https?://) or bare domains containing .com/.org/.net/.edu/.gov
+    const urlRe = /\bhttps?:\/\/[^\s,)]+|\b(?:[a-z0-9-]+\.)+(?:com|org|net|edu|gov)(?:\/[^\s,)]*)?/gi;
     const parts: GuideTextPart[] = [];
     let last = 0;
     let match: RegExpExecArray | null;
@@ -13,7 +14,8 @@ export function splitGuideTextLinks(text: string): GuideTextPart[] {
             parts.push({ type: 'text', text: text.slice(last, match.index) });
         }
         const raw = match[0];
-        parts.push({ type: 'link', text: raw, href: raw });
+        const href = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+        parts.push({ type: 'link', text: raw, href });
         last = match.index + raw.length;
     }
 

@@ -9,12 +9,12 @@
       "id": "resume",
       "label": "Write or improve a resume, cover letter, or job application",
       "gettingStarted": {
-        "intro": "Start by describing your situation and the job you're applying for.",
+        "intro": "Start by describing your situation and the job you're applying for. Here's an example to get you started:",
         "examplePrompt": "Help me write a resume for a [job title] position. I have [X] years of experience in [field] and I am good at [skill 1] and [skill 2].",
         "tips": [
           "If you already have a resume or cover letter, paste it in and ask the tool to improve it instead.",
           "Not sure what to include? Ask the tool: \"What information do you need from me to write a strong cover letter?\" It will guide you through the details.",
-          "Once you have a first draft, refine it with follow-up requests like \"can you make this sound more confident?\" or \"can you shorten this to one paragraph?\""
+          "Once you have a first draft, refine it with follow-up requests like \"can you make this sound more confident?\" or \"can you shorten this to one paragraph?\" or anything else you want."
         ],
         "cautions": [
           "Do not type your full home address, Social Security number, or date of birth into the chat. Use your first name and general location only if needed.",
@@ -26,7 +26,7 @@
       "id": "email",
       "label": "Draft a professional email or letter",
       "gettingStarted": {
-        "intro": "Describe who you're writing to and why.",
+        "intro": "Describe who you're writing to and why. Here's an example to get you started:",
         "examplePrompt": "Help me write a [type of email/letter] to [recipient] about [topic or reason].",
         "tips": [
           "For example: \"Help me write an email to my landlord asking him to fix the heating in my apartment.\"",
@@ -44,7 +44,7 @@
       "id": "research",
       "label": "Understand something better — research a topic for school, work, personal curiosity, or everyday life",
       "gettingStarted": {
-        "intro": "Just ask about whatever you want to understand.",
+        "intro": "Just ask about whatever you want to understand. Here's an example to get you started:",
         "examplePrompt": "Can you explain [topic] in simple terms?",
         "tips": [
           "For example: \"Can you explain how student loans work in simple terms?\" or \"What is climate change and why does it matter?\"",
@@ -53,7 +53,7 @@
           "Not sure where to start? Try: \"What are the most important things to know about [topic]?\""
         ],
         "cautions": [
-          "The tool can be wrong, especially on topics that change frequently — current events, laws, medical advice, or financial information. Always verify important facts using a trusted source, try https://factcheck.org, or ask a librarian.",
+          "The tool can be wrong, especially on topics that change frequently — current events, laws, medical advice, or financial information. Always verify important facts using a trusted source, try factcheck.org, or ask a librarian.",
           "Do not share personal details like your full name, address, or medical history when asking health-related questions. Keep questions general — \"what are the symptoms of diabetes?\" rather than sharing your own medical records."
         ]
       }
@@ -62,7 +62,7 @@
       "id": "brainstorm",
       "label": "Brainstorm ideas for a business, project, or creative work",
       "gettingStarted": {
-        "intro": "Describe what you're working on and what kind of ideas you need.",
+        "intro": "Describe what you're working on and what kind of ideas you need. Here's an example to get you started:",
         "examplePrompt": "Help me brainstorm ideas for [type of project or goal]. Here is some context: [brief description].",
         "tips": [
           "For example: \"Help me brainstorm names for my home cleaning business. I want something friendly and easy to remember.\"",
@@ -80,7 +80,7 @@
       "id": "marketing",
       "label": "Write or improve marketing content for a small business",
       "gettingStarted": {
-        "intro": "Describe your business and what you need.",
+        "intro": "Describe your business and what you need. Here's an example to get you started:",
         "examplePrompt": "Write a [type of content] for my [type of business]. Here is some context: [brief description of your business and what makes it special].",
         "tips": [
           "For example: \"Write a short Facebook post for my food truck. We sell Tex-Mex food and are open on weekends at the Riverside Farmers Market.\"",
@@ -98,7 +98,7 @@
       "id": "document",
       "label": "Get help understanding a complex document (lease, medical form, benefits letter)",
       "gettingStarted": {
-        "intro": "Paste or type the part of the document you don't understand, and ask the tool to explain it.",
+        "intro": "Paste or type the part of the document you don't understand, and ask the tool to explain it. Here's an example to get you started:",
         "examplePrompt": "Can you explain what this means in plain language: [paste the text you don't understand]. I found this in a [lease / medical form / benefits letter / other document].",
         "tips": [
           "For example: paste a confusing paragraph from a lease and ask \"What does this clause mean in my lease? What am I agreeing to?\"",
@@ -115,7 +115,7 @@
       "id": "planning",
       "label": "Plan something — an event, a budget, a trip",
       "gettingStarted": {
-        "intro": "Describe what you're planning and any key details or constraints.",
+        "intro": "Describe what you're planning and any key details or constraints. Here's an example to get you started:",
         "examplePrompt": "Help me plan a [type of event or trip]. Here are the details: [key information like budget, date, number of people, location].",
         "tips": [
           "For example: \"Help me plan a birthday party for 15 kids aged 6-8. My budget is around $200 and I want to keep it simple.\"",
@@ -136,40 +136,36 @@
     }
   ],
   "faqs": {
-    "concept": [
-      {
-        "q": "What is AI?",
-        "a": "AI stands for Artificial Intelligence. It refers to computer programs that can do things that normally require human thinking — like answering questions, writing text, or creating images. The tools on this kiosk are all powered by AI."
-      },
-      {
-        "q": "What is a large language model (LLM)?",
-        "a": "A large language model is a type of AI that learned from reading a huge amount of text — books, articles, and websites. That's how it learned to understand and respond to your questions in plain language. Think of it as a very well-read assistant."
-      },
-      {
-        "q": "What is open source?",
-        "a": "Open source means the technology behind the tool is publicly available — not owned or locked away by one company. It's a bit like a recipe that anyone can read, use, or improve. The chat tool on this kiosk uses an open source model."
-      },
-      {
-        "q": "What is a prompt?",
-        "a": "A prompt is simply what you type into the tool. It could be a question, a request, or an instruction — like \"help me write an email\" or \"explain what a mortgage is.\" The clearer your prompt, the better the response you'll get."
-      },
+    "criticalUse": [
       {
         "q": "How does the chat tool come up with its answers?",
-        "a": "The tool was trained on a large amount of text before you started using it. When you ask it something, it uses what it learned to write a response that fits your question. It doesn't search the internet in real time — it draws on knowledge it already has, which means it can sometimes be outdated or incorrect."
+        "a": "The tool was trained on a large amount of text. When you ask it something, it uses what it learned to write a response that fits your question. Since it draws on the data it has already been trained on, it could be outdated or incorrect."
       },
       {
         "q": "How is using the chat tool to find answers different from searching for answers on Google?",
-        "a": "When you search on Google, you get a list of links to websites — you have to click through and read them yourself. The chat tool instead reads your question and writes you a direct answer in plain language. It's more like asking a knowledgeable person than browsing the web. The tradeoff is that unlike Google, it doesn't always have the latest information and could sometimes get things wrong."
+        "a": "When you search on Google, you get a list of links to websites — you have to click through, read them yourself, and find what you want. The chat tool instead reads your question and writes you a direct answer in plain language.\nThe tool was trained on a large amount of text, and it uses the knowledge it gained from that training to respond to your question. Since it draws on the data it has already been trained on, it could be outdated or incorrect."
       },
       {
         "q": "Does the chat tool learn from what I type?",
-        "a": "No. What you type stays within your current session only. The tool does not update itself based on your conversations. Its knowledge comes from its original training, which happened before you started using it."
+        "a": "The tool does not directly learn or update itself from what you type. Instead, we use anonymized data from all users to identify broad patterns. This helps the system learn from the patterns, become smarter and more helpful over time while protecting your privacy."
+      },
+      {
+        "q": "Can I trust what the chat tool tells me?",
+        "a": "Not always. The tool can sound confident even when it is wrong. It can make up facts, give outdated information, or misunderstand your question. Always double-check anything important — especially health, legal, money, or current events — using a trusted source like factcheck.org or by asking a librarian."
+      },
+      {
+        "q": "What information should I never type into the chat?",
+        "a": "Never type your Social Security number, passwords, bank account details, or full home address into the chat. For most tasks you only need to share general information — for example \"I live in Utah\" rather than your full address. When in doubt, leave out personal details related to your identity."
+      },
+      {
+        "q": "Can I ask the tool to give me medical, legal or financial advice?",
+        "a": "The tool can help you understand general concepts or prepare questions, but it is not a doctor, lawyer, or financial advisor. So you can use it as a starting point but not professional advice. For anything important, always follow up with a qualified professional or ask your librarian to help you find the right resources."
       }
     ],
     "practical": [
       {
         "q": "How do I write a good question or request?",
-        "a": "Be specific and give context. Instead of \"help me with my resume,\" try something like \"help me write a resume for a cashier job. I have one year of retail experience.\" The more detail you include, the more useful the response will be. If you're not sure how to start, ask the tool: \"What information do you need from me to help with [your task]?\""
+        "a": "Be specific and give context. Instead of \"help me with my resume,\" try something like \"help me write a resume for a cashier job. I have one year of retail experience.\" The more detail you include, the more useful the response will be. If you're not sure how to start, ask the tool: \"What information do you need from me to help with [your task]?\"\nYou can see more tips here: https://www.promptingguide.ai/introduction/tips"
       },
       {
         "q": "Can I ask follow-up questions?",
@@ -185,29 +181,33 @@
       },
       {
         "q": "Can I download or copy the responses given to me?",
-        "a": "You can copy any response by selecting the text and copying it, then paste it into an email or document. There is no dedicated download button for chat responses. If you want to save something, copy it before you end your session."
+        "a": "Yes — there are a few options. To save your entire conversation, click the \"Export TXT\" button at the bottom of the screen — this downloads it as a simple text file you can open on any device. If you want to continue your conversation on a different AI tool, click \"Export JSON\" — this downloads the chat in a format that other AI tools can read and pick up from where you left off. To copy a single response, just select the text, copy it, and paste it into a document or email."
       },
       {
         "q": "What languages can I use?",
-        "a": "The tool works best in English but can understand and respond in many other languages. If you prefer to write in Spanish, French, or another language, just go ahead — it will do its best to respond in the same language."
+        "a": "The tool works best in English but can understand and respond in many other languages. If you prefer to write in Spanish, French, or another language, just go ahead — it will do its best to respond in the same language. Please note that your experience and the quality of responses may vary across different languages."
       },
       {
         "q": "How long can my message be?",
-        "a": "You can type quite a lot — there is no strict limit. That said, clear and focused messages tend to get better responses than very long ones. If you have a lot of context to share, break it into parts and go one step at a time."
+        "a": "There is no strict limit, but the tool can \"remember\" about 150,000 words at a time—roughly the length of two thick novels! This is called a context window. You can fill this window all at once with one big prompt, or use it up slowly over many back-and-forth messages. Once you hit that limit, the tool may start \"forgetting\" the very beginning of the chat to make room for new info.\nPro Tip: While the tool has a large memory, clear and focused messages usually get the best results. If you have a massive amount of information, try breaking it into smaller parts."
       }
     ],
-    "criticalUse": [
+    "concept": [
       {
-        "q": "Can I trust what the chat tool tells me?",
-        "a": "Not always. The tool can sound confident even when it is wrong. It can make up facts, give outdated information, or misunderstand your question. Always double-check anything important — especially health, legal, money, or current events — using a trusted source like https://factcheck.org or by asking a librarian."
+        "q": "What is AI?",
+        "a": "AI stands for Artificial Intelligence. It refers to computer programs designed to do things that normally require human intelligence — like learning, reasoning, and problem-solving. The tools on this kiosk are all powered by AI.\n- Learn more about AI here: https://cloud.google.com/learn/what-is-artificial-intelligence\n- Find definitions for key AI terms here: https://aipedagogy.org/guide/key-terms/"
       },
       {
-        "q": "What information should I never type into the chat?",
-        "a": "Never type your Social Security number, passwords, bank account details, or full home address into the chat. For most tasks you only need to share general information — for example \"I live in Utah\" rather than your full address. When in doubt, leave out personal details related to your identity."
+        "q": "What is a large language model (LLM)?",
+        "a": "A large language model is a type of AI model that is trained on a massive amount of text – books, articles, and websites. That's how it learns to understand and respond to your questions in plain language.\nYou can find definitions for key AI terms here: https://aipedagogy.org/guide/key-terms/"
       },
       {
-        "q": "What should I do if the chat tool gives me medical, legal, or financial information?",
-        "a": "Use it as a starting point only — not as professional advice. The tool can help you understand general concepts or prepare questions, but it is not a doctor, lawyer, or financial advisor. For anything important, always follow up with a qualified professional or ask your librarian to help you find the right resources."
+        "q": "What is open source?",
+        "a": "If a technology is defined as 'open source', that means the technology is not owned or locked away by one company but is publicly available for anyone to study and modify to make it more useful for themselves and everyone else. It's a bit like a recipe that anyone can read, use, or improve. The tools on this kiosk use open source models.\nYou can find more about 'open source' here: https://opensource.org/osd"
+      },
+      {
+        "q": "What is a prompt?",
+        "a": "A prompt is the input text you type into the AI-powered tool. The prompt often describes what you are looking for, but may also give specific instructions about style, tone, or format. It could be a question, a request, or an instruction — like \"help me write an email\" or \"explain what a mortgage is.\" The clearer your prompt, the better the response you'll get.\nYou can find definitions for key AI terms here: https://aipedagogy.org/guide/key-terms/"
       }
     ]
   }

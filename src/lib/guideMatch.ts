@@ -19,14 +19,27 @@ export const FUZZY_STOP = new Set([
     'that', 'with', 'get', 'use', 'if', 'but', 'not', 'and', 'or', 'as', 'at', 'about',
     'could', 'would', 'might', 'also', 'even', 'still', 'already', 'yet', 'too', 'its',
     'know', 'understand', 'think', 'want', 'need', 'help', 'tell', 'find', 'learn',
-    'try', 'figure', 'explain', 'show', 'describe', 'mean', 'means', 'define', 'said',
+    'try', 'figure', 'explain', 'show', 'describe', 'mean', 'means', 'define', 'said', 'ask',
     'dont', 'cant', 'wont', 'doesnt', 'isnt', 'arent', 'didnt', 'wasnt', 'havent',
     'just', 'really', 'maybe', 'perhaps', 'like', 'sort', 'kind', 'bit', 'way',
     'please', 'hi', 'hello', 'hey', 'okay', 'yeah', 'yes', 'sure', 'right', 'actually',
+    'make', 'give',
+    'good', 'more', 'very', 'much', 'many', 'only', 'well', 'new', 'own', 'any',
+    'something', 'done', 'over', 'here',
 ]);
 
 export function splitIntoBubbles(text: string): string[] {
     return text.split(/\n\n+/).map((s) => s.trim()).filter(Boolean);
+}
+
+// Strip a trailing 's' from plurals ("styles"→"style", "images"→"image",
+// "artworks"→"artwork"). Applied symmetrically to both query and corpus tokens
+// so matching is consistent. Excludes 'ss' endings (business, process, class).
+function stem(word: string): string {
+    if (word.length > 3 && word.endsWith('s') && !word.endsWith('ss')) {
+        return word.slice(0, -1);
+    }
+    return word;
 }
 
 export function tokenize(s: string): string[] {
@@ -34,7 +47,8 @@ export function tokenize(s: string): string[] {
         .toLowerCase()
         .replace(/[^a-z0-9\s]/g, '')
         .split(/\s+/)
-        .filter((w) => w.length > 2 && !FUZZY_STOP.has(w));
+        .filter((w) => w.length > 2 && !FUZZY_STOP.has(w))
+        .map(stem);
 }
 
 // Strip common intent-framing wrappers so "I don't know what X is" becomes "X".
@@ -57,7 +71,8 @@ export function fuzzyMatch(query: string, faqs: GuideMatchFAQ[]): GuideMatchFAQ 
     if (!qTokens.length) return null;
 
     const corpusTokens = new Set(faqs.flatMap((f) => [...tokenize(f.q), ...tokenize(f.a)]));
-    if (qTokens.some((t) => !corpusTokens.has(t))) return null;
+    const faqMaxOrphans = qTokens.length >= 4 ? 1 : 0;
+    if (qTokens.filter((t) => !corpusTokens.has(t)).length > faqMaxOrphans) return null;
 
     let best: { faq: GuideMatchFAQ; score: number } | null = null;
     for (const faq of faqs) {
@@ -84,6 +99,20 @@ export function fuzzyMatchUseCase<T extends GuideMatchUseCase>(
 ): T | null {
     const qTokens = tokenize(normalizeQuery(query));
     if (!qTokens.length) return null;
+
+    // Orphan-token check: route to the live model if too many query tokens are
+    // absent from the use-case corpus. Short queries (< 4 tokens) require a
+    // perfect corpus match; longer natural-language queries allow 1 unknown
+    // token so a single descriptive word doesn't discard an otherwise strong hit.
+    const corpusTokens = new Set(
+        useCases.flatMap((uc) => {
+            if (!uc.gettingStarted) return [];
+            const gs = uc.gettingStarted;
+            return tokenize([uc.label, gs.intro, gs.examplePrompt, ...gs.tips, ...gs.cautions].join(' '));
+        })
+    );
+    const ucMaxOrphans = qTokens.length >= 4 ? 1 : 0;
+    if (qTokens.filter((t) => !corpusTokens.has(t)).length > ucMaxOrphans) return null;
 
     let best: { uc: T; score: number; hits: number } | null = null;
     for (const uc of useCases) {

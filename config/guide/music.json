@@ -68,27 +68,7 @@
     }
   ],
   "faqs": {
-    "concept": [
-      {
-        "q": "What is AI?",
-        "a": "AI stands for Artificial Intelligence. It refers to computer programs that can do things that normally require human thinking — like answering questions, writing text, or creating images. The tools on this kiosk are all powered by AI."
-      },
-      {
-        "q": "What is a large language model (LLM)?",
-        "a": "A large language model is a type of AI that learned from reading a huge amount of text — books, articles, and websites. That's how it learned to understand and respond to your questions in plain language. Think of it as a very well-read assistant."
-      },
-      {
-        "q": "What is open source?",
-        "a": "Open source means the technology behind the tool is publicly available — not owned or locked away by one company. It's a bit like a recipe that anyone can read, use, or improve. The chat tool on this kiosk uses an open source model."
-      },
-      {
-        "q": "What is a prompt?",
-        "a": "A prompt is simply what you type into the tool — your description or instruction for what you want it to create. The clearer and more detailed your prompt, the closer the result will be to what you had in mind. For example: \"upbeat country song about summer\" or \"slow sad piano ballad with lyrics about missing home.\""
-      },
-      {
-        "q": "What is AI-generated music?",
-        "a": "AI-generated music is music created entirely by a computer program based on your description. You don't need any musical training or instruments — you just describe what you want and the tool composes and produces the track for you, including vocals and instrumentation."
-      },
+    "criticalUse": [
       {
         "q": "How does the music tool create songs from text?",
         "a": "The tool was trained on a large amount of music and musical patterns. When you type a description, it uses what it learned to generate a song that matches your prompt — choosing a style, tempo, instruments, and lyrics that fit. It's a bit like describing a song to a musician and having them play it for you on the spot."
@@ -96,6 +76,14 @@
       {
         "q": "Can AI-generated music sound like real music?",
         "a": "Yes — AI-generated music can sound surprisingly realistic and polished. The quality varies depending on how detailed your prompt is and what style you ask for. Some genres work better than others, and results can be unpredictable, so experimenting with different descriptions is part of the process."
+      },
+      {
+        "q": "Should I include real names or personal details in my lyrics?",
+        "a": "Avoid including full names of real people, personal addresses, or any sensitive information in your lyrics. Keep your content general and creative rather than personal or identifying."
+      },
+      {
+        "q": "Can AI music be mistaken for real music by others?",
+        "a": "Yes — AI-generated music can sound convincing enough that listeners may not realize it was computer-generated. Be transparent about how your music was made if you share it with others, especially if you're presenting it in a professional or creative context. Passing off AI-generated work as entirely your own without disclosure can be misleading."
       }
     ],
     "practical": [
@@ -104,12 +92,12 @@
         "a": "Describe the kind of music you want using words that capture the feel, genre, or theme. For example: \"relaxing acoustic guitar,\" \"energetic hip hop beat,\" \"80s pop with a fun vibe,\" or \"sad folk song about missing home.\" You can be as simple or as detailed as you like — even a single word like \"jazz\" or \"upbeat\" is a valid starting point."
       },
       {
-        "q": "Can I write my own lyrics?",
-        "a": "Yes — the Lyrics field lets you type your own words if you have something in mind. You can write a full set of lyrics or just a few lines and let the tool fill in the rest. If you leave it blank, the tool will generate lyrics automatically based on your style and mood description."
-      },
-      {
         "q": "What happens if I don't like the result?",
         "a": "Just tweak your description and generate again. Try changing one thing at a time — the genre, the mood, the tempo, or the lyrics — to get closer to what you want. Each generation is a new attempt, so don't be discouraged if the first result isn't quite right."
+      },
+      {
+        "q": "Can I write my own lyrics?",
+        "a": "Yes — the Lyrics field lets you type your own words if you have something in mind. You can write a full set of lyrics or just a few lines and let the tool fill in the rest. If you leave it blank, the tool will generate lyrics automatically based on your style and mood description."
       },
       {
         "q": "What happens if I leave the Lyrics field blank?",
@@ -129,21 +117,37 @@
       },
       {
         "q": "Can I download or save my generated track?",
-        "a": "Yes — once your track is generated it will appear in the audio player on screen. You can download it by clicking the \"Download Audio\" button below the player, or by clicking the three-dot menu on the right side of the audio player and selecting \"Download.\" Your previous creations also appear in the History panel on the left so you can revisit them during your session."
+        "a": "Yes — once your track is generated it will appear in the audio player on screen. You can download it by clicking the \"Download Audio\" button below the player. Your previous creations also appear in the History panel on the left so you can revisit them during your session and download them if needed."
+      },
+      {
+        "q": "What file format is the downloaded track?",
+        "a": "Your downloaded track will be in the MP3 format."
+      }
+    ],
+    "concept": [
+      {
+        "q": "What is AI?",
+        "a": "AI stands for Artificial Intelligence. It refers to computer programs designed to do things that normally require human intelligence — like learning, reasoning, and problem-solving. The tools on this kiosk are all powered by AI.\n- Learn more about AI here: https://cloud.google.com/learn/what-is-artificial-intelligence\n- Find definitions for key AI terms here: https://aipedagogy.org/guide/key-terms/"
+      },
+      {
+        "q": "What is a large language model (LLM)?",
+        "a": "A large language model is a type of AI model that is trained on a massive amount of text – books, articles, and websites. That's how it learns to understand and respond to your questions in plain language.\nYou can find definitions for key AI terms here: https://aipedagogy.org/guide/key-terms/"
+      },
+      {
+        "q": "What is open source?",
+        "a": "If a technology is defined as 'open source', that means the technology is not owned or locked away by one company but is publicly available for anyone to study and modify to make it more useful for themselves and everyone else. It's a bit like a recipe that anyone can read, use, or improve. The tools on this kiosk use open source models.\nYou can find more about 'open source' here: https://opensource.org/osd"
+      },
+      {
+        "q": "What is a prompt?",
+        "a": "A prompt is the input text you type into the AI-powered tool. The prompt often describes what you are looking for, but may also give specific instructions about style, tone, or format. For example: \"upbeat country song about summer\" or \"slow sad piano ballad with lyrics about missing home.\" The clearer and more detailed your prompt, the closer the result will be to what you had in mind.\nYou can find definitions for key AI terms here: https://aipedagogy.org/guide/key-terms/"
+      },
+      {
+        "q": "What is AI-generated music?",
+        "a": "AI-generated music is music created entirely by an AI program based on your description. As a user of AI-powered music-generation tools, you don't need any instruments or musical training — you just describe what you want and the tool composes and produces the track for you, including vocals and instrumentation."
       },
       {
         "q": "What is an MP3 file?",
-        "a": "An MP3 is a common audio file format — it's how most music is stored and shared digitally. When you download your generated track it will likely be saved as an MP3 file. You can play it on most phones, computers, and music apps. Think of it the same way you would a song you download from the internet."
-      }
-    ],
-    "criticalUse": [
-      {
-        "q": "Should I include real names or personal details in my lyrics?",
-        "a": "Avoid including full names of real people, personal addresses, or any sensitive information in your lyrics. Keep your content general and creative rather than personal or identifying."
-      },
-      {
-        "q": "Can AI music be mistaken for real music by others?",
-        "a": "Yes — AI-generated music can sound convincing enough that listeners may not realize it was computer-generated. Be transparent about how your music was made if you share it with others, especially if you're presenting it in a professional or creative context. Passing off AI-generated work as entirely your own without disclosure can be misleading."
+        "a": "An MP3 is a common audio file format — it's how most music is stored and shared digitally. When you download your generated track it will likely be saved as an MP3 file. You can play it on most phones, computers, and music apps.\nYou can read more about the MP3 format here: https://www.britannica.com/technology/MP3"
       }
     ]
   }

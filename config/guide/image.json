@@ -67,34 +67,22 @@
     }
   ],
   "faqs": {
-    "concept": [
-      {
-        "q": "What is AI?",
-        "a": "AI stands for Artificial Intelligence. It refers to computer programs that can do things that normally require human thinking — like answering questions, writing text, or creating images. The tools on this kiosk are all powered by AI."
-      },
-      {
-        "q": "What is a large language model (LLM)?",
-        "a": "A large language model is a type of AI that learned from reading a huge amount of text — books, articles, and websites. That's how it learned to understand and respond to your questions in plain language. Think of it as a very well-read assistant."
-      },
-      {
-        "q": "What is open source?",
-        "a": "Open source means the technology behind the tool is publicly available — not owned or locked away by one company. It's a bit like a recipe that anyone can read, use, or improve. The image tool on this kiosk uses an open source model."
-      },
-      {
-        "q": "What is a prompt?",
-        "a": "A prompt is simply what you type into the tool — your description of the image you want to create. The clearer and more detailed your prompt, the closer the result will be to what you had in mind. For example: \"a golden retriever sitting in a sunny park, warm afternoon light, watercolor style\" or \"a professional headshot of a woman in a business suit, plain white background.\""
-      },
-      {
-        "q": "What is an AI-generated image?",
-        "a": "An AI-generated image is a picture created entirely by a computer program based on your text description. No photographer, artist, or designer is involved — the tool interprets your words and produces a visual from scratch. The results can range from photorealistic to illustrated depending on what you ask for."
-      },
-      {
-        "q": "What is art style?",
-        "a": "Art style refers to the visual look and feel of an image — whether it looks like a photograph, a painting, a cartoon, or something else. You can describe a style by naming it directly or by describing what you want it to look like. Some examples: \"watercolor painting,\" \"photorealistic,\" \"cartoon,\" \"vintage poster,\" \"oil painting,\" \"pencil sketch,\" \"comic book style.\" Adding a style to your prompt gives the tool more direction and usually improves the result."
-      },
+    "criticalUse": [
       {
         "q": "How does the image tool decide what to create?",
         "a": "The tool was trained on a large amount of images and their descriptions. When you type a prompt, it uses what it learned to generate an image that matches your words as closely as it can. It doesn't copy existing images — it creates something new each time based on patterns it learned during training."
+      },
+      {
+        "q": "Can I generate images of real people?",
+        "a": "You can describe general types of people — \"a young woman in a red coat\" — but you should not attempt to generate realistic images of specific real, identifiable people without their permission. Creating images that could be mistaken for real photos of real people raises serious ethical and legal concerns."
+      },
+      {
+        "q": "Are there types of images I should not generate?",
+        "a": "Yes. Do not generate images that are violent, sexually explicit, hateful, or that could be used to deceive or harm others. Do not generate images designed to look like real news photographs or that depict real people in misleading situations. This is a public tool and responsible use is expected."
+      },
+      {
+        "q": "Can AI images be mistaken for real photographs?",
+        "a": "Yes — AI-generated images can look very realistic and convincing. Be transparent about how an image was made if you share it with others, especially in professional or public contexts. Using AI-generated images to mislead people — for example, presenting a generated photo as a real one — is considered dishonest and can have serious consequences."
       }
     ],
     "practical": [
@@ -105,6 +93,10 @@
       {
         "q": "How do I get results that look more like what I imagined?",
         "a": "Add more specific detail to your prompt. Describe the lighting, the colors, the mood, and the style. If the result is close but not quite right, tweak one or two details and generate again. For example, if the image looks too dark, add \"bright lighting\" or \"daylight\" to your description. It often takes a few tries to get exactly what you want."
+      },
+      {
+        "q": "What happens if I don't like the result?",
+        "a": "Adjust your description and generate again. Try adding more detail, changing the style, or describing the mood differently. Small changes to your prompt can produce very different results. You can also look back at your history to compare previous generations and identify what worked best."
       },
       {
         "q": "What art styles can I ask for?",
@@ -120,33 +112,45 @@
       },
       {
         "q": "Can I download or save my generated image?",
-        "a": "Yes — once your image is generated it will appear on screen. You can download it by clicking the \"Download Image\" button below the image. Your previous creations also appear in the History panel on the left so you can revisit them during your session."
+        "a": "Yes — once your image is generated it will appear on screen. You can download it by clicking the \"Download Image\" button below the image. Your previous creations also appear in the History panel on the left so you can revisit them during your session and download them if needed."
       },
       {
         "q": "What file format is the downloaded image?",
-        "a": "Your generated image will be downloaded as a JPEG file."
-      },
-      {
-        "q": "What is a JPEG file?",
-        "a": "A JPEG is one of the most common image file formats. It's how most photos and images are stored and shared digitally. You can open a JPEG on almost any device — phone, tablet, or computer — and it can be inserted into documents, shared by email, or posted on social media. Think of it the same way you would a photo you take on your phone."
-      },
-      {
-        "q": "What happens if I don't like the result?",
-        "a": "Adjust your description and generate again. Try adding more detail, changing the style, or describing the mood differently. Small changes to your prompt can produce very different results. You can also look back at your history to compare previous generations and identify what worked best."
+        "a": "Your download format depends on your account type. Individual Accounts: Images download as AVIF files (optimized for high quality and small file size). Guest Accounts: Images download as PNG files."
       }
     ],
-    "criticalUse": [
+    "concept": [
       {
-        "q": "Can I generate images of real people?",
-        "a": "You can describe general types of people — \"a young woman in a red coat\" — but you should not attempt to generate realistic images of specific real, identifiable people without their permission. Creating images that could be mistaken for real photos of real people raises serious ethical and legal concerns."
+        "q": "What is AI?",
+        "a": "AI stands for Artificial Intelligence. It refers to computer programs designed to do things that normally require human intelligence — like learning, reasoning, and problem-solving. The tools on this kiosk are all powered by AI.\n- Learn more about AI here: https://cloud.google.com/learn/what-is-artificial-intelligence\n- Find definitions for key AI terms here: https://aipedagogy.org/guide/key-terms/"
       },
       {
-        "q": "Are there types of images I should not generate?",
-        "a": "Yes. Do not generate images that are violent, sexually explicit, hateful, or that could be used to deceive or harm others. Do not generate images designed to look like real news photographs or that depict real people in misleading situations. This is a public tool and responsible use is expected."
+        "q": "What is a large language model (LLM)?",
+        "a": "A large language model is a type of AI model that is trained on a massive amount of text – books, articles, and websites. That's how it learns to understand and respond to your questions in plain language.\nYou can find definitions for key AI terms here: https://aipedagogy.org/guide/key-terms/"
       },
       {
-        "q": "Can AI images be mistaken for real photographs?",
-        "a": "Yes — AI-generated images can look very realistic and convincing. Be transparent about how an image was made if you share it with others, especially in professional or public contexts. Using AI-generated images to mislead people — for example, presenting a generated photo as a real one — is considered dishonest and can have serious consequences."
+        "q": "What is open source?",
+        "a": "If a technology is defined as 'open source', that means the technology is not owned or locked away by one company but is publicly available for anyone to study and modify to make it more useful for themselves and everyone else. It's a bit like a recipe that anyone can read, use, or improve. The tools on this kiosk use open source models.\nYou can find more about 'open source' here: https://opensource.org/osd"
+      },
+      {
+        "q": "What is a prompt?",
+        "a": "A prompt is the input text you type into the AI-powered tool. The prompt often describes what you are looking for, but may also give specific instructions about style, tone, or format. For example: \"a golden retriever sitting in a sunny park, warm afternoon light, watercolor style\" or \"a professional headshot of a woman in a business suit, plain white background.\" The clearer and more detailed your prompt, the closer the result will be to what you had in mind.\nYou can find definitions for key AI terms here: https://aipedagogy.org/guide/key-terms/"
+      },
+      {
+        "q": "What is an AI-generated image?",
+        "a": "An AI-generated image is a picture created entirely by an AI program based on your text description. No photographer, artist, or designer is involved — the tool interprets your words and produces a visual from scratch."
+      },
+      {
+        "q": "What is art style?",
+        "a": "Art style refers to the visual look and feel of an image — whether it looks like a photograph, a painting, a cartoon, or something else. You can describe a style by naming it directly or by describing what you want it to look like. Some examples: \"watercolor painting,\" \"photorealistic,\" \"cartoon,\" \"vintage poster,\" \"oil painting,\" \"pencil sketch,\" \"comic book style.\" Adding a style to your prompt gives the tool more direction and usually improves the result. You can read more about art styles here: https://drawpaintacademy.com/art-styles/"
+      },
+      {
+        "q": "What is an AVIF file?",
+        "a": "An AVIF is a modern, high-tech image file. Its main goal is to keep an image looking beautiful while making the file size as tiny as possible. It saves a lot of storage space and helps websites load much faster. The Catch: Because it's so new, it works perfectly in new browsers and apps, but older computers or software might not recognize it yet.\nYou can read more about AVIF here: https://fileinfo.com/extension/avif"
+      },
+      {
+        "q": "What is a PNG file?",
+        "a": "A PNG (Portable Network Graphics) is a standard image file that has been around for a long time. It is known for being high-quality and \"lossless,\" meaning it never gets blurry or pixelated when you save it. It works on almost every device or computer in existence. The files are much \"heavier\" or larger. If you have a lot of them, they will take up a lot of space on your phone or computer.\nYou can read more about PNG here: https://www.adobe.com/creativecloud/filetypes/image/raster/png-file.html"
       }
     ]
   }
