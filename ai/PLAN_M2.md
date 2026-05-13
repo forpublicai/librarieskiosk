@@ -102,7 +102,7 @@ src/app/video/page.tsx                         guide panel + coachmarks + chips 
 src/components/Header.tsx                      actions prop + ThemeToggle in right side
 src/lib/mediaPersistence.ts                    finalizeVideoUpload writes resultUrl on claim + on failure
 src/lib/guideLinks.ts                          bare-domain detection (.com/.org/.net/.edu/.gov → clickable links)
-src/lib/guideMatch.ts                          stem(), orphan-token check in fuzzyMatchUseCase, extra stop words
+src/lib/guideMatch.ts                          fuzzyMatch→fuzzyMatchFaqs; exact-match-first + word-count tiebreaker in both functions; DEFINITIONAL_RE guard; two-token minimum; normStr helper
 src/lib/guidePrompt.ts                         unified intent-detecting system prompt; split useCaseWordLimit/faqWordLimit in TIER_CAPS
 src/lib/nanogpt.ts                             new exported chatComplete() (non-streaming) for /api/guide
 src/lib/storage.ts                             generateSignedGetUrl options.downloadFilename
@@ -154,19 +154,23 @@ tier-select → entry-point → ┬→ what-is-it
 Free-form input is allowed on every screen except `tier-select`. On submit:
 
 1. Try `fuzzyMatchUseCase` against `content.useCases`. On hit (score ≥ 0.25), render the use-case's getting-started bundle and transition to `getting-started`.
-2. Try `fuzzyMatch` against the union of all FAQs. On hit (score ≥ 0.35), render the answer and transition to `faq-answer`.
+2. Try `fuzzyMatchFaqs` against the union of all FAQs. On hit (score ≥ 0.35), render the answer and transition to `faq-answer`.
 3. Otherwise, call `/api/guide` with `{question, tool, tier}` and render the streamed segments. Transition to `faq-answer`.
 
 #### Fuzzy matching algorithm
 
-Located in `src/lib/guideMatch.ts`. Two refinements that came out of testing:
+Located in `src/lib/guideMatch.ts`. Refinements that came out of testing:
 
 1. **Query normalization**: strip intent-framing wrappers ("I don't know what X is" → "X", "What does X mean?" → "X", "Tell me about X" → "X") before tokenizing. See `normalizeQuery()`.
 2. **Stop-word list**: a hand-tuned list of 60+ words covering structural grammar, intent framing, and conversational fillers. See `FUZZY_STOP`.
 3. **Orphan-token check**: build the union of tokens that appear anywhere in the FAQ corpus (questions + answers). If *any* query token is missing from the corpus, the question is by definition about something the static content doesn't cover — return `null` and let the live model handle it. This was the fix for "Is PNG the same as JPEG?" incorrectly matching the JPEG FAQ.
-4. **Two-pass scoring**: first pass scores against question text only; if no result above threshold, fall back to question + answer combined. This was the fix for "I don't know what a JPEG is" matching the *file format* FAQ instead of the *what is JPEG* FAQ — the question-only pass disambiguates between FAQs whose answers happen to share vocabulary.
+4. **Two-pass scoring** (`fuzzyMatchFaqs`): first pass scores against question text only; if no result above threshold, fall back to question + answer combined. This was the fix for "I don't know what a JPEG is" matching the *file format* FAQ instead of the *what is JPEG* FAQ — the question-only pass disambiguates between FAQs whose answers happen to share vocabulary.
+5. **Exact match first**: before any token scoring, both `fuzzyMatchFaqs` and `fuzzyMatchUseCase` check for a normalized string match (`normStr`) against the question/label. An exact hit is returned immediately without scoring. This ensures "what is art style?" matches "What is art style?" rather than a shorter FAQ that happens to share tokens.
+6. **Word-count tiebreaker**: when two candidates score equally, both functions prefer the shorter question/label (fewer raw words). Shorter means more focused on the query terms rather than incidentally containing them.
+7. **Definitional guard** (`DEFINITIONAL_RE`): queries starting with "what is/are", "how does", "why is/does", etc. are blocked from `fuzzyMatchUseCase` entirely (they are never use-case intents). In `fuzzyMatchFaqs` they are subject to a stricter rule: all query tokens must appear in the FAQ *question text* (not the answer), preventing answer-text bleed. This was the fix for "what is music style" matching a criticalUse FAQ whose answer happened to mention "style".
+8. **Minimum two token hits for multi-token queries**: for queries with more than one meaningful token, a single-token overlap is not enough to declare a match in either function. This prevents high-frequency domain words (e.g. "music", "image") from matching unrelated FAQs or use cases by accident.
 
-Threshold (0.35) was tuned empirically. Lower → too many false positives. Higher → live model is invoked for well-covered questions.
+Thresholds: `fuzzyMatchFaqs` requires score ≥ 0.35; `fuzzyMatchUseCase` requires score ≥ 0.25. Both were tuned empirically.
 
 #### Bubble cadence
 

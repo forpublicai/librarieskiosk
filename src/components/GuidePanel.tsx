@@ -14,7 +14,7 @@ import {
   type GuideTier,
 } from '@/lib/guideConstants';
 import {
-  fuzzyMatch,
+  fuzzyMatchFaqs,
   fuzzyMatchUseCase,
   splitIntoBubbles,
 } from '@/lib/guideMatch';
@@ -443,7 +443,7 @@ function GuidePanelInner({ content, tool, isOpen }: GuidePanelProps & { content:
       setScreen('getting-started');
       return;
     }
-    const faqMatch = fuzzyMatch(q, allFaqs);
+    const faqMatch = fuzzyMatchFaqs(q, allFaqs);
     if (faqMatch) {
       await renderFaqAnswer(faqMatch, q);
     } else {

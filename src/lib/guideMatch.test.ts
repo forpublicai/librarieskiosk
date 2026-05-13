@@ -1,25 +1,25 @@
 import { describe, expect, it } from 'vitest';
 import imageGuide from '@/config/guide/image.json';
-import { fuzzyMatch, fuzzyMatchUseCase, splitIntoBubbles } from './guideMatch';
+import { fuzzyMatchFaqs, fuzzyMatchUseCase, splitIntoBubbles } from './guideMatch';
 
 const imageFaqs = [
-    ...imageGuide.faqs.concept,
-    ...imageGuide.faqs.practical,
     ...imageGuide.faqs.criticalUse,
+    ...imageGuide.faqs.practical,
+    ...imageGuide.faqs.concept,
 ];
 
 describe('guide fuzzy matching', () => {
     it('matches JPEG definition questions to the JPEG FAQ', () => {
-        expect(fuzzyMatch("I don't know what a JPEG is", imageFaqs)?.q).toBe('What is a JPEG file?');
-        expect(fuzzyMatch('JPEG means?', imageFaqs)?.q).toBe('What is a JPEG file?');
+        expect(fuzzyMatchFaqs("I don't know what a JPEG is", imageFaqs)?.q).toBe('What is a JPEG file?');
+        expect(fuzzyMatchFaqs('JPEG means?', imageFaqs)?.q).toBe('What is a JPEG file?');
     });
 
     it('returns null when the query has orphan tokens outside the static corpus', () => {
-        expect(fuzzyMatch('Is PNG the same as JPEG?', imageFaqs)).toBeNull();
+        expect(fuzzyMatchFaqs('Is PNG the same as JPEG?', imageFaqs)).toBeNull();
     });
 
     it('matches download questions to the download FAQ', () => {
-        expect(fuzzyMatch('How do I download my image?', imageFaqs)?.q).toBe(
+        expect(fuzzyMatchFaqs('How do I download my image?', imageFaqs)?.q).toBe(
             'Can I download or save my generated image?'
         );
     });
