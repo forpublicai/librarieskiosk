@@ -1,7 +1,7 @@
 export type GuideTier = 1 | 2 | 3;
 
-export const MAX_INPUT_WORDS = 25;
-export const SOFT_WARN_WORDS = 20;
+export const MAX_INPUT_WORDS = 100;
+export const SOFT_WARN_WORDS = 80;
 export const MAX_LIVE_EXCHANGES_PER_SESSION = 5;
 
 export const LIBRARIAN_REDIRECT =
