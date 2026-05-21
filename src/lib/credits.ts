@@ -181,6 +181,126 @@ export async function deductCredits(userId: string, amount: number): Promise<num
 }
 
 /**
+ * Atomically credit `amount` back to a user's balance.
+ *
+ * Mirrors `deductCredits`' CASE on `creditsResetAt` so a refund that lands
+ * after the weekly window rolled over resets-and-adds rather than being
+ * wiped by the renewal.
+ */
+export async function refundCredits(userId: string, amount: number): Promise<void> {
+    if (amount <= 0) return;
+
+    const { currentResetAt } = getFixedWeeklyRenewalWindow();
+    const weeklyCreditsCase = weeklyCreditsSqlCase();
+    await prisma.$executeRawUnsafe(
+        `
+            UPDATE "User"
+            SET
+                "credits" = CASE
+                    WHEN "creditsResetAt" < $2 THEN (${weeklyCreditsCase}) + $3
+                    ELSE "credits" + $3
+                END,
+                "creditsResetAt" = CASE
+                    WHEN "creditsResetAt" < $2 THEN $2
+                    ELSE "creditsResetAt"
+                END
+            WHERE "id" = $1
+        `,
+        userId,
+        currentResetAt,
+        amount
+    );
+}
+
+/**
+ * Settle an outstanding credit hold on a MediaSession row.
+ *
+ * Atomically claims the hold (only one caller wins under contention) and:
+ *  - 'burn'   — clears the hold; balance unchanged (credits already deducted on submit).
+ *  - 'refund' — clears the hold and credits the held amount back to the user.
+ *
+ * Returns true iff this call claimed the hold (false = already settled or no hold).
+ */
+export async function settleCreditHold(
+    mediaSessionId: string,
+    outcome: 'burn' | 'refund'
+): Promise<boolean> {
+    return prisma.$transaction(async (tx) => {
+        // SELECT...FOR UPDATE captures the pre-clear amount under a row lock.
+        // (UPDATE...RETURNING returns post-update values, so it can't read the
+        // old heldCredits in a single statement.) Concurrent settlers block on
+        // the lock; only one sees the WHERE match before the UPDATE clears it.
+        const claimed = await tx.$queryRawUnsafe<{ heldCredits: number; userId: string }[]>(
+            `
+                SELECT "heldCredits", "userId"
+                FROM "MediaSession"
+                WHERE "id" = $1 AND "heldCredits" IS NOT NULL
+                FOR UPDATE
+            `,
+            mediaSessionId
+        );
+
+        if (claimed.length === 0) return false;
+
+        await tx.$executeRawUnsafe(
+            `UPDATE "MediaSession" SET "heldCredits" = NULL WHERE "id" = $1`,
+            mediaSessionId
+        );
+
+        if (outcome === 'burn') return true;
+
+        const { heldCredits, userId } = claimed[0];
+        if (heldCredits <= 0) return true;
+
+        const { currentResetAt } = getFixedWeeklyRenewalWindow();
+        const weeklyCreditsCase = weeklyCreditsSqlCase();
+        await tx.$executeRawUnsafe(
+            `
+                UPDATE "User"
+                SET
+                    "credits" = CASE
+                        WHEN "creditsResetAt" < $2 THEN (${weeklyCreditsCase}) + $3
+                        ELSE "credits" + $3
+                    END,
+                    "creditsResetAt" = CASE
+                        WHEN "creditsResetAt" < $2 THEN $2
+                        ELSE "creditsResetAt"
+                    END
+                WHERE "id" = $1
+            `,
+            userId,
+            currentResetAt,
+            heldCredits
+        );
+        return true;
+    });
+}
+
+/**
+ * Refund credits on MediaSessions whose hold has been outstanding longer than
+ * `minutesOld` — long-tail safety net for jobs whose terminal status never
+ * reached the status route (server crash, browser closed, etc).
+ *
+ * Returns the number of holds refunded.
+ */
+export async function sweepStaleCreditHolds(minutesOld: number): Promise<number> {
+    const cutoff = new Date(Date.now() - minutesOld * 60 * 1000);
+    const stale = await prisma.mediaSession.findMany({
+        where: {
+            heldCredits: { not: null },
+            createdAt: { lt: cutoff },
+        },
+        select: { id: true },
+    });
+
+    let refunded = 0;
+    for (const row of stale) {
+        if (await settleCreditHold(row.id, 'refund')) refunded += 1;
+    }
+    return refunded;
+}
+
+/**
  * Get current credit balance for a user.
  */
 export async function getBalance(userId: string): Promise<number> {

@@ -132,6 +132,10 @@ model MediaSession {
   sourceProviderUrl String? @db.Text
   providerRunId     String?
 
+  // Credit escrow: non-null while a hold is outstanding against this row.
+  // Cleared on terminal success (burn) or refunded on terminal failure.
+  heldCredits Int?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt @default(now())
 
