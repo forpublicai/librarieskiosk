@@ -20,7 +20,7 @@ interface AuthContextType {
     token: string | null;
     login: (username: string, password: string) => Promise<void>;
     loginAsGuest: () => Promise<void>;
-    logout: () => void;
+    logout: () => Promise<void>;
     refreshUser: () => Promise<void>;
     isLoading: boolean;
 }
@@ -39,8 +39,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const heartbeatRef = useRef<NodeJS.Timeout | null>(null);
     const hadActivityRef = useRef(false);
 
-    const logout = useCallback(() => {
-        // If guest user, clean up ephemeral session data before logout
+    const logout = useCallback(async () => {
+        // If guest user, clean up ephemeral session data. Fire-and-forget —
+        // not user-facing, no race with subsequent login.
         if (user?.role === 'GUEST' && token) {
             fetch('/api/auth/cleanup', {
                 method: 'POST',
@@ -49,12 +50,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }).catch((e) => console.error('Cleanup failed:', e));
         }
 
-        // Release server-side session slot (no-op for roles that don't have one)
+        // Release the server-side ActiveSession slot. Must complete before the
+        // next user can log in under a library at concurrent-session capacity,
+        // otherwise the new login races against the stale row and 409s. Short
+        // timeout so a hanging server doesn't trap the user on this screen.
         if (token) {
-            fetch('/api/auth/logout', {
-                method: 'POST',
-                headers: { Authorization: `Bearer ${token}` },
-            }).catch(() => {});
+            const ac = new AbortController();
+            const timer = setTimeout(() => ac.abort(), 3000);
+            try {
+                await fetch('/api/auth/logout', {
+                    method: 'POST',
+                    headers: { Authorization: `Bearer ${token}` },
+                    signal: ac.signal,
+                });
+            } catch {
+                // Network error or timeout — still clear local state so the
+                // user isn't stranded. The stale ActiveSession row will be
+                // swept by the idle cutoff at the next login attempt.
+            } finally {
+                clearTimeout(timer);
+            }
         }
 
         setUser(null);
@@ -135,11 +150,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (res.ok) {
                 const data = await res.json();
                 setUser(data.user);
-            } else {
+            } else if (res.status < 500) {
+                // 4xx — server says this token is definitively bad. Tear down.
                 logout();
             }
+            // 5xx — transient server issue; leave auth state alone so the
+            // next mount can retry. Don't burn the ActiveSession row.
         } catch {
-            logout();
+            // Network error or in-flight fetch aborted by a page refresh /
+            // navigation. Don't tear down — that would clear localStorage and
+            // try (and likely fail mid-flight) to DELETE the server session,
+            // stranding the user behind LIBRARY_AT_CAPACITY on the next login.
         }
     };
 

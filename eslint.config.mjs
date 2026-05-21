@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // CommonJS preload shims for tsx-based scripts — must use require()
+    // because they're invoked via `node --require` before any ESM loader.
+    "scripts/**/*.cjs",
   ]),
 ]);
 
