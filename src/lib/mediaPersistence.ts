@@ -327,12 +327,14 @@ export interface CreatePendingVideoInput {
     userId: string;
     prompt: string;
     runId: string;
+    heldCredits?: number;
 }
 
 export async function createPendingVideoSession({
     userId,
     prompt,
     runId,
+    heldCredits,
 }: CreatePendingVideoInput): Promise<{ mediaSessionId: string }> {
     const row = await prisma.mediaSession.create({
         data: {
@@ -342,6 +344,7 @@ export async function createPendingVideoSession({
             providerRunId: runId,
             storageProvider: 'R2',
             storageStatus: 'PENDING',
+            heldCredits: heldCredits ?? null,
         },
     });
     return { mediaSessionId: row.id };

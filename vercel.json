@@ -8,6 +8,10 @@
     {
       "path": "/api/cron/renew-credits",
       "schedule": "0 6 * * 1"
+    },
+    {
+      "path": "/api/cron/sweep-credit-holds",
+      "schedule": "0 * * * *"
     }
   ]
 }

@@ -13,6 +13,8 @@ const LIBRARIES = [
     'Public AI',
     'Tremonton, UT',
     'Sussex County, NJ',
+    'Osterville, MA',
+    'Salt Lake City, UT',
 ];
 
 export default function SignupPage() {

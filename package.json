@@ -17,7 +17,9 @@
     "db:sync": "npx prisma db push && npx tsx prisma/seed.ts",
     "db:reset": "npx prisma migrate reset --force",
     "smoke-test": "npx tsx scripts/smoke-test.ts",
-    "probe:nanogpt": "npx tsx scripts/nanogpt-probe.ts"
+    "probe:nanogpt": "npx tsx scripts/nanogpt-probe.ts",
+    "verify:credits": "node --require ./scripts/_preload.cjs --import tsx scripts/verify-credit-holds.ts",
+    "verify:cron-sweep": "node --require ./scripts/_preload.cjs --import tsx scripts/verify-sweep-cron.ts"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"
