@@ -49,6 +49,7 @@ export default function ImagePage() {
     const [error, setError] = useState('');
     const [sessions, setSessions] = useState<SessionItem[]>([]);
     const [guideOpen, setGuideOpen] = useState(false);
+    const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
     const isGuest = user?.role === 'GUEST';
     const hydratedRef = useRef(false);
     const progress = useGenerationProgress({
@@ -123,6 +124,22 @@ export default function ImagePage() {
         },
         [token]
     );
+
+    const handleDeleteSession = useCallback(async (id: string) => {
+        if (id.startsWith('guest_')) {
+            setSessions((prev) => prev.filter((s) => s.id !== id));
+            if (currentSessionId === id) { setCurrentSessionId(null); setImageUrl(null); }
+            setConfirmDelete(null);
+            return;
+        }
+        await fetch(`/api/media-sessions/${id}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        setSessions((prev) => prev.filter((s) => s.id !== id));
+        if (currentSessionId === id) { setCurrentSessionId(null); setImageUrl(null); }
+        setConfirmDelete(null);
+    }, [token, currentSessionId]);
 
     const handleGenerate = async (e: FormEvent) => {
         e.preventDefault();
@@ -219,44 +236,55 @@ export default function ImagePage() {
                             <div
                                 key={s.id}
                                 style={{
-                                    cursor: 'pointer',
+                                    position: 'relative',
                                     border: '1px solid var(--border-color)',
                                     padding: '10px',
                                     background: 'var(--bg-card)',
                                     transition: 'background 0.2s',
                                 }}
-                                onClick={async () => {
-                                    setCurrentSessionId(s.id);
-                                    if (s.url) {
-                                        setImageUrl(s.url);
-                                        return;
-                                    }
-                                    // R2-backed rows don't embed a full URL in the list;
-                                    // fetch the presigned URL on demand.
-                                    if (s.hasObject && token) {
-                                        const fresh = await refreshMediaUrl(s.id, token);
-                                        if (fresh?.url) setImageUrl(fresh.url);
-                                    }
-                                }}
                             >
-                                {(s.thumbnailUrl || s.url) && (
-                                    <img
-                                        src={s.thumbnailUrl || s.url || undefined}
-                                        alt={s.prompt}
-                                        loading="lazy"
-                                        decoding="async"
-                                        style={{
-                                            width: '100%',
-                                            maxHeight: '110px',
-                                            objectFit: 'cover',
-                                            marginBottom: '8px',
-                                        }}
-                                        onError={() => refreshSessionItemUrl(s.id)}
-                                    />
+                                {confirmDelete === s.id ? (
+                                    <div style={{ fontSize: '0.75rem' }}>
+                                        <div style={{ marginBottom: '8px', fontWeight: 'bold' }}>Delete this image?</div>
+                                        <div style={{ display: 'flex', gap: '6px' }}>
+                                            <button className="btn btn-primary" style={{ flex: 1, fontSize: '0.72rem', padding: '4px' }} onClick={() => handleDeleteSession(s.id)}>Delete</button>
+                                            <button className="btn" style={{ flex: 1, fontSize: '0.72rem', padding: '4px' }} onClick={() => setConfirmDelete(null)}>Cancel</button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <button
+                                            onClick={() => setConfirmDelete(s.id)}
+                                            style={{ position: 'absolute', top: '6px', right: '6px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.8rem', lineHeight: 1, padding: '2px 4px' }}
+                                            title="Delete"
+                                        >✕</button>
+                                        <div
+                                            style={{ cursor: 'pointer' }}
+                                            onClick={async () => {
+                                                setCurrentSessionId(s.id);
+                                                if (s.url) { setImageUrl(s.url); return; }
+                                                if (s.hasObject && token) {
+                                                    const fresh = await refreshMediaUrl(s.id, token);
+                                                    if (fresh?.url) setImageUrl(fresh.url);
+                                                }
+                                            }}
+                                        >
+                                            {(s.thumbnailUrl || s.url) && (
+                                                <img
+                                                    src={s.thumbnailUrl || s.url || undefined}
+                                                    alt={s.prompt}
+                                                    loading="lazy"
+                                                    decoding="async"
+                                                    style={{ width: '100%', maxHeight: '110px', objectFit: 'cover', marginBottom: '8px' }}
+                                                    onError={() => refreshSessionItemUrl(s.id)}
+                                                />
+                                            )}
+                                            <div style={{ fontSize: '0.75rem', fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                {s.prompt}
+                                            </div>
+                                        </div>
+                                    </>
                                 )}
-                                <div style={{ fontSize: '0.75rem', fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                    {s.prompt}
-                                </div>
                             </div>
                         ))}
                     </div>

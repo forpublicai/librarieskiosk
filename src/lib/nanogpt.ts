@@ -202,8 +202,7 @@ export async function submitVideoGeneration(
                 voice: 'af_bella',
                 duration: String(duration),
                 aspect_ratio: '16:9',
-                cfg_scale: 0.5,
-                sound: false,
+                resolution: '720p',
             }),
         }
     );

@@ -31,12 +31,12 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
     }
 
-    const { prompt, duration = 5 } = parsed;
+    const { prompt, duration = 6 } = parsed;
     if (!prompt || typeof prompt !== 'string') {
         return NextResponse.json({ error: 'Prompt is required' }, { status: 400 });
     }
 
-    const durationSec = Math.max(3, Math.min(15, Number(duration) || 5));
+    const durationSec = Number(duration) === 10 ? 10 : 6;
     const creditCost = calculateCredits('video', durationSec);
 
     try {

@@ -43,7 +43,7 @@ export default function VideoPage() {
     const { user, token, refreshUser, isLoading } = useAuth();
     const router = useRouter();
     const [prompt, setPrompt] = useState('');
-    const [duration, setDuration] = useState(5);
+    const [duration, setDuration] = useState(6);
     const [videoUrl, setVideoUrl] = useState<string | null>(null);
     const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
@@ -51,6 +51,7 @@ export default function VideoPage() {
     const [error, setError] = useState('');
     const [sessions, setSessions] = useState<SessionItem[]>([]);
     const [guideOpen, setGuideOpen] = useState(false);
+    const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
     const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const isGuest = user?.role === 'GUEST';
     const hydratedRef = useRef(false);
@@ -116,6 +117,22 @@ export default function VideoPage() {
         fallbackFilename: 'generated-video.mp4',
         mode: 'video',
     }), [videoUrl, currentSessionId, token]);
+
+    const handleDeleteSession = useCallback(async (id: string) => {
+        if (id.startsWith('guest_')) {
+            setSessions((prev) => prev.filter((s) => s.id !== id));
+            if (currentSessionId === id) { setCurrentSessionId(null); setVideoUrl(null); }
+            setConfirmDelete(null);
+            return;
+        }
+        await fetch(`/api/media-sessions/${id}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        setSessions((prev) => prev.filter((s) => s.id !== id));
+        if (currentSessionId === id) { setCurrentSessionId(null); setVideoUrl(null); }
+        setConfirmDelete(null);
+    }, [token, currentSessionId]);
 
     const pollStatus = async (id: string) => {
         try {
@@ -224,35 +241,53 @@ export default function VideoPage() {
                             <div
                                 key={s.id}
                                 style={{
-                                    cursor: 'pointer',
+                                    position: 'relative',
                                     border: '1px solid var(--border-color)',
                                     padding: '10px',
                                     background: 'var(--bg-card)',
                                     transition: 'background 0.2s',
                                 }}
-                                onClick={async () => {
-                                    setCurrentSessionId(s.id);
-                                    setError('');
-                                    if (s.url) {
-                                        setVideoUrl(s.url);
-                                        return;
-                                    }
-                                    setVideoUrl(null);
-                                    if (!token) return;
-                                    const fresh = await refreshMediaUrl(s.id, token);
-                                    if (fresh?.url) {
-                                        setVideoUrl(fresh.url);
-                                    } else {
-                                        setError('This video is no longer available.');
-                                    }
-                                }}
                             >
-                                <div style={{ fontSize: '0.75rem', fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                    {s.prompt}
-                                </div>
-                                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                                    {new Date(s.createdAt).toLocaleDateString()}
-                                </div>
+                                {confirmDelete === s.id ? (
+                                    <div style={{ fontSize: '0.75rem' }}>
+                                        <div style={{ marginBottom: '8px', fontWeight: 'bold' }}>Delete this video?</div>
+                                        <div style={{ display: 'flex', gap: '6px' }}>
+                                            <button className="btn btn-primary" style={{ flex: 1, fontSize: '0.72rem', padding: '4px' }} onClick={() => handleDeleteSession(s.id)}>Delete</button>
+                                            <button className="btn" style={{ flex: 1, fontSize: '0.72rem', padding: '4px' }} onClick={() => setConfirmDelete(null)}>Cancel</button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <button
+                                            onClick={() => setConfirmDelete(s.id)}
+                                            style={{ position: 'absolute', top: '6px', right: '6px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.8rem', lineHeight: 1, padding: '2px 4px' }}
+                                            title="Delete"
+                                        >✕</button>
+                                        <div
+                                            style={{ cursor: 'pointer' }}
+                                            onClick={async () => {
+                                                setCurrentSessionId(s.id);
+                                                setError('');
+                                                if (s.url) { setVideoUrl(s.url); return; }
+                                                setVideoUrl(null);
+                                                if (!token) return;
+                                                const fresh = await refreshMediaUrl(s.id, token);
+                                                if (fresh?.url) {
+                                                    setVideoUrl(fresh.url);
+                                                } else {
+                                                    setError('This video is no longer available.');
+                                                }
+                                            }}
+                                        >
+                                            <div style={{ fontSize: '0.75rem', fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: '16px' }}>
+                                                {s.prompt}
+                                            </div>
+                                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                                {new Date(s.createdAt).toLocaleDateString()}
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         ))}
                     </div>
@@ -287,26 +322,26 @@ export default function VideoPage() {
                                 <button type="button" className="example-chip" onClick={() => setPrompt('A butterfly landing on a flower')}>A butterfly landing on a flower</button>
                             </div>
 
-                            <div className="duration-slider" data-tour="video-duration">
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <label className="form-label" style={{ margin: 0 }}>Duration: {duration}s</label>
+                            <div data-tour="video-duration">
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                    <label className="form-label" style={{ margin: 0 }}>Duration</label>
                                     <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>
                                         Cost: {creditCost} {creditCost === 1 ? 'credit' : 'credits'}
                                     </span>
                                 </div>
-                                <input
-                                    type="range"
-                                    min={3}
-                                    max={15}
-                                    step={1}
-                                    value={duration}
-                                    onChange={(e) => setDuration(Number(e.target.value))}
-                                    disabled={loading}
-                                    className="slider"
-                                />
-                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                                    <span>3s</span>
-                                    <span>15s</span>
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                    {[6, 10].map((s) => (
+                                        <button
+                                            key={s}
+                                            type="button"
+                                            className={`btn${duration === s ? ' btn-primary' : ''}`}
+                                            onClick={() => setDuration(s)}
+                                            disabled={loading}
+                                            style={{ flex: 1 }}
+                                        >
+                                            {s}s
+                                        </button>
+                                    ))}
                                 </div>
                             </div>
                         </form>

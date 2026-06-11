@@ -19,8 +19,8 @@
     "endpoint": "image"
   },
   "video": {
-    "model": "pruna-ai/p-video/text-to-video",
-    "label": "Pruna AI Video",
+    "model": "grok-imagine-video",
+    "label": "Grok Imagine Video",
     "description": "AI video generation",
     "endpoint": "video"
   },
