@@ -9,6 +9,7 @@ import CoachmarkTour from '@/components/CoachmarkTour';
 import { refreshMediaUrl, downloadMedia } from '@/lib/mediaClient';
 import { useGenerationProgress, formatElapsed } from '@/hooks/useGenerationProgress';
 import { loadGuestState, saveGuestState } from '@/lib/guestSession';
+import modelConfig from '@/config/models.json';
 
 const VIDEO_PROGRESS_MESSAGES = [
     'Submitting to the video model…',
@@ -206,6 +207,9 @@ export default function VideoPage() {
                     Learning Guide
                 </button>
             } />
+            <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', padding: '8px 24px 0', margin: 0, letterSpacing: '0.03em' }}>
+                Currently using: {modelConfig.video.label}
+            </p>
 
             <div className="gen-container">
                 <aside className="gen-sidebar" data-tour="video-sidebar">

@@ -1,13 +1,13 @@
 {
   "chat": {
     "model": "nvidia/nemotron-3-ultra-550b-a55b:thinking",
-    "label": "NVIDIA Nemotron 3 Ultra 550B A55B",
+    "label": "NVIDIA Nemotron 3 Ultra",
     "description": "Conversational AI assistant",
     "endpoint": "chat"
   },
   "coding": {
     "model": "nvidia/nemotron-3-ultra-550b-a55b:thinking",
-    "label": "NVIDIA Nemotron 3 Ultra 550B A55B",
+    "label": "NVIDIA Nemotron 3 Ultra",
     "description": "AI coding assistant with tools",
     "endpoint": "chat",
     "systemPrompt": "You are an expert coding assistant. When the user asks you to write code, always respond with well-structured, commented code. Explain your approach briefly before writing code. If the user asks you to fix or debug code, analyze the issue and provide the corrected version."

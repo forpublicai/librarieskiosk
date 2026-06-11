@@ -9,6 +9,7 @@ import CoachmarkTour from '@/components/CoachmarkTour';
 import { refreshMediaUrl, downloadMedia } from '@/lib/mediaClient';
 import { useGenerationProgress, formatElapsed } from '@/hooks/useGenerationProgress';
 import { loadGuestState, saveGuestState } from '@/lib/guestSession';
+import modelConfig from '@/config/models.json';
 
 const MUSIC_PROGRESS_MESSAGES = [
     'Reading your prompt…',
@@ -182,6 +183,9 @@ export default function MusicPage() {
                     Learning Guide
                 </button>
             } />
+            <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', padding: '8px 24px 0', margin: 0, letterSpacing: '0.03em' }}>
+                Currently using: {modelConfig.music.label}
+            </p>
 
             <div className="gen-container">
                 <aside className="gen-sidebar" data-tour="music-sidebar">

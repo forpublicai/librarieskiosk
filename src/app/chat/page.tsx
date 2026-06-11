@@ -8,6 +8,7 @@ import GuidePanel from '@/components/GuidePanel';
 import CoachmarkTour from '@/components/CoachmarkTour';
 import { formatAssistantMessage } from '@/lib/formatMessage';
 import { loadGuestState, saveGuestState } from '@/lib/guestSession';
+import modelConfig from '@/config/models.json';
 
 interface Message {
     role: 'user' | 'assistant';
@@ -259,6 +260,9 @@ export default function ChatPage() {
                     Learning Guide
                 </button>
             } />
+            <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', padding: '8px 24px 0', margin: 0, letterSpacing: '0.03em' }}>
+                Currently using: {modelConfig.chat.label}
+            </p>
 
             <div className="chat-container">
                 {/* Sidebar */}

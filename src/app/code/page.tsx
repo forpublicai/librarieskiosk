@@ -9,6 +9,7 @@ import CoachmarkTour from '@/components/CoachmarkTour';
 import { formatAssistantMessage } from '@/lib/formatMessage';
 import { useGenerationProgress, formatElapsed } from '@/hooks/useGenerationProgress';
 import { loadGuestState, saveGuestState } from '@/lib/guestSession';
+import modelConfig from '@/config/models.json';
 
 interface Message {
     role: 'user' | 'assistant';
@@ -263,6 +264,9 @@ export default function CodePage() {
                     Learning Guide
                 </button>
             } />
+            <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', padding: '8px 24px 0', margin: 0, letterSpacing: '0.03em' }}>
+                Currently using: {modelConfig.coding.label}
+            </p>
 
             <div className="gen-container">
             <div className="code-container" style={{ gridTemplateColumns: '260px 1fr 1fr', flex: 1 }}>
