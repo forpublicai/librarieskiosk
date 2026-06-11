@@ -1,13 +1,13 @@
 {
   "chat": {
-    "model": "zai-org/glm-5",
-    "label": "GLM-5 Chat",
+    "model": "nvidia/nemotron-3-ultra-550b-a55b:thinking",
+    "label": "NVIDIA Nemotron 3 Ultra 550B A55B",
     "description": "Conversational AI assistant",
     "endpoint": "chat"
   },
   "coding": {
-    "model": "zai-org/glm-5",
-    "label": "GLM-5 Coder",
+    "model": "nvidia/nemotron-3-ultra-550b-a55b:thinking",
+    "label": "NVIDIA Nemotron 3 Ultra 550B A55B",
     "description": "AI coding assistant with tools",
     "endpoint": "chat",
     "systemPrompt": "You are an expert coding assistant. When the user asks you to write code, always respond with well-structured, commented code. Explain your approach briefly before writing code. If the user asks you to fix or debug code, analyze the issue and provide the corrected version."
@@ -19,9 +19,8 @@
     "endpoint": "image"
   },
   "video": {
-    "model": "kling-v30-std",
-    "label": "Kling 3.0 Standard",
-    
+    "model": "pruna-ai/p-video/text-to-video",
+    "label": "Pruna AI Video",
     "description": "AI video generation",
     "endpoint": "video"
   },
