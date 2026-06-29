@@ -14,6 +14,7 @@ import {
 } from './storage';
 import { getMediaReadUrl } from './mediaUrlCache';
 import { encodeImageWithThumbnail } from './imagePipeline';
+import { isNanogptHost } from './nanogpt';
 import type { ImageResult, MusicResult } from './nanogpt';
 
 /**
@@ -354,6 +355,13 @@ export interface FinalizeVideoInput {
     userId: string;
     runId: string;
     providerVideoUrl: string;
+    /**
+     * NanoGPT API key. Forwarded as `x-api-key` ONLY when the provider video URL
+     * is on NanoGPT's own host — grok-imagine-video assets are served from an
+     * authenticated content-proxy endpoint. Omitted for absolute third-party
+     * storage URLs so the key never leaves NanoGPT's domain.
+     */
+    apiKey?: string;
 }
 
 export interface FinalizeVideoResult {
@@ -377,6 +385,7 @@ export async function finalizeVideoUpload({
     userId,
     runId,
     providerVideoUrl,
+    apiKey,
 }: FinalizeVideoInput): Promise<FinalizeVideoResult> {
     const row = await prisma.mediaSession.findFirst({
         where: { providerRunId: runId, userId },
@@ -438,7 +447,13 @@ export async function finalizeVideoUpload({
             mode: 'video',
             extension: 'mp4',
         });
-        const upload = await uploadFromUrl(providerVideoUrl, key, 'video/*');
+        // grok-imagine-video assets live behind NanoGPT's authenticated content
+        // proxy; forward the key only to that host.
+        const fetchOptions =
+            apiKey && isNanogptHost(providerVideoUrl)
+                ? { authHeader: { name: 'x-api-key', value: apiKey } }
+                : {};
+        const upload = await uploadFromUrl(providerVideoUrl, key, 'video/*', {}, fetchOptions);
 
         await prisma.mediaSession.update({
             where: { id: row.id },

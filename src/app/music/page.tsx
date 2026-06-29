@@ -62,6 +62,12 @@ export default function MusicPage() {
 
     const creditCost = Math.round((duration / 10) * 5);
 
+    // Some models (e.g. Google Lyria) ignore the requested duration and always
+    // return a full-length track, so the slider would be misleading. When the
+    // model opts out of duration control we hide it and bill a flat rate (the
+    // fixed `duration` default below).
+    const showDurationSlider = (modelConfig.music as { durationControl?: boolean }).durationControl !== false;
+
     useEffect(() => {
         if (!isLoading && !user) router.push('/');
     }, [user, isLoading, router]);
@@ -298,28 +304,37 @@ export default function MusicPage() {
                                 </div>
                             )}
 
-                            <div className="duration-slider">
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <label className="form-label" style={{ margin: 0 }}>Duration: {duration}s</label>
+                            {showDurationSlider ? (
+                                <div className="duration-slider">
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <label className="form-label" style={{ margin: 0 }}>Duration: {duration}s</label>
+                                        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>
+                                            Cost: {creditCost} {creditCost === 1 ? 'credit' : 'credits'}
+                                        </span>
+                                    </div>
+                                    <input
+                                        type="range"
+                                        min={10}
+                                        max={300}
+                                        step={1}
+                                        value={duration}
+                                        onChange={(e) => setDuration(Number(e.target.value))}
+                                        disabled={loading}
+                                        className="slider"
+                                    />
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                                        <span>10s</span>
+                                        <span>5m</span>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="duration-slider" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Generates a full-length track</span>
                                     <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>
                                         Cost: {creditCost} {creditCost === 1 ? 'credit' : 'credits'}
                                     </span>
                                 </div>
-                                <input
-                                    type="range"
-                                    min={10}
-                                    max={300}
-                                    step={1}
-                                    value={duration}
-                                    onChange={(e) => setDuration(Number(e.target.value))}
-                                    disabled={loading}
-                                    className="slider"
-                                />
-                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                                    <span>10s</span>
-                                    <span>5m</span>
-                                </div>
-                            </div>
+                            )}
 
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
                                 <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem' }} data-tour="music-instrumental">

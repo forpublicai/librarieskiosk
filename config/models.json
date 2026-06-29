@@ -25,9 +25,10 @@
     "endpoint": "video"
   },
   "music": {
-    "model": "Elevenlabs-Music-V1",
-    "label": "Elevenlabs Music",
+    "model": "google/lyria-3-pro/music",
+    "label": "Google Lyria 3 Pro",
     "description": "AI music generation",
-    "endpoint": "music"
+    "endpoint": "music",
+    "durationControl": false
   }
 }

@@ -5,7 +5,40 @@
  * The API key is server-side only — never exposed to the browser.
  */
 
-const NANOGPT_BASE_URL = 'https://nano-gpt.com';
+export const NANOGPT_BASE_URL = 'https://nano-gpt.com';
+export const NANOGPT_HOST = 'nano-gpt.com';
+
+/**
+ * Some video models (notably grok-imagine-video) report the finished asset as a
+ * NanoGPT-relative content path, e.g.
+ *   /api/generate-video/content?model=...&runId=...&variant=video
+ * rather than an absolute storage URL. A relative path makes `new URL()` /
+ * `fetch()` throw `Invalid URL`, which previously killed the R2 finalize step
+ * AFTER the provider had already billed (credits burned, no playable video).
+ *
+ * Resolve relative paths against the API base. Absolute http(s) URLs (returned
+ * by models like veo/kling) pass through unchanged.
+ */
+export function resolveNanogptAssetUrl(url: string | null | undefined): string | undefined {
+    if (!url) return undefined;
+    const trimmed = url.trim();
+    if (!trimmed) return undefined;
+    if (/^https?:\/\//i.test(trimmed)) return trimmed;
+    try {
+        return new URL(trimmed, `${NANOGPT_BASE_URL}/`).toString();
+    } catch {
+        return undefined;
+    }
+}
+
+/** True when `url` is hosted on NanoGPT's own domain (auth-bearing content proxy). */
+export function isNanogptHost(url: string): boolean {
+    try {
+        return new URL(url).hostname.toLowerCase().replace(/\.$/, '') === NANOGPT_HOST;
+    } catch {
+        return false;
+    }
+}
 
 /**
  * Resolve the NanoGPT API key for a given library.
@@ -261,9 +294,13 @@ export async function pollVideoStatus(
     const result = await response.json();
     const data = result.data || result;
 
+    const rawVideoUrl = data.output?.video?.url || data.videoUrl || result.videoUrl;
+
     return {
         status: data.status || result.status || 'UNKNOWN',
-        videoUrl: data.output?.video?.url || data.videoUrl || result.videoUrl,
+        // Normalize provider-relative content paths to absolute URLs so the R2
+        // finalize step (and the client fallback) can actually fetch the asset.
+        videoUrl: resolveNanogptAssetUrl(rawVideoUrl),
         error: data.error || data.userFriendlyError,
         details: data.details,
     };
@@ -285,13 +322,22 @@ interface TtsStatusParams {
     cost?: number;
     paymentSource?: string;
     isApiRequest?: boolean;
+    /**
+     * Total wall-clock budget for polling. The loop stops and throws a timeout
+     * BEFORE this elapses so the caller's catch (e.g. the music route's credit
+     * refund) runs instead of the serverless platform killing the request
+     * mid-poll — which would leave credits deducted with no refund.
+     */
+    budgetMs?: number;
 }
 
-async function pollTtsStatus(params: TtsStatusParams): Promise<MusicResult> {
-    const maxAttempts = 40;
-    const delayMs = 3000;
+const DEFAULT_TTS_POLL_BUDGET_MS = 120_000;
 
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+async function pollTtsStatus(params: TtsStatusParams): Promise<MusicResult> {
+    const delayMs = 3000;
+    const deadline = Date.now() + (params.budgetMs ?? DEFAULT_TTS_POLL_BUDGET_MS);
+
+    while (true) {
         const search = new URLSearchParams({
             runId: params.runId,
             model: params.model,
@@ -335,6 +381,8 @@ async function pollTtsStatus(params: TtsStatusParams): Promise<MusicResult> {
             throw new Error(data.error || data.userFriendlyError || 'Music generation failed');
         }
 
+        // Make one final check then stop if the next sleep would exceed the budget.
+        if (Date.now() + delayMs >= deadline) break;
         await sleep(delayMs);
     }
 
@@ -346,7 +394,8 @@ export async function generateMusic(
     lyrics: string,
     model: string,
     apiKey: string,
-    duration: number = 10
+    duration: number = 10,
+    pollBudgetMs?: number
 ): Promise<MusicResult> {
     const promptText = (prompt || '').trim();
     const lyricsText = (lyrics || '').trim();
@@ -407,6 +456,7 @@ export async function generateMusic(
                 cost: typeof data.cost === 'number' ? data.cost : undefined,
                 paymentSource: typeof data.paymentSource === 'string' ? data.paymentSource : undefined,
                 isApiRequest: true,
+                budgetMs: pollBudgetMs,
             });
         }
 

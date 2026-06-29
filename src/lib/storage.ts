@@ -311,9 +311,10 @@ export async function uploadFromUrl(
     sourceUrl: string,
     key: string,
     expectedMimeGlob?: string,
-    options: UploadOptions = {}
+    options: UploadOptions = {},
+    fetchOptions: FetchBytesOptions = {}
 ): Promise<UploadResult> {
-    const { buffer, contentType } = await safeFetchBuffer(sourceUrl, expectedMimeGlob);
+    const { buffer, contentType } = await safeFetchBuffer(sourceUrl, expectedMimeGlob, fetchOptions);
     return uploadBuffer(key, buffer, contentType, options);
 }
 
@@ -415,6 +416,14 @@ const MAX_REDIRECT_HOPS = 1;
 
 export interface FetchBytesOptions {
     allowedHosts?: Set<string>;
+    /**
+     * Optional auth header attached ONLY to the first request, to the original
+     * caller-validated host. It is deliberately dropped on any redirect hop so a
+     * provider API key never leaks to a CDN/storage host the upstream redirects
+     * to. Used to fetch NanoGPT's authenticated content-proxy URLs (x-api-key)
+     * for grok-imagine-video assets before uploading them to R2.
+     */
+    authHeader?: { name: string; value: string };
 }
 
 export class DownloadHostNotAllowedError extends Error {
@@ -526,16 +535,23 @@ async function safeFetchBuffer(
     // body read for a successful response happens outside the retry block to
     // avoid double-reading. We promote retryable HTTP statuses (5xx/429/408)
     // to thrown RetryableHttpError so withRetry can recognise them.
+    // Do NOT forward cookies. Forward an explicit auth header only on the very
+    // first hop (redirectHops === 0) to the caller-validated host — never across
+    // a redirect, so provider keys can't leak to a redirect target.
+    const requestHeaders: Record<string, string> = {
+        Accept: expectedMimeGlob || '*/*',
+        'User-Agent': 'publicai-library-kiosk/1.0',
+    };
+    if (redirectHops === 0 && options.authHeader?.value) {
+        requestHeaders[options.authHeader.name] = options.authHeader.value;
+    }
+
     const response = await withRetry(
         async () => {
             const r = await fetch(parsed.toString(), {
                 method: 'GET',
                 redirect: 'manual',
-                // Do NOT forward auth or cookies
-                headers: {
-                    Accept: expectedMimeGlob || '*/*',
-                    'User-Agent': 'publicai-library-kiosk/1.0',
-                },
+                headers: requestHeaders,
             });
             if (r.status >= 500 || r.status === 429 || r.status === 408) {
                 // Drain the body so the socket can be returned to the pool.
