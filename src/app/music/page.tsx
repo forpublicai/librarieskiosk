@@ -9,6 +9,7 @@ import CoachmarkTour from '@/components/CoachmarkTour';
 import { refreshMediaUrl, downloadMedia } from '@/lib/mediaClient';
 import { useGenerationProgress, formatElapsed } from '@/hooks/useGenerationProgress';
 import { loadGuestState, saveGuestState } from '@/lib/guestSession';
+import modelConfig from '@/config/models.json';
 
 const MUSIC_PROGRESS_MESSAGES = [
     'Reading your prompt…',
@@ -50,6 +51,7 @@ export default function MusicPage() {
     const [error, setError] = useState('');
     const [sessions, setSessions] = useState<SessionItem[]>([]);
     const [guideOpen, setGuideOpen] = useState(false);
+    const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
     const isGuest = user?.role === 'GUEST';
     const hydratedRef = useRef(false);
     const progress = useGenerationProgress({
@@ -59,6 +61,12 @@ export default function MusicPage() {
     });
 
     const creditCost = Math.round((duration / 10) * 5);
+
+    // Some models (e.g. Google Lyria) ignore the requested duration and always
+    // return a full-length track, so the slider would be misleading. When the
+    // model opts out of duration control we hide it and bill a flat rate (the
+    // fixed `duration` default below).
+    const showDurationSlider = (modelConfig.music as { durationControl?: boolean }).durationControl !== false;
 
     useEffect(() => {
         if (!isLoading && !user) router.push('/');
@@ -110,6 +118,22 @@ export default function MusicPage() {
         fallbackFilename: 'generated-track.mp3',
         mode: 'music',
     }), [audioUrl, currentSessionId, token]);
+
+    const handleDeleteSession = useCallback(async (id: string) => {
+        if (id.startsWith('guest_')) {
+            setSessions((prev) => prev.filter((s) => s.id !== id));
+            if (currentSessionId === id) { setCurrentSessionId(null); setAudioUrl(null); }
+            setConfirmDelete(null);
+            return;
+        }
+        await fetch(`/api/media-sessions/${id}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        setSessions((prev) => prev.filter((s) => s.id !== id));
+        if (currentSessionId === id) { setCurrentSessionId(null); setAudioUrl(null); }
+        setConfirmDelete(null);
+    }, [token, currentSessionId]);
 
     const handleGenerate = async (e: FormEvent) => {
         e.preventDefault();
@@ -182,6 +206,9 @@ export default function MusicPage() {
                     Learning Guide
                 </button>
             } />
+            <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', padding: '8px 24px 0', margin: 0, letterSpacing: '0.03em' }}>
+                Currently using: {modelConfig.music.label}
+            </p>
 
             <div className="gen-container">
                 <aside className="gen-sidebar" data-tour="music-sidebar">
@@ -196,30 +223,48 @@ export default function MusicPage() {
                             <div
                                 key={s.id}
                                 style={{
-                                    cursor: 'pointer',
+                                    position: 'relative',
                                     border: '1px solid var(--border-color)',
                                     padding: '10px',
                                     background: 'var(--bg-card)',
                                     transition: 'background 0.2s',
                                 }}
-                                onClick={async () => {
-                                    setCurrentSessionId(s.id);
-                                    if (s.url) {
-                                        setAudioUrl(s.url);
-                                        return;
-                                    }
-                                    if (s.hasObject && token) {
-                                        const fresh = await refreshMediaUrl(s.id, token);
-                                        if (fresh?.url) setAudioUrl(fresh.url);
-                                    }
-                                }}
                             >
-                                <div style={{ fontSize: '0.75rem', fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                    {s.prompt}
-                                </div>
-                                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                                    {new Date(s.createdAt).toLocaleDateString()}
-                                </div>
+                                {confirmDelete === s.id ? (
+                                    <div style={{ fontSize: '0.75rem' }}>
+                                        <div style={{ marginBottom: '8px', fontWeight: 'bold' }}>Delete this track?</div>
+                                        <div style={{ display: 'flex', gap: '6px' }}>
+                                            <button className="btn btn-primary" style={{ flex: 1, fontSize: '0.72rem', padding: '4px' }} onClick={() => handleDeleteSession(s.id)}>Delete</button>
+                                            <button className="btn" style={{ flex: 1, fontSize: '0.72rem', padding: '4px' }} onClick={() => setConfirmDelete(null)}>Cancel</button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <button
+                                            onClick={() => setConfirmDelete(s.id)}
+                                            style={{ position: 'absolute', top: '6px', right: '6px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.8rem', lineHeight: 1, padding: '2px 4px' }}
+                                            title="Delete"
+                                        >✕</button>
+                                        <div
+                                            style={{ cursor: 'pointer' }}
+                                            onClick={async () => {
+                                                setCurrentSessionId(s.id);
+                                                if (s.url) { setAudioUrl(s.url); return; }
+                                                if (s.hasObject && token) {
+                                                    const fresh = await refreshMediaUrl(s.id, token);
+                                                    if (fresh?.url) setAudioUrl(fresh.url);
+                                                }
+                                            }}
+                                        >
+                                            <div style={{ fontSize: '0.75rem', fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: '16px' }}>
+                                                {s.prompt}
+                                            </div>
+                                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                                {new Date(s.createdAt).toLocaleDateString()}
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         ))}
                     </div>
@@ -259,28 +304,37 @@ export default function MusicPage() {
                                 </div>
                             )}
 
-                            <div className="duration-slider">
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <label className="form-label" style={{ margin: 0 }}>Duration: {duration}s</label>
+                            {showDurationSlider ? (
+                                <div className="duration-slider">
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <label className="form-label" style={{ margin: 0 }}>Duration: {duration}s</label>
+                                        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>
+                                            Cost: {creditCost} {creditCost === 1 ? 'credit' : 'credits'}
+                                        </span>
+                                    </div>
+                                    <input
+                                        type="range"
+                                        min={10}
+                                        max={300}
+                                        step={1}
+                                        value={duration}
+                                        onChange={(e) => setDuration(Number(e.target.value))}
+                                        disabled={loading}
+                                        className="slider"
+                                    />
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                                        <span>10s</span>
+                                        <span>5m</span>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="duration-slider" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Generates a full-length track</span>
                                     <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>
                                         Cost: {creditCost} {creditCost === 1 ? 'credit' : 'credits'}
                                     </span>
                                 </div>
-                                <input
-                                    type="range"
-                                    min={10}
-                                    max={300}
-                                    step={1}
-                                    value={duration}
-                                    onChange={(e) => setDuration(Number(e.target.value))}
-                                    disabled={loading}
-                                    className="slider"
-                                />
-                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                                    <span>10s</span>
-                                    <span>5m</span>
-                                </div>
-                            </div>
+                            )}
 
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
                                 <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem' }} data-tour="music-instrumental">

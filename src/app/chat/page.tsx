@@ -8,6 +8,7 @@ import GuidePanel from '@/components/GuidePanel';
 import CoachmarkTour from '@/components/CoachmarkTour';
 import { formatAssistantMessage } from '@/lib/formatMessage';
 import { loadGuestState, saveGuestState } from '@/lib/guestSession';
+import modelConfig from '@/config/models.json';
 
 interface Message {
     role: 'user' | 'assistant';
@@ -200,33 +201,62 @@ export default function ChatPage() {
 
             const decoder = new TextDecoder();
             let assistantContent = '';
+            // SSE events can be split across network chunks; buffer until we see a
+            // newline so a `data:` line straddling a chunk boundary isn't dropped
+            // (which previously left the assistant reply blank).
+            let sseBuffer = '';
+            let streamDone = false;
             setMessages((prev) => [...prev, { role: 'assistant', content: '' }]);
 
-            while (true) {
+            // Parse one SSE line. `.trim()` also strips the trailing \r of CRLF
+            // line endings. Returns true once the terminating [DONE] is seen.
+            const processSseLine = (rawLine: string): boolean => {
+                const line = rawLine.trim();
+                if (!line.startsWith('data:')) return false;
+                const data = line.slice(5).trim();
+                if (data === '[DONE]') return true;
+                try {
+                    const parsed = JSON.parse(data);
+                    const content = parsed.choices?.[0]?.delta?.content;
+                    if (content) {
+                        assistantContent += content;
+                        setMessages((prev) => {
+                            const updated = [...prev];
+                            updated[updated.length - 1] = { role: 'assistant', content: assistantContent };
+                            return updated;
+                        });
+                    }
+                } catch { /* incomplete or non-JSON data line — ignore */ }
+                return false;
+            };
+
+            while (!streamDone) {
                 const { done, value } = await reader.read();
                 if (done) break;
-                const chunk = decoder.decode(value, { stream: true });
-                for (const line of chunk.split('\n')) {
-                    if (line.startsWith('data: ')) {
-                        const data = line.slice(6);
-                        if (data === '[DONE]') break;
-                        try {
-                            const parsed = JSON.parse(data);
-                            const content = parsed.choices?.[0]?.delta?.content;
-                            if (content) {
-                                assistantContent += content;
-                                setMessages((prev) => {
-                                    const updated = [...prev];
-                                    updated[updated.length - 1] = { role: 'assistant', content: assistantContent };
-                                    return updated;
-                                });
-                            }
-                        } catch { }
-                    }
+                sseBuffer += decoder.decode(value, { stream: true });
+
+                let newlineIdx: number;
+                while ((newlineIdx = sseBuffer.indexOf('\n')) !== -1) {
+                    const line = sseBuffer.slice(0, newlineIdx);
+                    sseBuffer = sseBuffer.slice(newlineIdx + 1);
+                    if (processSseLine(line)) { streamDone = true; break; }
                 }
             }
 
-            const finalMessages = [...newMessages, { role: 'assistant' as const, content: assistantContent }];
+            // Flush the decoder and process a final line that arrived without a
+            // trailing newline, so a valid one-line stream isn't lost to the
+            // blank-response fallback below.
+            if (!streamDone) {
+                sseBuffer += decoder.decode();
+                if (sseBuffer.trim().length > 0) processSseLine(sseBuffer);
+            }
+
+            // Surface a clear message instead of a blank bubble when the model
+            // returns no text (empty stream / reasoning-only / upstream cutoff).
+            const finalContent = assistantContent.trim().length > 0
+                ? assistantContent
+                : 'The assistant didn’t return a response. Please try sending your message again.';
+            const finalMessages = [...newMessages, { role: 'assistant' as const, content: finalContent }];
             setMessages(finalMessages);
             scheduleSave(finalMessages, activeConvId);
             await refreshUser();
@@ -259,6 +289,9 @@ export default function ChatPage() {
                     Learning Guide
                 </button>
             } />
+            <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', padding: '8px 24px 0', margin: 0, letterSpacing: '0.03em' }}>
+                Currently using: {modelConfig.chat.label}
+            </p>
 
             <div className="chat-container">
                 {/* Sidebar */}

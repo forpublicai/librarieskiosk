@@ -81,4 +81,33 @@ describe('storage download helpers', () => {
         ).rejects.toBeInstanceOf(DownloadHostNotAllowedError);
         expect(fetchMock).toHaveBeenCalledTimes(1);
     });
+
+    it('forwards the auth header only on the first hop and drops it across redirects', async () => {
+        const fetchMock = vi.mocked(fetch);
+        fetchMock
+            .mockResolvedValueOnce(new Response(null, {
+                status: 302,
+                headers: { location: 'https://cdn.example/video.mp4' },
+            }))
+            .mockResolvedValueOnce(new Response(new Uint8Array([1, 2, 3]), {
+                status: 200,
+                headers: { 'content-type': 'video/mp4' },
+            }));
+
+        const result = await fetchBytesFromUrl(
+            'https://nano-gpt.com/api/generate-video/content?runId=abc&variant=video',
+            'video/*',
+            { authHeader: { name: 'x-api-key', value: 'secret-key' } }
+        );
+
+        expect(result.contentType).toBe('video/mp4');
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+
+        const firstHeaders = fetchMock.mock.calls[0][1]?.headers as Record<string, string>;
+        expect(firstHeaders['x-api-key']).toBe('secret-key');
+
+        // The key must never follow the redirect to the storage/CDN host.
+        const secondHeaders = fetchMock.mock.calls[1][1]?.headers as Record<string, string>;
+        expect(secondHeaders['x-api-key']).toBeUndefined();
+    });
 });

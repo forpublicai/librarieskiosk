@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { requireAuth, isAuthResult } from '@/lib/auth';
+import { getNanogptKey, isNanogptHost } from '@/lib/nanogpt';
 import { getDownloadProxyAllowedHosts, DownloadProxyConfigError } from '@/lib/env';
 import {
     generateSignedGetUrl,
@@ -89,8 +90,14 @@ export async function GET(
     }
 
     try {
+        // NanoGPT's content-proxy URLs (e.g. grok-imagine-video) require the
+        // x-api-key; forward it only when the fallback host is NanoGPT's own.
+        const authHeader = isNanogptHost(fallbackUrl)
+            ? { name: 'x-api-key', value: getNanogptKey(authResult.user.library) }
+            : undefined;
         const { buffer, contentType } = await fetchBytesFromUrl(fallbackUrl, mimeGlobForMode(mode), {
             allowedHosts: getDownloadProxyAllowedHosts(),
+            authHeader,
         });
         return new NextResponse(new Uint8Array(buffer), {
             headers: {

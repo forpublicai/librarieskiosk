@@ -42,6 +42,7 @@ export async function GET(request: NextRequest) {
                 userId: authResult.user.userId,
                 runId,
                 providerVideoUrl: status.videoUrl!,
+                apiKey: getNanogptKey(authResult.user.library),
             });
         }
 
