@@ -15,6 +15,7 @@ const LIBRARIES = [
     'Sussex County, NJ',
     'Osterville, MA',
     'Salt Lake City, UT',
+    'Grapevine, TX',
 ];
 
 export default function SignupPage() {
