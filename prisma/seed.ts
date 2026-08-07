@@ -68,6 +68,20 @@ async function main() {
     });
     console.log(`Library created/found: ${grapevine.name}`);
 
+    const jessamine = await prisma.library.upsert({
+        where: { name: 'Jessamine County, KY' },
+        update: {},
+        create: { name: 'Jessamine County, KY', weeklyPool: 1750, poolRemaining: 1750 },
+    });
+    console.log(`Library created/found: ${jessamine.name}`);
+
+    const adams = await prisma.library.upsert({
+        where: { name: 'Adams Public Library, IN' },
+        update: {},
+        create: { name: 'Adams Public Library, IN', weeklyPool: 1750, poolRemaining: 1750 },
+    });
+    console.log(`Library created/found: ${adams.name}`);
+
     // Create admin user for Pottsboro
     const admin = await prisma.user.upsert({
         where: { username: 'admin_pottsboro' },
@@ -173,6 +187,36 @@ async function main() {
     });
     console.log(`Grapevine admin created/found: ${grapevineAdmin.username} (${grapevineAdmin.id})`);
 
+    // Create admin user for Adams Public Library
+    const adamsAdmin = await prisma.user.upsert({
+        where: { username: 'admin_adams' },
+        update: {},
+        create: {
+            username: 'admin_adams',
+            passwordHash: hashSync(adminPassword, 10),
+            library: 'Adams Public Library, IN',
+            role: 'ADMIN',
+            status: 'APPROVED',
+            credits: 1750,
+        },
+    });
+    console.log(`Adams admin created/found: ${adamsAdmin.username} (${adamsAdmin.id})`);
+
+    // Create admin user for Jessamine County
+    const jessamineAdmin = await prisma.user.upsert({
+        where: { username: 'admin_jessamine' },
+        update: {},
+        create: {
+            username: 'admin_jessamine',
+            passwordHash: hashSync(adminPassword, 10),
+            library: 'Jessamine County, KY',
+            role: 'ADMIN',
+            status: 'APPROVED',
+            credits: 1750,
+        },
+    });
+    console.log(`Jessamine admin created/found: ${jessamineAdmin.username} (${jessamineAdmin.id})`);
+
     // Super admin also acts as the admin for the "Public AI" library
     const superAdmin = await prisma.user.upsert({
         where: { username: 'superadmin' },
@@ -225,7 +269,7 @@ async function main() {
     // is the actual library name so `getNanogptKey(user.library)` automatically
     // routes to the per-library NanoGPT key, and their credit pool is isolated
     // from every other library.
-    const libraries = [pottsboro, salem, publicAi, tremonton, sussex, osterville, saltLakeCity, grapevine];
+    const libraries = [pottsboro, salem, publicAi, tremonton, sussex, osterville, saltLakeCity, grapevine, adams, jessamine];
     for (const lib of libraries) {
         const username = guestUsernameForLibrary(lib.name);
         const libGuest = await prisma.user.upsert({

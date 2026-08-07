@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
 
         // Validate library
         const trimmedLibrary = library.trim();
-        const ALLOWED_LIBRARIES = ['Pottsboro, TX', 'Salem City, UT', 'Public AI', 'Tremonton, UT', 'Sussex County, NJ', 'Osterville, MA', 'Salt Lake City, UT', 'Grapevine, TX'];
+        const ALLOWED_LIBRARIES = ['Pottsboro, TX', 'Salem City, UT', 'Public AI', 'Tremonton, UT', 'Sussex County, NJ', 'Osterville, MA', 'Salt Lake City, UT', 'Grapevine, TX', 'Adams Public Library, IN', 'Jessamine County, KY'];
         if (!ALLOWED_LIBRARIES.includes(trimmedLibrary)) {
             return NextResponse.json(
                 { error: 'Please select a valid library' },

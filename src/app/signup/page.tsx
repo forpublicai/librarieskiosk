@@ -16,6 +16,8 @@ const LIBRARIES = [
     'Osterville, MA',
     'Salt Lake City, UT',
     'Grapevine, TX',
+    'Adams Public Library, IN',
+    'Jessamine County, KY',
 ];
 
 export default function SignupPage() {
