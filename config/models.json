@@ -19,8 +19,8 @@
     "endpoint": "image"
   },
   "video": {
-    "model": "grok-imagine-video",
-    "label": "Grok Imagine Video",
+    "model": "ltx-2-19b",
+    "label": "LTX-2 19B",
     "description": "AI video generation",
     "endpoint": "video"
   },
