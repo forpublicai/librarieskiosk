@@ -62,7 +62,7 @@ Weekly credit renewal is the one scheduled app maintenance path: Vercel cron cal
 
 ### 2.2 Two access gates — they are independent
 
-1. **Kiosk-device gate** — `middleware.ts` checks the `kiosk_access` cookie or `?access=<KIOSK_ACCESS_TOKEN>`. Anyone outside the kiosk gets a static 403 HTML page. This is per-device, not per-user. If `KIOSK_ACCESS_TOKEN` is unset, dev mode is enabled and everyone is allowed in.
+1. **Kiosk-device gate** — `middleware.ts` checks the `kiosk_access` cookie or `?access=<KIOSK_ACCESS_TOKEN>`. The cookie is an 8h HS256 JWT signed with a key derived from `KIOSK_ACCESS_TOKEN` (`lib/kioskAccess.ts`), so it cannot be forged and rotating the token revokes every kiosk cookie. Anyone outside the kiosk gets a static 403 HTML page. This is per-device, not per-user. If `KIOSK_ACCESS_TOKEN` is unset, dev mode is enabled and everyone is allowed in.
 2. **User-account gate** — JWT bearer token in `Authorization: Bearer ...`, verified by `lib/auth.ts`. PATRONs additionally require a live `ActiveSession` row whose `lastActivity` is within `SESSION_IDLE_MS` (10 minutes).
 
 Both gates must pass on every API call. Guests skip the second gate's idle check.
@@ -154,7 +154,7 @@ Notable fields and invariants:
 ### 5.1 First kiosk visit
 
 1. Browser opens `https://host/l/pottsboro_tx?access=TOKEN`.
-2. `middleware.ts` matches `?access`, sets `kiosk_access` cookie (8h), redirects to `/l/pottsboro_tx`.
+2. `middleware.ts` matches `?access`, sets a signed `kiosk_access` JWT cookie (8h), redirects to `/l/pottsboro_tx`.
 3. `/l/[slug]/route.ts` validates the slug against the `Library` table, sets `kiosk_library=pottsboro_tx` cookie (8h), redirects to `/`.
 4. Landing page renders `<LoginPage>`; user clicks "Continue as Guest".
 5. `POST /api/auth/guest` reads the cookie, finds `guest_pottsboro_tx`, signs an 8h JWT.
