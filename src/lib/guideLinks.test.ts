@@ -11,9 +11,18 @@ describe('guide link splitting', () => {
         ]);
     });
 
-    it('does not link bare domains or AI-themed phrases', () => {
-        expect(splitGuideTextLinks('Try factcheck.org, not social.ai as plain text.')).toEqual([
-            { type: 'text', text: 'Try factcheck.org, not social.ai as plain text.' },
+    it('links bare .com/.org/.net/.edu/.gov domains with an https href', () => {
+        expect(splitGuideTextLinks('Try factcheck.org, or usa.gov/help.')).toEqual([
+            { type: 'text', text: 'Try ' },
+            { type: 'link', text: 'factcheck.org', href: 'https://factcheck.org' },
+            { type: 'text', text: ', or ' },
+            { type: 'link', text: 'usa.gov/help.', href: 'https://usa.gov/help.' },
+        ]);
+    });
+
+    it('does not link other bare domains or AI-themed phrases', () => {
+        expect(splitGuideTextLinks('Not social.ai or chat.io as plain text.')).toEqual([
+            { type: 'text', text: 'Not social.ai or chat.io as plain text.' },
         ]);
     });
 });
