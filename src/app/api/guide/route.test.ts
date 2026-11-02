@@ -29,7 +29,7 @@ vi.mock('@/lib/nanogpt', () => ({
 }));
 vi.mock('@/lib/credits', () => ({ logUsage }));
 
-import { MAX_LIVE_EXCHANGES_PER_SESSION } from '@/lib/guideConstants';
+import { MAX_INPUT_WORDS, MAX_LIVE_EXCHANGES_PER_SESSION } from '@/lib/guideConstants';
 import { POST } from './route';
 
 function guideRequest(body: unknown) {
@@ -141,7 +141,7 @@ describe('POST /api/guide', () => {
     });
 
     it('rejects overlong questions before reserving quota', async () => {
-        const question = Array.from({ length: 26 }, (_, i) => `word${i}`).join(' ');
+        const question = Array.from({ length: MAX_INPUT_WORDS + 1 }, (_, i) => `word${i}`).join(' ');
         const response = await POST(guideRequest({
             question,
             tool: 'image',
