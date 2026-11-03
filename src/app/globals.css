@@ -1758,7 +1758,14 @@ a.lk-btn--danger { color: var(--danger); }
 
 /* ---------- Admin: stats, hairline rows, status, dialog, charts ---------- */
 .lk-page--wide { max-width: 1280px; }
-.lk-table__name { text-align: left; font-weight: 700; white-space: nowrap; }
+/* Wide tables scroll inside .lk-table-wrap instead of widening the page.
+   position: relative keeps screen-reader-only labels inside the scroller. */
+.lk-page, .lk-page > *, .lk-page section { min-width: 0; }
+.lk-table-wrap { position: relative; }
+.lk-table tbody th.lk-table__name {
+  text-align: left; white-space: nowrap; padding: var(--space-3);
+  font: 700 17px/24px var(--font-sans); color: var(--ink); border-bottom: 1px solid var(--border);
+}
 .lk-table__sub { display: block; font: 400 15px/22px var(--font-sans); color: var(--ink-muted); }
 .lk-status { display: inline-flex; align-items: center; gap: var(--space-2); font-weight: 700; white-space: nowrap; }
 .lk-status--success .lk-icon { color: var(--success); }

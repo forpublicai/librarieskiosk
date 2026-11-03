@@ -408,7 +408,7 @@ function SessionCapEditor({
     const dirty = draft !== String(value);
 
     return (
-        <form className="lk-cap" onSubmit={(e) => { e.preventDefault(); save(); }}>
+        <form className="lk-cap" noValidate onSubmit={(e) => { e.preventDefault(); save(); }}>
             <label className="lk-sr" htmlFor={id}>Kiosks at once for {library}</label>
             <input
                 id={id}
