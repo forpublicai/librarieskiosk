@@ -1,0 +1,59 @@
+{
+  "v": 3,
+  "assetGroups": {
+    "Logos": {
+      "files": {
+        "lib-logo.png": {
+          "blob": "94aadda89d397e091a23d6a22e48edad",
+          "name": "lib-logo.png",
+          "size": 35444,
+          "type": "image/png"
+        },
+        "logo.svg": {
+          "blob": "4aa0921299c599770d95d20e70462a30",
+          "name": "logo.svg",
+          "size": 3887,
+          "type": "image/svg+xml"
+        }
+      },
+      "name": "Logos",
+      "order": [
+        "lib-logo.png",
+        "logo.svg"
+      ],
+      "tile": "l"
+    }
+  },
+  "blobs": {},
+  "createdOnFiles": {
+    "at": "2026-11-02T20:38:50Z",
+    "v": 1
+  },
+  "docs": {
+    "readme": "project/README.md",
+    "sections": []
+  },
+  "groups": [
+    "Logos"
+  ],
+  "lastChange": {
+    "by": "Mohsin Y. K. Yousufi",
+    "at": "2026-11-03T20:12:37Z",
+    "via": "Claude Code",
+    "note": "Gradients removed: no Backdrop, solid red Chat hero tile."
+  },
+  "layout": "files",
+  "libraries": [
+    {
+      "name": "react",
+      "version": "18"
+    },
+    {
+      "name": "react-dom",
+      "version": "18"
+    }
+  ],
+  "namespace": "Kiosk",
+  "sections": {},
+  "title": "Libraries Kiosk"
+}

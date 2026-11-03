@@ -1,0 +1,13 @@
+<!-- @dsCard group="Feedback" height=80 -->
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>CreditBadge preview</title></head>
+<body style="margin:0">
+<div id="root" class="lk-app" style="padding:16px"></div>
+<script>
+  var K = window.Kiosk, h = React.createElement;
+  
+  ReactDOM.createRoot(document.getElementById('root')).render(h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' } }, h(K.CreditBadge, { credits: 42, renewsAt: 'Monday at 12:00 AM' }), h(K.CreditBadge, { credits: 3, renewsAt: 'Monday at 12:00 AM' })));
+</script>
+</body>
+</html>

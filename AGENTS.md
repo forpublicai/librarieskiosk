@@ -213,5 +213,6 @@ Key rule: **decision-complete plans only**. The plan must be self-contained enou
 - Cross-cutting engineering wisdom → [LEARNINGS.md](LEARNINGS.md).
 - How a piece of the kiosk fits together → [ai/ARCHITECTURE.md](ai/ARCHITECTURE.md).
 - Visual / UX intent → [ai/DESIGN.md](ai/DESIGN.md).
+- New visual design system (locked, not yet built into the app) → [design-system/README.md](design-system/README.md).
 - Adding a library → [docs/adding-a-library.md](docs/adding-a-library.md).
 - R2 background → [docs/r2-integration-plan.md](docs/r2-integration-plan.md), [docs/r2-optimization.md](docs/r2-optimization.md).

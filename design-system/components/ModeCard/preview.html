@@ -1,0 +1,13 @@
+<!-- @dsCard group="Navigation" height=700 -->
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>ModeCard preview</title></head>
+<body style="margin:0">
+<div id="root" class="lk-app" style="padding:16px"></div>
+<script>
+  var K = window.Kiosk, h = React.createElement;
+  
+  ReactDOM.createRoot(document.getElementById('root')).render(h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16 } }, h('div', { style: { gridColumn: '1 / -1' } }, h(K.ModeCard, { hero: true, tool: 'chat', title: 'Chat', description: 'Ask a question, get help writing, or plan something.', cost: 'Free' })), h(K.ModeCard, { tool: 'image', title: 'Image', description: 'Describe a picture. The AI draws it.', cost: '1 credit' }), h(K.ModeCard, { tool: 'music', title: 'Music', description: 'Make a short song from a few words.', cost: '5 credits per 10 sec' }), h(K.ModeCard, { tool: 'video', title: 'Video', description: 'Turn an idea into a short clip.', cost: '25 credits per 10 sec' }), h(K.ModeCard, { tool: 'code', title: 'Code', description: 'Write and fix code with a helper.', cost: '1 credit' })));
+</script>
+</body>
+</html>

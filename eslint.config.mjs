@@ -15,6 +15,8 @@ const eslintConfig = defineConfig([
     // CommonJS preload shims for tsx-based scripts — must use require()
     // because they're invoked via `node --require` before any ESM loader.
     "scripts/**/*.cjs",
+    // Design system reference: a hand-written browser bundle, not app code.
+    "design-system/**",
   ]),
 ]);
 
