@@ -1,34 +1,22 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import Button from '@/components/ui/Button';
+import { useTheme } from '@/hooks/useTheme';
 
-function readInitialTheme(): 'dark' | 'light' {
-    if (typeof window === 'undefined') return 'dark';
-    const saved = window.localStorage.getItem('theme');
-    return saved === 'light' ? 'light' : 'dark';
-}
-
-export default function ThemeToggle() {
-    const [theme, setTheme] = useState<'dark' | 'light'>(readInitialTheme);
-
-    useEffect(() => {
-        document.documentElement.setAttribute('data-theme', theme);
-        localStorage.setItem('theme', theme);
-    }, [theme]);
-
-    const toggle = () => {
-        const next = theme === 'dark' ? 'light' : 'dark';
-        setTheme(next);
-    };
+/** Labelled light/dark switch. The label names the theme it switches to. */
+export default function ThemeToggle({ className }: { className?: string }) {
+    const { theme, toggleTheme } = useTheme();
+    const dark = theme === 'dark';
 
     return (
-        <button
-            onClick={toggle}
-            className="theme-toggle"
-            aria-label="Toggle theme"
-            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+        <Button
+            variant="quiet"
+            icon={dark ? 'sun' : 'moon'}
+            onClick={toggleTheme}
+            className={className}
+            title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
         >
-            {theme === 'dark' ? '☀️' : '🌙'}
-        </button>
+            {dark ? 'Light' : 'Dark'}
+        </Button>
     );
 }

@@ -2,6 +2,7 @@ import 'server-only';
 
 import { prisma } from './db';
 import { getFixedWeeklyRenewalWindow, nextFixedWeeklyRenewAt } from './creditRenewalWindow';
+import { CREDIT_COSTS } from './creditCosts';
 
 export class InsufficientCreditsError extends Error {
     constructor() {
@@ -18,13 +19,7 @@ export class InsufficientCreditsError extends Error {
  * Chat: 0 (free model)
  * Code: 1 credit (flat)
  */
-export const CREDIT_COSTS: Record<string, number> = {
-    image: 1,
-    music: 5,   // per 10 seconds
-    video: 25,  // per 10 seconds
-    chat: 0,
-    code: 1,
-};
+export { CREDIT_COSTS };
 
 export const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
