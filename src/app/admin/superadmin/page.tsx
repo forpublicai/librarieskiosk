@@ -1,10 +1,14 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useId } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
+import { formatLastLogin, GroupHeading, ROLE_NAMES, StatusLabel, TOOL_COLUMNS } from '@/components/AdminParts';
 import Header from '@/components/Header';
-import CreditBadge from '@/components/CreditBadge';
+import Tabs from '@/components/Tabs';
+import Button from '@/components/ui/Button';
+import Icon from '@/components/ui/Icon';
+import Spinner from '@/components/ui/Spinner';
 import { formatCreditRenewalTitle } from '@/lib/creditRenewal';
 
 interface LibraryBreakdown {
@@ -48,6 +52,13 @@ interface Overview {
     totalCreditsUsed: number;
 }
 
+type SuperTab = 'libraries' | 'pools' | 'users' | 'guests';
+
+// Libraries table: a pool at or below this many credits shows "Low".
+const LOW_POOL_CREDITS = 200;
+// Pools list: a pool at or below this share shows "Running low".
+const LOW_POOL_PERCENT = 20;
+
 export default function SuperAdminPage() {
     const { user, token, isLoading } = useAuth();
     const router = useRouter();
@@ -56,7 +67,7 @@ export default function SuperAdminPage() {
     const [usageByMode, setUsageByMode] = useState<ModeUsage[]>([]);
     const [users, setUsers] = useState<UserAccount[]>([]);
     const [guests, setGuests] = useState<UserAccount[]>([]);
-    const [tab, setTab] = useState<'overview' | 'libraries' | 'users' | 'guests'>('overview');
+    const [tab, setTab] = useState<SuperTab>('libraries');
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -90,257 +101,150 @@ export default function SuperAdminPage() {
 
     if (isLoading || !user || user.role !== 'SUPER_ADMIN') return null;
 
-    const modes = ['chat', 'image', 'video', 'music', 'code'];
     const userGroups = groupAccountsByLibrary(users, libraries);
     const guestGroups = groupAccountsByLibrary(guests, libraries);
 
     return (
         <div className="page-container" style={{ overflow: 'auto' }}>
-            <Header title="Super Admin" />
+            <Header title="Super admin" />
 
-            <div style={{ padding: '24px 32px' }}>
-                {/* Overview cards */}
+            <main className="lk-page lk-page--wide">
+                <h1 className="lk-title">All libraries</h1>
+
                 {overview && (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px', marginBottom: '24px' }}>
-                        <StatCard label="Libraries" value={overview.totalLibraries} icon="📚" />
-                        <StatCard label="Users" value={overview.totalUsers} icon="👥" />
-                        <StatCard label="Guests" value={overview.totalGuests} icon="👤" />
-                        <StatCard label="Total Usage" value={overview.totalUsageLogs} icon="📊" />
-                        <StatCard label="Credits Used" value={overview.totalCreditsUsed} icon="💰" />
+                    <div className="lk-stats">
+                        <Stat label="Libraries" value={overview.totalLibraries} />
+                        <Stat label="Accounts" value={overview.totalUsers} />
+                        <Stat label="Guest accounts" value={overview.totalGuests} />
+                        <Stat label="Times tools were used" value={overview.totalUsageLogs} />
+                        <Stat label="Credits used" value={overview.totalCreditsUsed} />
                     </div>
                 )}
 
-                {/* Usage by mode summary */}
                 {usageByMode.length > 0 && (
-                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '24px' }}>
-                        {usageByMode.map((m) => (
-                            <CreditBadge key={m.mode} style={{ fontSize: '0.8rem' }}>
-                                {m.mode}: {m.count} uses ({m.credits} cr)
-                            </CreditBadge>
-                        ))}
-                    </div>
+                    <section aria-labelledby="usage-by-tool" className="lk-form">
+                        <h2 id="usage-by-tool" className="lk-heading">Use by tool</h2>
+                        <UsageChart rows={usageByMode} />
+                    </section>
                 )}
 
-                {/* Tabs */}
-                <div style={{ display: 'flex', gap: '0', borderBottom: '1px solid var(--border-color)', marginBottom: '24px' }}>
-                    {(['overview', 'libraries', 'users', 'guests'] as const).map((t) => (
-                        <button
-                            key={t}
-                            className={tab === t ? 'btn btn-primary' : 'btn'}
-                            onClick={() => setTab(t)}
-                            style={{ borderBottom: 'none', fontSize: '0.8rem', textTransform: 'capitalize' }}
-                        >
-                            {t === 'overview' ? `Libraries (${libraries.length})` : t === 'libraries' ? 'Pool Status' : t === 'users' ? `Users (${users.length})` : `Guests (${guests.length})`}
-                        </button>
-                    ))}
-                </div>
+                <Tabs<SuperTab>
+                    label="Super admin sections"
+                    value={tab}
+                    onChange={setTab}
+                    items={[
+                        { id: 'libraries', label: `Libraries (${libraries.length})` },
+                        { id: 'pools', label: 'Credit pools' },
+                        { id: 'users', label: `Accounts (${users.length})` },
+                        { id: 'guests', label: `Guests (${guests.length})` },
+                    ]}
+                />
 
-                {loading && <div style={{ textAlign: 'center', padding: '48px' }}><div className="gen-spinner" /></div>}
-
-                {/* Libraries overview tab */}
-                {!loading && tab === 'overview' && (
-                    <div style={{ overflowX: 'auto' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
-                            <thead>
-                                <tr style={{ borderBottom: '2px solid var(--border-strong)' }}>
-                                    <th style={thStyle}>Library</th>
-                                    <th style={thStyle}>Users</th>
-                                    <th style={thStyle}>Guests</th>
-                                    <th style={thStyle}>Total Usage</th>
-                                    <th style={thStyle}>Credits Used</th>
-                                    <th style={thStyle}>Pool</th>
-                                    <th style={thStyle}>Session Cap</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {libraries.map((lib) => (
-                                    <tr key={lib.name} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                                        <td style={tdStyle}><strong>{lib.name}</strong></td>
-                                        <td style={tdStyle}>{lib.userCount}</td>
-                                        <td style={tdStyle}>{lib.guestCount}</td>
-                                        <td style={tdStyle}>{lib.totalUsage}</td>
-                                        <td style={tdStyle}>{lib.totalCredits}</td>
-                                        <td style={tdStyle}>
-                                            <span
-                                                title={formatCreditRenewalTitle(lib.poolRenewAt)}
-                                                style={{
-                                                    padding: '2px 8px', fontSize: '0.75rem', fontWeight: 600,
-                                                    background: lib.poolRemaining > 200 ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)',
-                                                    color: lib.poolRemaining > 200 ? 'var(--accent-green)' : 'var(--accent-red)',
-                                                }}
-                                            >
-                                                {lib.poolRemaining}/{lib.weeklyPool}
-                                            </span>
-                                        </td>
-                                        <td style={tdStyle}>
-                                            <SessionCapEditor
-                                                library={lib.name}
-                                                value={lib.maxConcurrentSessions}
-                                                token={token}
-                                                onSaved={loadData}
-                                            />
-                                        </td>
+                <section id={`panel-${tab}`} role="tabpanel" aria-labelledby={`tab-${tab}`}>
+                    {loading ? (
+                        <Spinner label="Loading…" />
+                    ) : tab === 'libraries' ? (
+                        <div className="lk-table-wrap">
+                            <table className="lk-table">
+                                <thead>
+                                    <tr>
+                                        <th scope="col">Library</th>
+                                        <th scope="col" className="lk-table__num">Accounts</th>
+                                        <th scope="col" className="lk-table__num">Guests</th>
+                                        <th scope="col" className="lk-table__num">Times used</th>
+                                        <th scope="col" className="lk-table__num">Credits used</th>
+                                        <th scope="col">Pool left</th>
+                                        <th scope="col">Kiosks at once</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-
-                {/* Pool status tab */}
-                {!loading && tab === 'libraries' && (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
-                        {libraries.map((lib) => {
-                            const pct = Math.round((lib.poolRemaining / lib.weeklyPool) * 100);
-                            return (
-                                <div key={lib.name} style={{
-                                    padding: '20px', background: 'var(--bg-card)', border: '1px solid var(--border-color)',
-                                }}>
-                                    <div style={{ fontWeight: 'bold', marginBottom: '12px', fontSize: '1rem' }}>{lib.name}</div>
-                                    <div style={{ marginBottom: '8px' }}>
-                                        <div style={{
-                                            height: '8px', background: 'var(--bg-elevated)', borderRadius: '4px', overflow: 'hidden',
-                                        }}>
-                                            <div style={{
-                                                width: `${pct}%`, height: '100%',
-                                                background: pct > 50 ? 'var(--accent-green)' : pct > 20 ? 'var(--accent-orange)' : 'var(--accent-red)',
-                                                transition: 'width 0.3s',
-                                            }} />
+                                </thead>
+                                <tbody>
+                                    {libraries.map((lib) => (
+                                        <tr key={lib.name}>
+                                            <th scope="row" className="lk-table__name">{lib.name}</th>
+                                            <td className="lk-table__num">{lib.userCount}</td>
+                                            <td className="lk-table__num">{lib.guestCount}</td>
+                                            <td className="lk-table__num">{lib.totalUsage}</td>
+                                            <td className="lk-table__num">{lib.totalCredits}</td>
+                                            <td title={formatCreditRenewalTitle(lib.poolRenewAt)}>
+                                                <span className="lk-row-actions">
+                                                    <span>{lib.poolRemaining} of {lib.weeklyPool}</span>
+                                                    {lib.poolRemaining <= LOW_POOL_CREDITS && (
+                                                        <span className="lk-status lk-status--danger">
+                                                            <Icon name="alert" size={20} />
+                                                            Low
+                                                        </span>
+                                                    )}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <SessionCapEditor
+                                                    library={lib.name}
+                                                    value={lib.maxConcurrentSessions}
+                                                    token={token}
+                                                    onSaved={loadData}
+                                                />
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    ) : tab === 'pools' ? (
+                        <ul className="lk-rows">
+                            {libraries.map((lib) => {
+                                const pct = lib.weeklyPool > 0 ? Math.round((lib.poolRemaining / lib.weeklyPool) * 100) : 0;
+                                return (
+                                    <li key={lib.name} className="lk-row">
+                                        <div className="lk-row__text">
+                                            <p className="lk-row__title">{lib.name}</p>
+                                            <div className="lk-meter lk-series-1" aria-hidden="true">
+                                                <div className="lk-meter__fill" style={{ width: `${Math.min(100, Math.max(0, pct))}%` }} />
+                                            </div>
+                                            <p className="lk-fine">
+                                                <span title={formatCreditRenewalTitle(lib.poolRenewAt)}>
+                                                    {lib.poolRemaining} of {lib.weeklyPool} credits left ({pct}%)
+                                                </span>
+                                                {' · '}{lib.userCount} {lib.userCount === 1 ? 'account' : 'accounts'}
+                                                {' · '}used {lib.totalUsage} {lib.totalUsage === 1 ? 'time' : 'times'}
+                                            </p>
                                         </div>
-                                    </div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                                        <span title={formatCreditRenewalTitle(lib.poolRenewAt)}>{lib.poolRemaining} remaining</span>
-                                        <span>{pct}%</span>
-                                    </div>
-                                    <div style={{ marginTop: '12px', display: 'flex', gap: '16px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                                        <span>👥 {lib.userCount} users</span>
-                                        <span>📊 {lib.totalUsage} uses</span>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                )}
-
-                {/* Guests tab */}
-                {!loading && tab === 'guests' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                        {guests.length === 0 ? (
-                            <div style={{ textAlign: 'center', padding: '48px', color: 'var(--text-muted)' }}>No guest accounts found</div>
+                                        {pct <= LOW_POOL_PERCENT && (
+                                            <span className="lk-status lk-status--warning">
+                                                <Icon name="alert" size={20} />
+                                                Running low
+                                            </span>
+                                        )}
+                                    </li>
+                                );
+                            })}
+                        </ul>
+                    ) : tab === 'guests' ? (
+                        guests.length === 0 ? (
+                            <p className="lk-fine">No guest accounts yet.</p>
                         ) : (
-                            guestGroups.map((group) => (
+                            <div className="lk-groups">
+                                {guestGroups.map((group) => (
+                                    <section key={group.library}>
+                                        <GroupHeading library={group.library} count={group.accounts.length} />
+                                        <AccountTable accounts={group.accounts} guests />
+                                    </section>
+                                ))}
+                            </div>
+                        )
+                    ) : users.length === 0 ? (
+                        <p className="lk-fine">No accounts yet.</p>
+                    ) : (
+                        <div className="lk-groups">
+                            {userGroups.map((group) => (
                                 <section key={group.library}>
                                     <GroupHeading library={group.library} count={group.accounts.length} />
-                                    <div style={{ overflowX: 'auto' }}>
-                                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
-                                            <thead>
-                                                <tr style={{ borderBottom: '2px solid var(--border-strong)' }}>
-                                                    <th style={thStyle}>Username</th>
-                                                    <th style={thStyle}>Status</th>
-                                                    <th style={thStyle}>Credits</th>
-                                                    <th style={thStyle}>Logins</th>
-                                                    <th style={thStyle}>Last Login</th>
-                                                    <th style={thStyle}>Usage</th>
-                                                    {modes.map((m) => (
-                                                        <th key={m} style={thStyle}>{m}</th>
-                                                    ))}
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {group.accounts.map((g) => (
-                                                    <tr key={g.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                                                        <td style={tdStyle}>
-                                                            <strong>{g.username}</strong>
-                                                            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginLeft: '4px' }}>GUEST</span>
-                                                        </td>
-                                                        <td style={tdStyle}>
-                                                            <span style={{
-                                                                padding: '2px 8px', fontSize: '0.75rem', fontWeight: 600,
-                                                                background: g.status === 'APPROVED' ? 'rgba(16,185,129,0.1)' : g.status === 'BANNED' ? 'rgba(239,68,68,0.1)' : 'rgba(255,77,0,0.1)',
-                                                                color: g.status === 'APPROVED' ? 'var(--accent-green)' : g.status === 'BANNED' ? 'var(--accent-red)' : 'var(--accent-orange)',
-                                                            }}>
-                                                                {g.status}
-                                                            </span>
-                                                        </td>
-                                                        <td style={tdStyle} title={formatCreditRenewalTitle(g.creditsRenewAt)}>{g.credits}</td>
-                                                        <td style={tdStyle}>{g.loginCount}</td>
-                                                        <td style={tdStyle}>{formatLastLogin(g.lastLoginAt, g.loginCount)}</td>
-                                                        <td style={tdStyle}>{g.totalUsage}</td>
-                                                        {modes.map((m) => (
-                                                            <td key={m} style={tdStyle}>{g.usageByMode[m]?.count || 0}</td>
-                                                        ))}
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
+                                    <AccountTable accounts={group.accounts} />
                                 </section>
-                            ))
-                        )}
-                    </div>
-                )}
-
-                {/* Users tab */}
-                {!loading && tab === 'users' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                        {userGroups.map((group) => (
-                            <section key={group.library}>
-                                <GroupHeading library={group.library} count={group.accounts.length} />
-                                <div style={{ overflowX: 'auto' }}>
-                                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
-                                        <thead>
-                                            <tr style={{ borderBottom: '2px solid var(--border-strong)' }}>
-                                                <th style={thStyle}>User</th>
-                                                <th style={thStyle}>Role</th>
-                                                <th style={thStyle}>Status</th>
-                                                <th style={thStyle}>Credits</th>
-                                                <th style={thStyle}>Logins</th>
-                                                <th style={thStyle}>Last Login</th>
-                                                <th style={thStyle}>Usage</th>
-                                                {modes.map((m) => (
-                                                    <th key={m} style={thStyle}>{m}</th>
-                                                ))}
-                                                <th style={thStyle}>Joined</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {group.accounts.map((u) => (
-                                                <tr key={u.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                                                    <td style={tdStyle}>
-                                                        <strong>{u.username}</strong>
-                                                        {u.role === 'ADMIN' && <span style={{ fontSize: '0.7rem', color: 'var(--accent-orange)', marginLeft: '4px' }}>ADMIN</span>}
-                                                        {u.role === 'SUPER_ADMIN' && <span style={{ fontSize: '0.7rem', color: 'var(--accent-red)', marginLeft: '4px' }}>SUPER</span>}
-                                                    </td>
-                                                    <td style={tdStyle}>
-                                                        <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>{u.role}</span>
-                                                    </td>
-                                                    <td style={tdStyle}>
-                                                        <span style={{
-                                                            padding: '2px 8px', fontSize: '0.75rem', fontWeight: 600,
-                                                            background: u.status === 'APPROVED' ? 'rgba(16,185,129,0.1)' : u.status === 'BANNED' ? 'rgba(239,68,68,0.1)' : 'rgba(255,77,0,0.1)',
-                                                            color: u.status === 'APPROVED' ? 'var(--accent-green)' : u.status === 'BANNED' ? 'var(--accent-red)' : 'var(--accent-orange)',
-                                                        }}>
-                                                            {u.status}
-                                                        </span>
-                                                    </td>
-                                                    <td style={tdStyle} title={formatCreditRenewalTitle(u.creditsRenewAt)}>{u.credits}</td>
-                                                    <td style={tdStyle}>{u.loginCount}</td>
-                                                    <td style={tdStyle}>{formatLastLogin(u.lastLoginAt, u.loginCount)}</td>
-                                                    <td style={tdStyle}>{u.totalUsage}</td>
-                                                    {modes.map((m) => (
-                                                        <td key={m} style={tdStyle}>{u.usageByMode[m]?.count || 0}</td>
-                                                    ))}
-                                                    <td style={tdStyle}>{new Date(u.createdAt).toLocaleDateString()}</td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </section>
-                        ))}
-                    </div>
-                )}
-            </div>
+                            ))}
+                        </div>
+                    )}
+                </section>
+            </main>
         </div>
     );
 }
@@ -364,24 +268,88 @@ function groupAccountsByLibrary(accounts: UserAccount[], libraries: LibraryBreak
     }));
 }
 
-function formatLastLogin(lastLoginAt: string | null, loginCount: number): string {
-    if (lastLoginAt) {
-        const date = new Date(lastLoginAt);
-        if (!Number.isNaN(date.getTime())) return date.toLocaleString();
-    }
-
-    return loginCount > 0 ? 'Unknown' : 'Never';
+function Stat({ label, value }: { label: string; value: number }) {
+    return (
+        <div className="lk-stat">
+            <span className="lk-stat__value">{value.toLocaleString()}</span>
+            <span className="lk-stat__label">{label}</span>
+        </div>
+    );
 }
 
-function GroupHeading({ library, count }: { library: string; count: number }) {
+/** Horizontal bars, one per tool, in Home order. Each bar uses its tool's color. */
+function UsageChart({ rows }: { rows: ModeUsage[] }) {
+    const order = TOOL_COLUMNS.map((t) => t.key as string);
+    const sorted = [...rows].sort((a, b) => {
+        const ia = order.indexOf(a.mode);
+        const ib = order.indexOf(b.mode);
+        return (ia === -1 ? order.length : ia) - (ib === -1 ? order.length : ib) || a.mode.localeCompare(b.mode);
+    });
+    const max = Math.max(1, ...sorted.map((r) => r.count));
+
     return (
-        <div style={{ marginBottom: '10px' }}>
-            <h3 style={{ fontSize: '0.9rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                {library}
-            </h3>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                {count} account{count === 1 ? '' : 's'}
-            </div>
+        <ul className="lk-chart">
+            {sorted.map((r) => {
+                const tool = TOOL_COLUMNS.find((t) => t.key === r.mode);
+                const label = tool?.label ?? (r.mode === 'guide' ? 'Learning guide' : r.mode);
+                return (
+                    <li key={r.mode} className={tool ? `lk-chart__row lk-tool--${tool.key}` : 'lk-chart__row'}>
+                        <span className="lk-chart__label">
+                            <Icon name={tool?.key ?? 'help'} size={20} />
+                            {label}
+                        </span>
+                        <span className="lk-chart__track">
+                            <span className="lk-chart__lane" aria-hidden="true">
+                                <span className="lk-chart__bar" style={{ width: `${(r.count / max) * 100}%` }} />
+                            </span>
+                            <span className="lk-chart__value">
+                                {r.count.toLocaleString()} {r.count === 1 ? 'use' : 'uses'} · {r.credits.toLocaleString()} {r.credits === 1 ? 'credit' : 'credits'}
+                            </span>
+                        </span>
+                    </li>
+                );
+            })}
+        </ul>
+    );
+}
+
+function AccountTable({ accounts, guests = false }: { accounts: UserAccount[]; guests?: boolean }) {
+    return (
+        <div className="lk-table-wrap">
+            <table className="lk-table">
+                <thead>
+                    <tr>
+                        <th scope="col">{guests ? 'Guest account' : 'Account'}</th>
+                        {!guests && <th scope="col">Role</th>}
+                        <th scope="col">Status</th>
+                        <th scope="col" className="lk-table__num">Credits</th>
+                        <th scope="col" className="lk-table__num">Sign-ins</th>
+                        <th scope="col">Last sign-in</th>
+                        <th scope="col" className="lk-table__num">Times used</th>
+                        {TOOL_COLUMNS.map((t) => (
+                            <th key={t.key} scope="col" className="lk-table__num">{t.label}</th>
+                        ))}
+                        {!guests && <th scope="col">Joined</th>}
+                    </tr>
+                </thead>
+                <tbody>
+                    {accounts.map((a) => (
+                        <tr key={a.id}>
+                            <th scope="row" className="lk-table__name">{a.username}</th>
+                            {!guests && <td>{ROLE_NAMES[a.role] ?? a.role}</td>}
+                            <td><StatusLabel status={a.status} /></td>
+                            <td className="lk-table__num" title={formatCreditRenewalTitle(a.creditsRenewAt)}>{a.credits}</td>
+                            <td className="lk-table__num">{a.loginCount}</td>
+                            <td>{formatLastLogin(a.lastLoginAt, a.loginCount)}</td>
+                            <td className="lk-table__num">{a.totalUsage}</td>
+                            {TOOL_COLUMNS.map((t) => (
+                                <td key={t.key} className="lk-table__num">{a.usageByMode[t.key]?.count || 0}</td>
+                            ))}
+                            {!guests && <td>{new Date(a.createdAt).toLocaleDateString()}</td>}
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
         </div>
     );
 }
@@ -400,6 +368,7 @@ function SessionCapEditor({
     const [draft, setDraft] = useState(String(value));
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const id = useId();
 
     useEffect(() => {
         setDraft(String(value));
@@ -409,7 +378,7 @@ function SessionCapEditor({
         if (!token) return;
         const n = Number(draft);
         if (!Number.isInteger(n) || n < 1) {
-            setError('Must be a whole number ≥ 1');
+            setError('Use a whole number, 1 or more.');
             return;
         }
         setSaving(true);
@@ -425,12 +394,12 @@ function SessionCapEditor({
             });
             if (!res.ok) {
                 const data = await res.json().catch(() => ({}));
-                setError(data.error || 'Save failed');
+                setError(data.error || 'It did not save. Please try again.');
             } else {
                 onSaved();
             }
         } catch {
-            setError('Save failed');
+            setError('It did not save. Please try again.');
         } finally {
             setSaving(false);
         }
@@ -439,63 +408,30 @@ function SessionCapEditor({
     const dirty = draft !== String(value);
 
     return (
-        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+        <form className="lk-cap" onSubmit={(e) => { e.preventDefault(); save(); }}>
+            <label className="lk-sr" htmlFor={id}>Kiosks at once for {library}</label>
             <input
+                id={id}
+                className="lk-field__control"
                 type="number"
+                inputMode="numeric"
                 min={1}
                 value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                style={{
-                    width: '64px',
-                    padding: '4px 6px',
-                    background: 'var(--bg-elevated)',
-                    border: '1px solid var(--border-color)',
-                    color: 'inherit',
-                    fontSize: '0.85rem',
-                }}
+                onChange={(e) => { setDraft(e.target.value); setError(null); }}
+                aria-invalid={error ? true : undefined}
+                aria-describedby={error ? `${id}-err` : undefined}
             />
             {dirty && (
-                <button
-                    className="btn btn-primary"
-                    onClick={save}
-                    disabled={saving}
-                    style={{ fontSize: '0.7rem', padding: '4px 8px' }}
-                >
-                    {saving ? '…' : 'Save'}
-                </button>
+                <Button type="submit" disabled={saving}>
+                    {saving ? 'Saving…' : 'Save'}
+                </Button>
             )}
             {error && (
-                <span style={{ fontSize: '0.7rem', color: 'var(--accent-red)' }}>{error}</span>
+                <span className="lk-cap__error" id={`${id}-err`} role="alert">
+                    <Icon name="alert" size={20} />
+                    {error}
+                </span>
             )}
-        </div>
+        </form>
     );
 }
-
-function StatCard({ label, value, icon }: { label: string; value: number; icon: string }) {
-    return (
-        <div style={{
-            padding: '16px 20px', background: 'var(--bg-card)', border: '1px solid var(--border-color)',
-            textAlign: 'center',
-        }}>
-            <div style={{ fontSize: '1.5rem', marginBottom: '4px' }}>{icon}</div>
-            <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{value.toLocaleString()}</div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</div>
-        </div>
-    );
-}
-
-const thStyle: React.CSSProperties = {
-    textAlign: 'left',
-    padding: '10px 8px',
-    fontWeight: 600,
-    fontSize: '0.75rem',
-    textTransform: 'uppercase',
-    letterSpacing: '0.04em',
-    color: 'var(--text-secondary)',
-    whiteSpace: 'nowrap',
-};
-
-const tdStyle: React.CSSProperties = {
-    padding: '10px 8px',
-    verticalAlign: 'middle',
-};

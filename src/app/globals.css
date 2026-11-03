@@ -2057,3 +2057,62 @@ a.lk-btn--danger { color: var(--danger); }
 .lk-notice { flex-wrap: wrap; }
 .lk-notice__body { flex: 1 1 160px; }
 .lk-notice > .lk-btn { margin-left: auto; }
+
+/* ---------- Admin: stats, hairline rows, status, dialog, charts ---------- */
+.lk-page--wide { max-width: 1280px; }
+.lk-table__name { text-align: left; font-weight: 700; white-space: nowrap; }
+.lk-table__sub { display: block; font: 400 15px/22px var(--font-sans); color: var(--ink-muted); }
+.lk-status { display: inline-flex; align-items: center; gap: var(--space-2); font-weight: 700; white-space: nowrap; }
+.lk-status--success .lk-icon { color: var(--success); }
+.lk-status--warning .lk-icon { color: var(--warning); }
+.lk-status--danger .lk-icon { color: var(--danger); }
+.lk-row-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.lk-table .lk-row-actions { flex-wrap: nowrap; }
+.lk-group-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-3); margin-bottom: var(--space-2); }
+.lk-groups { display: flex; flex-direction: column; gap: var(--space-6); }
+
+/* A list of rows split by hairlines: no cards */
+.lk-rows { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--border); }
+.lk-row {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3) var(--space-4);
+  padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--border);
+}
+.lk-row__text { flex: 1 1 280px; min-width: 0; display: flex; flex-direction: column; gap: var(--space-1); }
+.lk-row__title { font: 700 18px/26px var(--font-sans); color: var(--ink); overflow-wrap: anywhere; }
+.lk-row__body { color: var(--ink); overflow-wrap: anywhere; }
+
+/* Small number field inside a table row, still a 48px target */
+.lk-cap { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.lk-cap .lk-field__control { width: 96px; min-height: var(--target-min); padding: var(--space-2) var(--space-3); }
+.lk-cap__error { display: inline-flex; align-items: center; gap: var(--space-1); font: 700 15px/22px var(--font-sans); color: var(--danger); }
+
+/* Dialog: the only box that lifts with shadow-lg */
+.lk-dialog {
+  width: min(480px, calc(100vw - 2 * var(--space-4))); max-height: calc(100vh - 2 * var(--space-4));
+  margin: auto; padding: 0; color: var(--ink);
+  background: var(--surface-raised); border: 1px solid var(--border); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+}
+.lk-dialog::backdrop { background: var(--overlay); }
+.lk-dialog__inner { display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-5) var(--space-5) var(--space-5) var(--space-6); }
+.lk-dialog__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.lk-dialog__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2); margin-top: var(--space-2); }
+
+/* Bar chart: each tool's bar uses the tool color; other series use the fixed order red, cobalt, sun, pink, green */
+.lk-chart { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
+.lk-chart__row { display: grid; grid-template-columns: minmax(120px, 180px) minmax(0, 1fr); align-items: center; gap: var(--space-2) var(--space-4); }
+.lk-chart__label { display: inline-flex; align-items: center; gap: var(--space-2); font-weight: 700; }
+.lk-chart__track { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--space-3); min-width: 0; }
+.lk-chart__lane { display: block; min-width: 0; }
+.lk-chart__bar { display: block; height: 20px; min-width: 4px; border-radius: var(--radius-sm); background: var(--tool, var(--border-strong)); }
+.lk-chart__value { font: 400 15px/22px var(--font-sans); color: var(--ink-muted); white-space: nowrap; }
+.lk-series-1 { --tool: var(--red); }
+.lk-series-2 { --tool: var(--cobalt); }
+.lk-series-3 { --tool: var(--sun); }
+.lk-series-4 { --tool: var(--pink); }
+.lk-series-5 { --tool: var(--green); }
+.lk-meter { height: 12px; border-radius: var(--radius-full); background: var(--surface-sunken); border: 1px solid var(--border); overflow: hidden; }
+.lk-meter__fill { height: 100%; background: var(--tool, var(--red)); }
+@media (max-width: 600px) {
+  .lk-chart__row { grid-template-columns: 1fr; }
+}
