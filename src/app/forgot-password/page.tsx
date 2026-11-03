@@ -3,7 +3,11 @@
 import Link from 'next/link';
 import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
+import AuthLogo from '@/components/AuthLogo';
 import FloatingThemeToggle from '@/components/FloatingThemeToggle';
+import Button from '@/components/ui/Button';
+import Notice from '@/components/ui/Notice';
+import TextField from '@/components/ui/TextField';
 
 type Step = 'username' | 'answer' | 'done';
 
@@ -33,7 +37,7 @@ export default function ForgotPasswordPage() {
             setQuestion(data.question);
             setStep('answer');
         } catch (err) {
-            setError(err instanceof Error ? err.message.toUpperCase() : 'LOOKUP FAILED');
+            setError(err instanceof Error ? err.message : 'Lookup failed.');
         } finally {
             setLoading(false);
         }
@@ -44,11 +48,11 @@ export default function ForgotPasswordPage() {
         setError('');
 
         if (newPassword !== confirmPassword) {
-            setError('PASSWORDS DO NOT MATCH');
+            setError('The two passwords do not match.');
             return;
         }
         if (newPassword.length < 6) {
-            setError('PASSWORD MUST BE AT LEAST 6 CHARACTERS');
+            setError('The password must have at least 6 characters.');
             return;
         }
 
@@ -63,138 +67,106 @@ export default function ForgotPasswordPage() {
             if (!res.ok) throw new Error(data.error || 'Reset failed.');
             setStep('done');
         } catch (err) {
-            setError(err instanceof Error ? err.message.toUpperCase() : 'RESET FAILED');
+            setError(err instanceof Error ? err.message : 'Reset failed.');
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <div className="login-container">
+        <div className="lk-auth-single">
             <FloatingThemeToggle />
-            <div className="login-card">
-                <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-                    <img src="/images/logo.svg" alt="Public AI" className="login-logo-img" />
-                    <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', textTransform: 'uppercase' }}>
-                        RESET PASSWORD
-                    </h1>
-                </div>
+            <div className="lk-auth-single__inner">
+                <AuthLogo />
+                <h1 className="lk-title">Reset your password</h1>
 
-                {error && <div className="login-error" style={{ marginBottom: '20px' }}>{error}</div>}
+                {error && <Notice tone="danger" title="Your password was not reset">{error}</Notice>}
 
                 {step === 'username' && (
-                    <form className="login-form" onSubmit={handleLookup}>
-                        <div className="form-group" style={{ marginBottom: '32px' }}>
-                            <label className="form-label" htmlFor="fp-username">USERNAME</label>
-                            <input
-                                id="fp-username"
-                                className="input"
-                                type="text"
-                                value={username}
-                                onChange={(e) => setUsername(e.target.value)}
-                                placeholder="ENTER USERNAME"
-                                autoFocus
-                                required
-                            />
-                        </div>
-                        <button className="btn btn-primary btn-lg" type="submit" disabled={loading || !username}
-                            style={{ padding: '20px' }}>
-                            {loading ? 'LOOKING UP...' : 'CONTINUE'}
-                        </button>
+                    <form className="lk-form" onSubmit={handleLookup}>
+                        <TextField
+                            id="fp-username"
+                            label="Username"
+                            hint="Next, you answer the security question you chose when you signed up."
+                            type="text"
+                            value={username}
+                            onChange={(e) => setUsername(e.target.value)}
+                            autoComplete="username"
+                            autoFocus
+                            required
+                        />
+                        <Button variant="primary" size="lg" block type="submit" disabled={loading || !username}>
+                            {loading ? 'Looking up…' : 'Continue'}
+                        </Button>
                     </form>
                 )}
 
                 {step === 'answer' && (
-                    <form className="login-form" onSubmit={handleReset}>
-                        <div className="form-group">
-                            <label className="form-label">SECURITY QUESTION</label>
-                            <div style={{
-                                padding: '12px 14px',
-                                border: '1px solid var(--border-color)',
-                                background: 'var(--bg-card)',
-                                fontSize: '0.9rem',
-                                color: 'var(--text-primary)',
-                                marginBottom: '4px',
-                            }}>
-                                {question}
-                            </div>
+                    <form className="lk-form" onSubmit={handleReset}>
+                        <div className="lk-field">
+                            <span className="lk-field__label">Your security question</span>
+                            <p className="lk-question">{question}</p>
                         </div>
-
-                        <div className="form-group">
-                            <label className="form-label" htmlFor="fp-answer">YOUR ANSWER</label>
-                            <input
-                                id="fp-answer"
-                                className="input"
-                                type="text"
-                                value={answer}
-                                onChange={(e) => setAnswer(e.target.value)}
-                                autoComplete="off"
-                                autoFocus
-                                required
-                            />
-                        </div>
-
-                        <div className="form-group">
-                            <label className="form-label" htmlFor="fp-new">NEW PASSWORD</label>
-                            <input
-                                id="fp-new"
-                                className="input"
-                                type="password"
-                                value={newPassword}
-                                onChange={(e) => setNewPassword(e.target.value)}
-                                placeholder="MIN 6 CHARACTERS"
-                                required
-                                minLength={6}
-                            />
-                        </div>
-
-                        <div className="form-group" style={{ marginBottom: '32px' }}>
-                            <label className="form-label" htmlFor="fp-confirm">CONFIRM PASSWORD</label>
-                            <input
-                                id="fp-confirm"
-                                className="input"
-                                type="password"
-                                value={confirmPassword}
-                                onChange={(e) => setConfirmPassword(e.target.value)}
-                                placeholder="RE-ENTER PASSWORD"
-                                required
-                                minLength={6}
-                            />
-                        </div>
-
-                        <button className="btn btn-primary btn-lg" type="submit"
+                        <TextField
+                            id="fp-answer"
+                            label="Your answer"
+                            hint="Capital letters do not matter."
+                            type="text"
+                            value={answer}
+                            onChange={(e) => setAnswer(e.target.value)}
+                            autoComplete="off"
+                            autoFocus
+                            required
+                        />
+                        <TextField
+                            id="fp-new"
+                            label="New password"
+                            hint="At least 6 characters."
+                            type="password"
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
+                            autoComplete="new-password"
+                            required
+                            minLength={6}
+                        />
+                        <TextField
+                            id="fp-confirm"
+                            label="Type the new password again"
+                            type="password"
+                            value={confirmPassword}
+                            onChange={(e) => setConfirmPassword(e.target.value)}
+                            autoComplete="new-password"
+                            required
+                            minLength={6}
+                        />
+                        <Button
+                            variant="primary"
+                            size="lg"
+                            block
+                            type="submit"
                             disabled={loading || !answer || !newPassword || !confirmPassword}
-                            style={{ padding: '20px' }}>
-                            {loading ? 'RESETTING...' : 'RESET PASSWORD'}
-                        </button>
+                        >
+                            {loading ? 'Resetting…' : 'Reset password'}
+                        </Button>
                     </form>
                 )}
 
                 {step === 'done' && (
-                    <div style={{ textAlign: 'center' }}>
-                        <p style={{ fontSize: '1rem', fontWeight: 'bold', marginBottom: '32px' }}>
-                            PASSWORD RESET SUCCESSFULLY.
-                        </p>
-                        <button
-                            className="btn btn-primary btn-lg"
-                            onClick={() => router.push('/')}
-                            style={{ padding: '20px', width: '100%' }}
-                        >
-                            GO TO LOGIN
-                        </button>
-                    </div>
+                    <>
+                        <Notice tone="success" title="Your password is reset">
+                            You can now sign in with your new password.
+                        </Notice>
+                        <Button variant="primary" size="lg" block onClick={() => router.push('/')}>
+                            Go to sign in
+                        </Button>
+                    </>
                 )}
 
-                <p style={{
-                    textAlign: 'center',
-                    fontSize: '1rem',
-                    fontWeight: 'bold',
-                    marginTop: '32px'
-                }}>
-                    <Link href="/" style={{ textDecoration: 'underline' }}>
-                        BACK TO LOGIN
-                    </Link>
-                </p>
+                {step !== 'done' && (
+                    <p>
+                        Remember it now? <Link className="lk-link" href="/">Back to sign in</Link>
+                    </p>
+                )}
             </div>
         </div>
     );

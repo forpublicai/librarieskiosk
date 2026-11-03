@@ -1978,3 +1978,58 @@ a.lk-btn--danger { color: var(--danger); }
 .lk-range input[type="range"]:disabled { opacity: 0.45; cursor: not-allowed; }
 .lk-range__ends { display: flex; justify-content: space-between; font: 400 15px/22px var(--font-sans); color: var(--ink-subtle); }
 .lk-credits { white-space: nowrap; }
+
+/* ---------- Forms, tabs and tables (app additions) ---------- */
+.lk-field__select { cursor: pointer; }
+.lk-form { display: flex; flex-direction: column; gap: var(--space-4); }
+.lk-form > .lk-btn { margin-top: var(--space-2); }
+.lk-divider { display: flex; align-items: center; gap: var(--space-3); font: 400 15px/22px var(--font-sans); color: var(--ink-subtle); }
+.lk-divider::before, .lk-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+.lk-fine { font: 400 15px/22px var(--font-sans); color: var(--ink-muted); }
+.lk-tabs { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.lk-tabs .lk-chip:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+.lk-table-wrap { overflow-x: auto; }
+.lk-table { width: 100%; border-collapse: collapse; font: 400 17px/24px var(--font-sans); color: var(--ink); }
+.lk-table th {
+  text-align: left; padding: var(--space-3) var(--space-3); white-space: nowrap;
+  font: 700 15px/22px var(--font-sans); color: var(--ink-muted); border-bottom: 2px solid var(--border-strong);
+}
+.lk-table td { padding: var(--space-3) var(--space-3); border-bottom: 1px solid var(--border); vertical-align: middle; }
+.lk-table__num { text-align: right; font-variant-numeric: tabular-nums; }
+.lk-table__clip { max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lk-table__mode { display: inline-flex; align-items: center; gap: var(--space-2); font-weight: 700; }
+
+/* ---------- Auth pages ---------- */
+.lk-auth { min-height: 100vh; display: grid; grid-template-columns: minmax(0, 1fr) minmax(380px, 520px); background: var(--surface); }
+.lk-auth__brand { display: flex; flex-direction: column; justify-content: center; gap: var(--space-5); padding: var(--space-8) var(--space-7); }
+.lk-auth__logo img { height: 72px; width: auto; display: block; }
+.lk-auth__nav { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-left: calc(var(--space-4) * -1); }
+.lk-auth__panel {
+  display: flex; flex-direction: column; justify-content: center; gap: var(--space-5);
+  padding: var(--space-8) var(--space-6) var(--space-6); background: var(--surface-sunken); border-left: 1px solid var(--border);
+}
+.lk-auth__links { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-5); }
+.lk-auth__footer { font: 400 15px/22px var(--font-sans); color: var(--ink-muted); }
+.lk-auth-single { min-height: 100vh; display: flex; justify-content: center; padding: var(--space-8) var(--space-4) var(--space-7); background: var(--surface); }
+.lk-auth-single__inner { width: 100%; max-width: 520px; display: flex; flex-direction: column; gap: var(--space-5); }
+.lk-auth-single__inner .lk-auth__logo img { height: 56px; }
+.lk-question { padding: var(--space-3) var(--space-4); background: var(--surface-sunken); border-radius: var(--radius-md); }
+@media (max-width: 900px) {
+  .lk-auth { grid-template-columns: 1fr; }
+  .lk-auth__brand { padding: var(--space-8) var(--space-4) var(--space-5); }
+  .lk-auth__panel { border-left: 0; border-top: 1px solid var(--border); padding: var(--space-6) var(--space-4); }
+  .lk-auth__logo img { height: 56px; }
+}
+
+/* ---------- Account ---------- */
+.lk-page { width: 100%; max-width: 960px; margin: 0 auto; padding: var(--space-7) var(--space-6); display: flex; flex-direction: column; gap: var(--space-5); }
+.lk-page__meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); color: var(--ink-muted); }
+.lk-page__narrow { max-width: 480px; }
+.lk-stats { display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-6); }
+.lk-stat { display: flex; flex-direction: column; }
+.lk-stat__value { font: 900 30px/36px var(--font-sans); color: var(--ink); }
+.lk-stat__label { font: 400 15px/22px var(--font-sans); color: var(--ink-muted); }
+@media (max-width: 600px) {
+  .lk-page { padding: var(--space-6) var(--space-4); }
+}
