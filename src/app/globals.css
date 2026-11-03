@@ -1809,7 +1809,7 @@ a.lk-btn--danger { color: var(--danger); }
   box-shadow: var(--shadow-sm);
 }
 .lk-header__menu .lk-btn { justify-content: flex-start; }
-@media (max-width: 700px) {
+@media (max-width: 820px) {
   .lk-header { padding: var(--space-2) var(--space-4); flex-wrap: wrap; row-gap: var(--space-1); }
   .lk-header__end { margin-left: auto; }
   .lk-header--tool .lk-header__logo { display: none; }
@@ -1865,7 +1865,7 @@ a.lk-btn--danger { color: var(--danger); }
   padding: var(--space-6); background: var(--surface-raised); border: 1px solid var(--border); border-radius: var(--radius-lg);
 }
 .lk-header__menu-wrap { display: contents; }
-@media (max-width: 700px) {
+@media (max-width: 820px) {
   .lk-header__menu-wrap { display: block; }
 }
 

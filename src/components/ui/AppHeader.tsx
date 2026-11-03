@@ -35,7 +35,7 @@ interface AppHeaderProps {
     children?: ReactNode;
 }
 
-/** The top bar on every signed-in screen. Below 700px the extra and account items move into a menu. */
+/** The top bar on every signed-in screen. Below 820px (1200px on tool screens) the extra and account items move into a menu. */
 export default function AppHeader({
     logoLight,
     logoDark,
