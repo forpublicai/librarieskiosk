@@ -1,7 +1,13 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, type FormEvent, type ReactNode } from 'react';
 import { useAuth } from '@/components/AuthProvider';
+import CopyButton from '@/components/CopyButton';
+import Button from '@/components/ui/Button';
+import ChatMessage from '@/components/ui/ChatMessage';
+import Icon, { type IconName } from '@/components/ui/Icon';
+import IconButton from '@/components/ui/IconButton';
+import Notice from '@/components/ui/Notice';
 import {
   countWords,
   guideTierKey,
@@ -62,6 +68,7 @@ interface Message {
 interface GuidePanelProps {
   tool: string;
   isOpen: boolean;
+  onClose: () => void;
 }
 
 // Dynamic-import loaders, one per tool. Each is a separate code-split chunk
@@ -87,7 +94,7 @@ function renderText(text: string): React.ReactNode {
     <>
       {splitGuideTextLinks(text).map((part, idx) => (
         part.type === 'link'
-          ? <a key={idx} href={part.href} target="_blank" rel="noopener noreferrer" className="guide-link">{part.text}</a>
+          ? <a key={idx} href={part.href} target="_blank" rel="noopener noreferrer" className="lk-guide__link">{part.text}</a>
           : part.text
       ))}
     </>
@@ -149,22 +156,91 @@ function isGuideContent(value: unknown): value is GuideContent {
   );
 }
 
-function GuideContentError({ isOpen }: { isOpen: boolean }) {
+// Selector for anything Tab can reach inside the panel.
+const FOCUSABLE = 'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+// After the panel closes, focus goes back to a visible guide button, or to
+// the header menu button when the guide button sits in the closed menu.
+function focusGuideButton() {
+  const target = Array.from(document.querySelectorAll<HTMLElement>('[data-tour="guide-btn"], .lk-header__menu-btn'))
+    .find((el) => el.offsetParent !== null);
+  target?.focus();
+}
+
+/**
+ * The panel frame: a column beside the thread on wide screens, a drawer over
+ * the page below 900px. It is hidden (and out of the tab order) while closed.
+ * In drawer mode focus moves in, Tab stays inside and Escape closes it.
+ */
+function GuideFrame({ isOpen, onClose, headerExtra, children }: {
+  isOpen: boolean;
+  onClose: () => void;
+  headerExtra?: ReactNode;
+  children: ReactNode;
+}) {
+  const ref = useRef<HTMLElement>(null);
+  // Pages pass a new onClose each render; keep the latest one without re-running the effect.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const panel = ref.current;
+    const drawer = window.matchMedia('(max-width: 900px)').matches;
+    if (drawer) panel?.querySelector<HTMLElement>('.lk-guide__close')?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && (drawer || panel?.contains(document.activeElement))) {
+        onCloseRef.current();
+        focusGuideButton();
+        return;
+      }
+      if (!drawer || e.key !== 'Tab' || !panel) return;
+      const focusable = Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE));
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+      if (e.shiftKey && (active === first || !panel.contains(active))) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && (active === last || !panel.contains(active))) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [isOpen]);
+
+  const close = () => {
+    onClose();
+    focusGuideButton();
+  };
+
   return (
-    <div className={`guide-panel${isOpen ? ' guide-panel--open' : ''}`}>
-      <div className="guide-panel-header">
-        <span className="guide-panel-title">Learning Guide</span>
-      </div>
-      <div className="guide-panel-body">
-        <div className="guide-panel-messages">
-          <div className="guide-message guide-message--bot">
-            <div className="guide-message-content">
-              <span className="guide-message-text">Guide content failed to load.</span>
-            </div>
-          </div>
+    <>
+      {isOpen && <div className="lk-guide__scrim" onClick={close} aria-hidden="true" />}
+      <section ref={ref} className="lk-guide" aria-labelledby="lk-guide-title" hidden={!isOpen}>
+        <div className="lk-guide__head">
+          <h2 id="lk-guide-title" className="lk-heading">Learning guide</h2>
+          <IconButton icon="close" label="Close the learning guide" className="lk-guide__close" onClick={close} />
         </div>
+        {headerExtra}
+        {children}
+      </section>
+    </>
+  );
+}
+
+function GuideContentError({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+  return (
+    <GuideFrame isOpen={isOpen} onClose={onClose}>
+      <div className="lk-guide__body">
+        <Notice tone="warning" title="The guide did not load">
+          Please close it and try again, or ask a librarian.
+        </Notice>
       </div>
-    </div>
+    </GuideFrame>
   );
 }
 
@@ -173,7 +249,7 @@ function GuideContentError({ isOpen }: { isOpen: boolean }) {
 // to the implementation component once content is available. Splitting it
 // this way lets the implementation rely on `content: GuideContent` (non-null)
 // without sprinkling guards through every handler.
-export default function GuidePanel({ tool, isOpen }: GuidePanelProps) {
+export default function GuidePanel({ tool, isOpen, onClose }: GuidePanelProps) {
   const [content, setContent] = useState<GuideContent | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
   const load = CONTENT_LOADERS[tool];
@@ -200,14 +276,14 @@ export default function GuidePanel({ tool, isOpen }: GuidePanelProps) {
 
   if (!load) {
     console.error(`No guide content loader configured for tool="${tool}"`);
-    return <GuideContentError isOpen={isOpen} />;
+    return <GuideContentError isOpen={isOpen} onClose={onClose} />;
   }
-  if (loadFailed) return <GuideContentError isOpen={isOpen} />;
+  if (loadFailed) return <GuideContentError isOpen={isOpen} onClose={onClose} />;
   if (!content) return null;
-  return <GuidePanelInner content={content} tool={tool} isOpen={isOpen} />;
+  return <GuidePanelInner content={content} tool={tool} isOpen={isOpen} onClose={onClose} />;
 }
 
-function GuidePanelInner({ content, tool, isOpen }: GuidePanelProps & { content: GuideContent }) {
+function GuidePanelInner({ content, tool, isOpen, onClose }: GuidePanelProps & { content: GuideContent }) {
   const { user, token } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [screen, setScreen] = useState<Screen>('tier-select');
@@ -215,9 +291,6 @@ function GuidePanelInner({ content, tool, isOpen }: GuidePanelProps & { content:
   const [selectedFaqCategory, setSelectedFaqCategory] = useState<FaqCategory | null>(null);
   const [visitedUseCases, setVisitedUseCases] = useState<Set<string>>(new Set());
   const [freeInput, setFreeInput] = useState('');
-  const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
-  const [highlightBadge, setHighlightBadge] = useState(false);
-  const [highlightInput, setHighlightInput] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
   const [liveLimitReached, setLiveLimitReached] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -281,11 +354,9 @@ function GuidePanelInner({ content, tool, isOpen }: GuidePanelProps & { content:
     setTier(t);
     await add(
       { role: 'user', content: TIER_LABELS[t] },
-      { role: 'bot', content: "Got it — I'll tailor explanations to your need. You can change this anytime using the badge at the top." },
+      { role: 'bot', content: "Got it — I'll tailor explanations to your need. You can change this anytime with Change level at the top." },
       { role: 'bot', content: "What would you like help with?" }
     );
-    setHighlightBadge(true);
-    setTimeout(() => setHighlightBadge(false), 2800);
     setScreen('entry-point');
   }
 
@@ -359,8 +430,6 @@ function GuidePanelInner({ content, tool, isOpen }: GuidePanelProps & { content:
         { role: 'bot', content: "Describe what you have in mind in the text box below, and I'll guide you." }
       );
       setScreen('open-question');
-      setHighlightInput(true);
-      setTimeout(() => setHighlightInput(false), 2800);
       setTimeout(() => inputRef.current?.focus(), 50);
       return;
     }
@@ -388,8 +457,6 @@ function GuidePanelInner({ content, tool, isOpen }: GuidePanelProps & { content:
       { role: 'bot', content: 'Go ahead — type your question below.' }
     );
     setScreen('faq-answer');
-    setHighlightInput(true);
-    setTimeout(() => setHighlightInput(false), 2800);
     setTimeout(() => inputRef.current?.focus(), 50);
   }
 
@@ -477,76 +544,74 @@ function GuidePanelInner({ content, tool, isOpen }: GuidePanelProps & { content:
     initializedRef.current = true;
   }
 
-  function handleCopy(text: string, idx: number) {
-    navigator.clipboard.writeText(text).catch(() => {});
-    setCopiedIdx(idx);
-    setTimeout(() => setCopiedIdx(c => c === idx ? null : c), 2000);
+  // One choice in the options list. `back` is the quiet "Main menu" style.
+  function option(key: string, label: ReactNode, onClick: () => void, kind: 'choice' | 'back' = 'choice', icon?: IconName) {
+    return (
+      <Button
+        key={key}
+        variant={kind === 'back' ? 'quiet' : 'secondary'}
+        icon={kind === 'back' ? 'back' : icon}
+        block
+        className="lk-guide__option"
+        onClick={onClick}
+      >
+        {label}
+      </Button>
+    );
   }
 
   function renderOptions() {
     const otherUseCase = content.useCases.find(uc => !uc.gettingStarted);
+    const mainMenu = option('main-menu', 'Main menu', handleMainMenu, 'back');
 
     switch (screen) {
       case 'tier-select':
-        return ([1, 2, 3] as GuideTier[]).map(t => (
-          <button key={t} className="guide-option-btn" onClick={() => handleTierSelect(t)}>
-            {TIER_LABELS[t]}
-          </button>
-        ));
+        return ([1, 2, 3] as GuideTier[]).map(t => option(`tier-${t}`, TIER_LABELS[t], () => handleTierSelect(t)));
 
       case 'entry-point':
         return (
           <>
-            <button className="guide-option-btn" onClick={handleWhatIsIt}>What is this tool?</button>
-            <button className="guide-option-btn" onClick={handleWhatCanIDo}>What can I do with this tool?</button>
-            <button className="guide-option-btn" onClick={handleGoToFaqs}>Other key questions (FAQs)</button>
+            {option('what', 'What is this tool?', handleWhatIsIt)}
+            {option('can', 'What can I do with this tool?', handleWhatCanIDo)}
+            {option('faqs', 'Other key questions (FAQs)', handleGoToFaqs)}
           </>
         );
 
       case 'what-is-it':
         return (
           <>
-            <button className="guide-option-btn" onClick={handleWhatCanIDo}>What can I do with this tool?</button>
-            <button className="guide-option-btn" onClick={handleGoToFaqs}>Other key questions (FAQs)</button>
-            <button className="guide-option-btn guide-option-btn--secondary" onClick={handleMainMenu}>↩ Main menu</button>
+            {option('can', 'What can I do with this tool?', handleWhatCanIDo)}
+            {option('faqs', 'Other key questions (FAQs)', handleGoToFaqs)}
+            {mainMenu}
           </>
         );
 
       case 'use-cases':
         return (
           <>
-            {content.useCases.map(uc => (
-              <button
-                key={uc.id}
-                className="guide-option-btn"
-                onClick={() => handleUseCaseSelect(uc)}
-              >
-                {visitedUseCases.has(uc.id) && (
-                  <span style={{ color: 'var(--accent-orange)', marginRight: 6, fontSize: '0.7rem' }}>✓</span>
-                )}
-                {uc.label}
-              </button>
+            {content.useCases.map(uc => option(
+              uc.id,
+              visitedUseCases.has(uc.id)
+                ? <>{uc.label}<span className="lk-sr"> (seen)</span></>
+                : uc.label,
+              () => handleUseCaseSelect(uc),
+              'choice',
+              visitedUseCases.has(uc.id) ? 'check' : undefined,
             ))}
-            <button className="guide-option-btn guide-option-btn--secondary" onClick={handleMainMenu}>↩ Main menu</button>
+            {mainMenu}
           </>
         );
 
       case 'open-question':
-        return (
-          <button className="guide-option-btn guide-option-btn--secondary" onClick={handleMainMenu}>↩ Main menu</button>
-        );
+        return mainMenu;
 
       case 'getting-started':
         return (
           <>
-            <button className="guide-option-btn" onClick={handleWhatCanIDo}>Explore another use</button>
-            <button className="guide-option-btn" onClick={handleGoToFaqs}>Other key questions (FAQs)</button>
-            {otherUseCase && (
-              <button className="guide-option-btn" onClick={() => handleUseCaseSelect(otherUseCase)}>
-                I have something else in mind
-              </button>
-            )}
-            <button className="guide-option-btn guide-option-btn--secondary" onClick={handleMainMenu}>↩ Main menu</button>
+            {option('another', 'Explore another use', handleWhatCanIDo)}
+            {option('faqs', 'Other key questions (FAQs)', handleGoToFaqs)}
+            {otherUseCase && option('other', 'I have something else in mind', () => handleUseCaseSelect(otherUseCase))}
+            {mainMenu}
           </>
         );
 
@@ -554,14 +619,10 @@ function GuidePanelInner({ content, tool, isOpen }: GuidePanelProps & { content:
         return (
           <>
             {(['criticalUse', 'practical', 'concept'] as FaqCategory[]).map(cat => (
-              <button key={cat} className="guide-option-btn" onClick={() => handleFaqCategorySelect(cat)}>
-                {FAQ_CATEGORY_LABELS[cat]}
-              </button>
+              option(cat, FAQ_CATEGORY_LABELS[cat], () => handleFaqCategorySelect(cat))
             ))}
-            <button className="guide-option-btn guide-option-btn--live" onClick={handleSomethingElse}>
-              Something else — type my question
-            </button>
-            <button className="guide-option-btn guide-option-btn--secondary" onClick={handleMainMenu}>↩ Main menu</button>
+            {option('else', 'Something else? Type your question', handleSomethingElse, 'choice', 'chat')}
+            {mainMenu}
           </>
         );
 
@@ -569,24 +630,18 @@ function GuidePanelInner({ content, tool, isOpen }: GuidePanelProps & { content:
         return (
           <>
             {selectedFaqCategory && content.faqs[selectedFaqCategory].map((faq, i) => (
-              <button key={i} className="guide-option-btn" onClick={() => handleFaqSelect(faq)}>
-                {faq.q}
-              </button>
+              option(`faq-${i}`, faq.q, () => handleFaqSelect(faq))
             ))}
-            <button className="guide-option-btn guide-option-btn--live" onClick={handleSomethingElse}>
-              Something else — type my question
-            </button>
-            <button className="guide-option-btn guide-option-btn--secondary" onClick={handleGoToFaqs}>
-              ↩ Back to categories
-            </button>
+            {option('else', 'Something else? Type your question', handleSomethingElse, 'choice', 'chat')}
+            {option('back', 'Back to topics', handleGoToFaqs, 'back')}
           </>
         );
 
       case 'faq-answer':
         return (
           <>
-            <button className="guide-option-btn" onClick={handleGoToFaqs}>More questions (FAQs)</button>
-            <button className="guide-option-btn guide-option-btn--secondary" onClick={handleMainMenu}>↩ Main menu</button>
+            {option('more', 'More questions (FAQs)', handleGoToFaqs)}
+            {mainMenu}
           </>
         );
 
@@ -595,99 +650,94 @@ function GuidePanelInner({ content, tool, isOpen }: GuidePanelProps & { content:
     }
   }
 
-  return (
-    <div className={`guide-panel${isOpen ? ' guide-panel--open' : ''}`}>
-      <div className="guide-panel-header">
-        <span className="guide-panel-title">📖 Learning Guide</span>
-        {tier && (
-          <button
-            className={`guide-tier-badge${highlightBadge ? ' guide-tier-badge--highlight' : ''}`}
-            onClick={resetTier}
-            title="Change your experience level"
-          >
-            {TIER_SHORT_LABELS[tier]} ✎
-          </button>
-        )}
-      </div>
-      <button
-        className="cm-restart-link"
-        onClick={() => {
-          const key = `cm_${user?.username ?? 'anon'}_${tool}`;
-          localStorage.removeItem(key);
-          window.dispatchEvent(new CustomEvent('cm-restart', { detail: { tool } }));
-        }}
-      >
-        ↺ Restart page tour
-      </button>
+  const wordCount = countWords(freeInput);
+  const tooLong = wordCount > MAX_INPUT_WORDS;
+  const nearLimit = wordCount >= SOFT_WARN_WORDS && !tooLong;
 
-      <div className="guide-panel-body">
-        <div className="guide-panel-messages">
-          {messages.map((msg, i) => (
-            <div key={i} className={`guide-message guide-message--${msg.role}`}>
-              <div className="guide-message-content">
-                <span className="guide-message-text">{renderText(msg.content)}</span>
-                {msg.copyable && (
-                  <div className="guide-copy-block">
-                    <div className="guide-copy-prompt">&quot;{msg.copyable}&quot;</div>
-                    <button
-                      className={`guide-copy-btn${copiedIdx === i ? ' guide-copy-btn--copied' : ''}`}
-                      onClick={() => msg.copyable && handleCopy(msg.copyable, i)}
-                    >
-                      {copiedIdx === i ? '✓ Copied!' : '⎘ Copy prompt'}
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
-          {isThinking && (
-            <div className="guide-message guide-message--bot">
-              <div className="guide-message-content guide-message-thinking">
-                <span className="typing-dot" />
-                <span className="typing-dot" />
-                <span className="typing-dot" />
-              </div>
-            </div>
+  return (
+    <GuideFrame
+      isOpen={isOpen}
+      onClose={onClose}
+      headerExtra={
+        <div className="lk-guide__tools">
+          {tier && (
+            <span className="lk-guide__level">
+              <span className="lk-fine">Level: <strong>{TIER_SHORT_LABELS[tier]}</strong></span>
+              <Button variant="quiet" onClick={resetTier}>Change level</Button>
+            </span>
           )}
+          <Button
+            variant="quiet"
+            onClick={() => {
+              const key = `cm_${user?.username ?? 'anon'}_${tool}`;
+              localStorage.removeItem(key);
+              window.dispatchEvent(new CustomEvent('cm-restart', { detail: { tool } }));
+            }}
+          >
+            Show the page tour again
+          </Button>
+        </div>
+      }
+    >
+      <div className="lk-guide__body">
+        <div className="lk-guide__messages" aria-live="polite">
+          {messages.map((msg, i) => (
+            msg.role === 'user' ? (
+              <ChatMessage key={i} role="user">{msg.content}</ChatMessage>
+            ) : (
+              <ChatMessage
+                key={i}
+                actions={msg.copyable ? <CopyButton text={msg.copyable} label="Copy prompt" /> : undefined}
+              >
+                <p className="lk-guide__text">{renderText(msg.content)}</p>
+                {msg.copyable && <p className="lk-guide__prompt">“{msg.copyable}”</p>}
+              </ChatMessage>
+            )
+          ))}
+          {isThinking && <ChatMessage thinking />}
           <div ref={messagesEndRef} />
         </div>
 
-        <div className="guide-panel-options">
+        <div className="lk-guide__options">
           {renderOptions()}
         </div>
       </div>
 
-      {screen !== 'tier-select' && (() => {
-        const wordCount = countWords(freeInput);
-        const tooLong = wordCount > MAX_INPUT_WORDS;
-        const nearLimit = wordCount >= SOFT_WARN_WORDS && !tooLong;
-        return (
-          <>
-            {liveLimitReached && (
-              <div className="guide-limit-banner">
-                {LIBRARIAN_REDIRECT}
-              </div>
-            )}
-            <form className="guide-panel-input" onSubmit={handleFreeInputSubmit}>
+      {screen !== 'tier-select' && (
+        <div className="lk-guide__ask">
+          {liveLimitReached && (
+            <Notice tone="info">{LIBRARIAN_REDIRECT}</Notice>
+          )}
+          <form className="lk-guide__form" onSubmit={(e: FormEvent) => handleFreeInputSubmit(e)}>
+            <label className="lk-field__label" htmlFor={`lk-guide-input-${tool}`}>
+              {screen === 'open-question' ? 'Describe what you have in mind' : 'Ask your own question'}
+            </label>
+            <div className="lk-guide__row">
               <input
+                id={`lk-guide-input-${tool}`}
                 ref={inputRef}
-                className={`guide-input${highlightInput ? ' guide-input--highlight' : ''}`}
+                className="lk-field__control"
                 value={freeInput}
                 onChange={e => setFreeInput(e.target.value)}
-                placeholder={screen === 'open-question' ? 'Describe what you have in mind...' : 'Type a question...'}
+                aria-invalid={tooLong ? true : undefined}
+                aria-describedby={nearLimit || tooLong ? `lk-guide-count-${tool}` : undefined}
               />
-              <button type="submit" className="guide-send-btn" disabled={!freeInput.trim() || tooLong}>➤</button>
-            </form>
+              <IconButton icon="send" label="Ask the guide" variant="primary" type="submit" disabled={!freeInput.trim() || tooLong} />
+            </div>
             {(nearLimit || tooLong) && (
-              <div className={`guide-word-count${tooLong ? ' guide-word-count--error' : ' guide-word-count--warn'}`}>
+              <p
+                id={`lk-guide-count-${tool}`}
+                className={tooLong ? 'lk-field__error' : 'lk-field__hint'}
+              >
+                {tooLong && <Icon name="alert" size={20} />}
                 {tooLong
-                  ? `Too long (${wordCount} words). Please shorten — ${MAX_INPUT_WORDS} word limit.`
-                  : `${wordCount} / ${MAX_INPUT_WORDS} words — keep it short`}
-              </div>
+                  ? `That is ${wordCount} words. Please keep it under ${MAX_INPUT_WORDS}.`
+                  : `${wordCount} of ${MAX_INPUT_WORDS} words. Keep it short.`}
+              </p>
             )}
-          </>
-        );
-      })()}
-    </div>
+          </form>
+        </div>
+      )}
+    </GuideFrame>
   );
 }

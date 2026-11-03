@@ -278,7 +278,7 @@ export default function VideoPage() {
                         )}
                     </>
                 }
-                after={<GuidePanel tool="video" isOpen={guideOpen} />}
+                after={<GuidePanel tool="video" isOpen={guideOpen} onClose={() => setGuideOpen(false)} />}
             >
                 <div className="lk-thread" data-tour="video-result">
                     <div className="lk-thread__inner">

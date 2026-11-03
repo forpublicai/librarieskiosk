@@ -273,7 +273,7 @@ export default function ImagePage() {
                         )}
                     </>
                 }
-                after={<GuidePanel tool="image" isOpen={guideOpen} />}
+                after={<GuidePanel tool="image" isOpen={guideOpen} onClose={() => setGuideOpen(false)} />}
             >
                 <div className="lk-thread" data-tour="image-result">
                     <div className="lk-thread__inner">

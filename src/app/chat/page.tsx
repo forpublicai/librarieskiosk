@@ -340,7 +340,7 @@ export default function ChatPage() {
                         )}
                     </>
                 }
-                after={<GuidePanel tool="chat" isOpen={guideOpen} />}
+                after={<GuidePanel tool="chat" isOpen={guideOpen} onClose={() => setGuideOpen(false)} />}
             >
                 <div className="lk-thread" data-tour="chat-messages">
                     <div className="lk-thread__inner">

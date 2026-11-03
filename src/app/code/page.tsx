@@ -344,7 +344,7 @@ export default function CodePage() {
                                 <p className="lk-code-pane__empty">The newest code from the chat shows here.</p>
                             )}
                         </section>
-                        <GuidePanel tool="code" isOpen={guideOpen} />
+                        <GuidePanel tool="code" isOpen={guideOpen} onClose={() => setGuideOpen(false)} />
                     </>
                 }
             >

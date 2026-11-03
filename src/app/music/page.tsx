@@ -264,7 +264,7 @@ export default function MusicPage() {
                         )}
                     </>
                 }
-                after={<GuidePanel tool="music" isOpen={guideOpen} />}
+                after={<GuidePanel tool="music" isOpen={guideOpen} onClose={() => setGuideOpen(false)} />}
             >
                 <div className="lk-thread" data-tour="music-result">
                     <div className="lk-thread__inner">
