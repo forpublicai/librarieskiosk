@@ -89,7 +89,8 @@ export default function Composer({
                     autoFocus={autoFocus}
                     onChange={(e) => setValue(e.target.value)}
                     onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
+                        // Enter also confirms an input-method candidate (Chinese, Japanese); do not send then.
+                        if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
                             e.preventDefault();
                             send();
                         }

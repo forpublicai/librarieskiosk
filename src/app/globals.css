@@ -1758,7 +1758,7 @@ textarea.lk-field__control { min-height: 120px; resize: vertical; }
 .lk-msg__body pre code { background: none; padding: 0; }
 .lk-msg__body img { display: block; max-width: 100%; border-radius: var(--radius-lg); }
 .lk-msg__actions { display: flex; gap: var(--space-1); margin-left: calc(var(--space-3) * -1); }
-.lk-msg__actions .lk-btn { min-height: 44px; color: var(--ink-muted); }
+.lk-msg__actions .lk-btn { min-height: var(--target-min); color: var(--ink-muted); }
 .lk-msg__time { font: 400 15px/22px var(--font-sans); color: var(--ink-subtle); }
 
 /* ---------- Composer ---------- */
@@ -1949,7 +1949,7 @@ a.lk-btn--danger { color: var(--danger); }
 .lk-media__video { display: block; width: 100%; max-height: 520px; border-radius: var(--radius-lg); background: var(--surface-sunken); }
 .lk-media__audio { display: block; width: 100%; }
 .lk-media__actions { display: flex; gap: var(--space-1); margin-left: calc(var(--space-3) * -1); }
-.lk-media__actions .lk-btn { min-height: 44px; color: var(--ink-muted); }
+.lk-media__actions .lk-btn { min-height: var(--target-min); color: var(--ink-muted); }
 .lk-wait { display: flex; flex-direction: column; gap: var(--space-1); }
 .lk-wait__meta { padding-left: calc(22px + var(--space-3)); font: 400 15px/22px var(--font-sans); color: var(--ink-subtle); }
 
@@ -2032,4 +2032,17 @@ a.lk-btn--danger { color: var(--danger); }
 .lk-stat__label { font: 400 15px/22px var(--font-sans); color: var(--ink-muted); }
 @media (max-width: 600px) {
   .lk-page { padding: var(--space-6) var(--space-4); }
+}
+
+/* Tool headers carry more items (Home, tool name, guide): switch to the menu earlier. */
+@media (max-width: 1200px) {
+  .lk-header--tool .lk-header__wide { display: none; }
+  .lk-header--tool .lk-header__menu-btn { display: inline-flex; }
+  .lk-header--tool .lk-header__menu-wrap { display: block; }
+}
+
+/* Last in the file so it wins over the shape hover rules above. */
+@media (prefers-reduced-motion: reduce) {
+  .lk-mode__shape { transition: none; }
+  .lk-mode:hover .lk-mode__shape, .lk-mode:focus-visible .lk-mode__shape, .lk-mode:active .lk-mode__shape { transform: none; }
 }
