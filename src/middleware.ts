@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
+import {
+    KIOSK_ACCESS_COOKIE,
+    KIOSK_ACCESS_MAX_AGE_SEC,
+    createKioskAccessCookieValue,
+    isValidKioskAccessCookie,
+    timingSafeEqualString,
+} from '@/lib/kioskAccess';
 
-const COOKIE_NAME = 'kiosk_access';
-const COOKIE_MAX_AGE = 60 * 60 * 8; // 8 hours
-
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
     const token = process.env.KIOSK_ACCESS_TOKEN;
     const { pathname, searchParams } = request.nextUrl;
 
@@ -20,25 +24,25 @@ export function middleware(request: NextRequest) {
 
     // If the secret token is in the URL, set the cookie and redirect to clean URL
     const param = searchParams.get('access');
-    if (param === token) {
+    if (param !== null && timingSafeEqualString(param, token)) {
         const cleanUrl = new URL(pathname, request.url);
         const response = NextResponse.redirect(cleanUrl);
-        response.cookies.set(COOKIE_NAME, 'true', {
+        response.cookies.set(KIOSK_ACCESS_COOKIE, await createKioskAccessCookieValue(token), {
             httpOnly: true,
             sameSite: 'lax',
-            maxAge: COOKIE_MAX_AGE,
+            maxAge: KIOSK_ACCESS_MAX_AGE_SEC,
             path: '/',
         });
         return response;
     }
 
-    // If cookie is present, allow through
-    const cookie = request.cookies.get(COOKIE_NAME);
-    if (cookie?.value === 'true') {
+    // If a validly signed, unexpired cookie is present, allow through
+    const cookie = request.cookies.get(KIOSK_ACCESS_COOKIE);
+    if (await isValidKioskAccessCookie(cookie?.value, token)) {
         return NextResponse.next();
     }
 
-    // No cookie, no token — blocked
+    // No valid cookie, no token — blocked
     return new NextResponse(
         `<!DOCTYPE html>
 <html lang="en">
