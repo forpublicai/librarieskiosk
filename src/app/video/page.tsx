@@ -1,13 +1,22 @@
 'use client';
 
-import { useState, FormEvent, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
 import Header from '@/components/Header';
 import GuidePanel from '@/components/GuidePanel';
 import CoachmarkTour from '@/components/CoachmarkTour';
+import GenerationWait from '@/components/GenerationWait';
+import HistoryList from '@/components/HistoryList';
+import ToolLayout from '@/components/ToolLayout';
+import Button from '@/components/ui/Button';
+import ChatMessage from '@/components/ui/ChatMessage';
+import Chip from '@/components/ui/Chip';
+import Composer from '@/components/ui/Composer';
+import Notice from '@/components/ui/Notice';
+import { calculateCredits, formatCredits } from '@/lib/creditCosts';
 import { refreshMediaUrl, downloadMedia } from '@/lib/mediaClient';
-import { useGenerationProgress, formatElapsed } from '@/hooks/useGenerationProgress';
+import { useGenerationProgress } from '@/hooks/useGenerationProgress';
 import { loadGuestState, saveGuestState } from '@/lib/guestSession';
 import modelConfig from '@/config/models.json';
 
@@ -34,6 +43,13 @@ interface SessionItem {
 
 const GUEST_KEY = 'video';
 
+const VIDEO_CHIPS = [
+    'Waves crashing on a beach at sunset',
+    'A butterfly landing on a flower',
+];
+
+const VIDEO_LENGTHS = [6, 10];
+
 interface GuestVideoState {
     videoUrl: string | null;
     sessions: SessionItem[];
@@ -51,7 +67,8 @@ export default function VideoPage() {
     const [error, setError] = useState('');
     const [sessions, setSessions] = useState<SessionItem[]>([]);
     const [guideOpen, setGuideOpen] = useState(false);
-    const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+    // The prompt behind the clip on screen, shown as the patron's bubble.
+    const [resultPrompt, setResultPrompt] = useState<string | null>(null);
     const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const isGuest = user?.role === 'GUEST';
     const hydratedRef = useRef(false);
@@ -62,7 +79,7 @@ export default function VideoPage() {
         intervalSec: 5,
     });
 
-    const creditCost = Math.round((duration / 10) * 25);
+    const creditCost = calculateCredits('video', duration);
 
     useEffect(() => {
         if (!isLoading && !user) router.push('/');
@@ -121,8 +138,7 @@ export default function VideoPage() {
     const handleDeleteSession = useCallback(async (id: string) => {
         if (id.startsWith('guest_')) {
             setSessions((prev) => prev.filter((s) => s.id !== id));
-            if (currentSessionId === id) { setCurrentSessionId(null); setVideoUrl(null); }
-            setConfirmDelete(null);
+            if (currentSessionId === id) { setCurrentSessionId(null); setVideoUrl(null); setResultPrompt(null); }
             return;
         }
         await fetch(`/api/media-sessions/${id}`, {
@@ -130,9 +146,23 @@ export default function VideoPage() {
             headers: { Authorization: `Bearer ${token}` },
         });
         setSessions((prev) => prev.filter((s) => s.id !== id));
-        if (currentSessionId === id) { setCurrentSessionId(null); setVideoUrl(null); }
-        setConfirmDelete(null);
+        if (currentSessionId === id) { setCurrentSessionId(null); setVideoUrl(null); setResultPrompt(null); }
     }, [token, currentSessionId]);
+
+    const selectSession = async (s: SessionItem) => {
+        setCurrentSessionId(s.id);
+        setResultPrompt(s.prompt);
+        setError('');
+        if (s.url) { setVideoUrl(s.url); return; }
+        setVideoUrl(null);
+        if (!token) return;
+        const fresh = await refreshMediaUrl(s.id, token);
+        if (fresh?.url) {
+            setVideoUrl(fresh.url);
+        } else {
+            setError('This video is no longer available.');
+        }
+    };
 
     const pollStatus = async (id: string) => {
         try {
@@ -164,7 +194,7 @@ export default function VideoPage() {
             } else if (normalizedStatus === 'FAILED' || normalizedStatus === 'CANCELED') {
                 throw new Error(data.error || 'Video generation failed');
             } else {
-                setStatus(`Generating... stage: ${normalizedStatus || 'IN_PROGRESS'}`);
+                setStatus(`Stage: ${(normalizedStatus || 'IN_PROGRESS').toLowerCase().replace(/_/g, ' ')}`);
             }
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Polling failed');
@@ -173,15 +203,15 @@ export default function VideoPage() {
         }
     };
 
-    const handleGenerate = async (e: FormEvent) => {
-        e.preventDefault();
-        if (!prompt.trim() || loading) return;
+    const handleGenerate = async (text: string) => {
+        if (!text.trim() || loading) return;
         setLoading(true);
         setError('');
         setVideoUrl(null);
         setCurrentSessionId(null);
-        setStatus('Submitting request...');
-        lastPromptRef.current = prompt.trim();
+        setResultPrompt(text.trim());
+        setStatus('Sending your request…');
+        lastPromptRef.current = text.trim();
         try {
             const res = await fetch('/api/video', {
                 method: 'POST',
@@ -189,7 +219,7 @@ export default function VideoPage() {
                     'Content-Type': 'application/json',
                     Authorization: `Bearer ${token}`,
                 },
-                body: JSON.stringify({ prompt: prompt.trim(), duration }),
+                body: JSON.stringify({ prompt: text.trim(), duration }),
             });
             if (!res.ok) {
                 const data = await res.json();
@@ -199,7 +229,7 @@ export default function VideoPage() {
             const generationId = data.runId || data.id || data.requestId;
             if (data.mediaSessionId) setCurrentSessionId(data.mediaSessionId);
             if (generationId) {
-                setStatus('Generation started...');
+                setStatus('Your clip is in the queue.');
                 pollIntervalRef.current = setInterval(() => pollStatus(generationId), 5000);
             } else {
                 throw new Error('No generation ID returned');
@@ -212,190 +242,124 @@ export default function VideoPage() {
 
     if (isLoading || !user) return null;
 
+    const sessionById = new Map(sessions.map((s) => [s.id, s]));
+
     return (
         <div className="page-container">
-            <Header title="Videos" actions={
-                <button
-                    className={`guide-toggle-btn${guideOpen ? ' guide-toggle-btn--active' : ''}`}
+            <Header title="Video" tool="video" actions={
+                <Button
+                    variant="quiet"
+                    icon="help"
+                    aria-pressed={guideOpen}
                     onClick={() => setGuideOpen(o => !o)}
                     data-tour="guide-btn"
                 >
-                    <span className="guide-toggle-icon">?</span>
-                    Learning Guide
-                </button>
+                    Learning guide
+                </Button>
             } />
-            <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', padding: '8px 24px 0', margin: 0, letterSpacing: '0.03em' }}>
-                Currently using: {modelConfig.video.label}
-            </p>
 
-            <div className="gen-container">
-                <aside className="gen-sidebar" data-tour="video-sidebar">
-                    <h2 className="form-label" style={{ marginBottom: '20px' }}>History</h2>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        {sessions.length === 0 && (
-                            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                                No videos generated yet.
-                            </p>
+            <ToolLayout
+                sidebarLabel="Your videos"
+                sidebarTour="video-sidebar"
+                sidebar={
+                    <>
+                        {isGuest && <p className="lk-tool__note">Guest videos are cleared when you leave.</p>}
+                        {sessions.length === 0 ? (
+                            <p className="lk-tool__note">Your videos will show here.</p>
+                        ) : (
+                            <HistoryList
+                                items={sessions.map((s) => ({ id: s.id, title: s.prompt || 'Untitled video', updatedAt: s.createdAt }))}
+                                activeId={currentSessionId}
+                                icon="video"
+                                noun="video"
+                                onSelect={(id) => { const s = sessionById.get(id); if (s) selectSession(s); }}
+                                onDelete={handleDeleteSession}
+                            />
                         )}
-                        {sessions.map((s) => (
-                            <div
-                                key={s.id}
-                                style={{
-                                    position: 'relative',
-                                    border: '1px solid var(--border-color)',
-                                    padding: '10px',
-                                    background: 'var(--bg-card)',
-                                    transition: 'background 0.2s',
-                                }}
-                            >
-                                {confirmDelete === s.id ? (
-                                    <div style={{ fontSize: '0.75rem' }}>
-                                        <div style={{ marginBottom: '8px', fontWeight: 'bold' }}>Delete this video?</div>
-                                        <div style={{ display: 'flex', gap: '6px' }}>
-                                            <button className="btn btn-primary" style={{ flex: 1, fontSize: '0.72rem', padding: '4px' }} onClick={() => handleDeleteSession(s.id)}>Delete</button>
-                                            <button className="btn" style={{ flex: 1, fontSize: '0.72rem', padding: '4px' }} onClick={() => setConfirmDelete(null)}>Cancel</button>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <>
-                                        <button
-                                            onClick={() => setConfirmDelete(s.id)}
-                                            style={{ position: 'absolute', top: '6px', right: '6px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.8rem', lineHeight: 1, padding: '2px 4px' }}
-                                            title="Delete"
-                                        >✕</button>
-                                        <div
-                                            style={{ cursor: 'pointer' }}
-                                            onClick={async () => {
-                                                setCurrentSessionId(s.id);
-                                                setError('');
-                                                if (s.url) { setVideoUrl(s.url); return; }
-                                                setVideoUrl(null);
-                                                if (!token) return;
-                                                const fresh = await refreshMediaUrl(s.id, token);
-                                                if (fresh?.url) {
-                                                    setVideoUrl(fresh.url);
-                                                } else {
-                                                    setError('This video is no longer available.');
-                                                }
-                                            }}
-                                        >
-                                            <div style={{ fontSize: '0.75rem', fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: '16px' }}>
-                                                {s.prompt}
-                                            </div>
-                                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                                                {new Date(s.createdAt).toLocaleDateString()}
-                                            </div>
-                                        </div>
-                                    </>
-                                )}
+                    </>
+                }
+                after={<GuidePanel tool="video" isOpen={guideOpen} />}
+            >
+                <div className="lk-thread" data-tour="video-result">
+                    <div className="lk-thread__inner">
+                        {!loading && !videoUrl && !error && (
+                            <div className="lk-empty">
+                                <h1 className="lk-display">What should happen in your clip?</h1>
+                                <p>Describe a scene and how things move. A clip takes 1 to 4 minutes to make.</p>
                             </div>
-                        ))}
-                    </div>
-                </aside>
-
-                <main className="gen-main">
-                    <div style={{ width: '100%', maxWidth: '800px' }}>
-                        <form className="gen-prompt-area" onSubmit={handleGenerate}>
-                            <label className="form-label">Describe the video you want to create</label>
-                            <div style={{ display: 'flex' }} data-tour="video-prompt">
-                                <input
-                                    className="input"
-                                    value={prompt}
-                                    onChange={(e) => setPrompt(e.target.value)}
-                                    placeholder="A drone shot of a tropical island..."
-                                    disabled={loading}
-                                    autoFocus
-                                    style={{ flex: 1, borderRight: 'none' }}
+                        )}
+                        {resultPrompt && (loading || videoUrl || error) && (
+                            <ChatMessage role="user">{resultPrompt}</ChatMessage>
+                        )}
+                        {loading && (
+                            <GenerationWait
+                                message={progress.message}
+                                elapsedSec={progress.elapsedSec}
+                                typical="1 to 4 minutes"
+                                detail={status || undefined}
+                            />
+                        )}
+                        {error && (
+                            <Notice tone="danger" title="The video could not be made">
+                                {error} Please try again, or change your description.
+                            </Notice>
+                        )}
+                        {!loading && videoUrl && (
+                            <div className="lk-media">
+                                <video
+                                    src={videoUrl}
+                                    controls
+                                    preload="metadata"
+                                    playsInline
+                                    onError={refreshMainUrl}
+                                    className="lk-media__video"
+                                    aria-label={resultPrompt ? `Video of: ${resultPrompt}` : 'Your video'}
                                 />
-                                <button
-                                    className="btn btn-primary"
-                                    type="submit"
-                                    disabled={loading || !prompt.trim()}
-                                    style={{ padding: '14px 32px' }}
-                                >
-                                    {loading ? '...' : 'Generate'}
-                                </button>
-                            </div>
-                            <div className="example-prompts">
-                                <span className="example-prompts-label">Try:</span>
-                                <button type="button" className="example-chip" onClick={() => setPrompt('Waves crashing on a beach at sunset')}>Waves crashing on a beach at sunset</button>
-                                <button type="button" className="example-chip" onClick={() => setPrompt('A butterfly landing on a flower')}>A butterfly landing on a flower</button>
-                            </div>
-
-                            <div data-tour="video-duration">
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                                    <label className="form-label" style={{ margin: 0 }}>Duration</label>
-                                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>
-                                        Cost: {creditCost} {creditCost === 1 ? 'credit' : 'credits'}
-                                    </span>
-                                </div>
-                                <div style={{ display: 'flex', gap: '8px' }}>
-                                    {[6, 10].map((s) => (
-                                        <button
-                                            key={s}
-                                            type="button"
-                                            className={`btn${duration === s ? ' btn-primary' : ''}`}
-                                            onClick={() => setDuration(s)}
-                                            disabled={loading}
-                                            style={{ flex: 1 }}
-                                        >
-                                            {s}s
-                                        </button>
-                                    ))}
+                                <div className="lk-media__actions">
+                                    <Button variant="quiet" icon="download" onClick={handleDownload}>Download</Button>
                                 </div>
                             </div>
-                        </form>
-
-                        {error && <div className="gen-error" style={{ marginBottom: '20px' }}>{error}</div>}
-
-                        <div className="gen-result-area" data-tour="video-result">
-                            {loading && (
-                                <div className="gen-loading">
-                                    <div className="gen-spinner" />
-                                    <div className="gen-loading-text">{progress.message}</div>
-                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', letterSpacing: '0.05em' }}>
-                                        {formatElapsed(progress.elapsedSec)} elapsed · typically 1–4 minutes
-                                    </div>
-                                    {status && (
-                                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', opacity: 0.7 }}>
-                                            {status}
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-                            {!loading && videoUrl && (
-                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px', width: '100%', padding: '24px' }}>
-                                    <video
-                                        src={videoUrl}
-                                        controls
-                                        loop
-                                        preload="metadata"
-                                        playsInline
-                                        onError={refreshMainUrl}
-                                        style={{ maxWidth: '100%', maxHeight: '500px', border: '1px solid var(--border-color)' }}
-                                    />
-                                    <button
-                                        className="btn"
-                                        onClick={handleDownload}
-                                    >
-                                        Download Video
-                                    </button>
-                                </div>
-                            )}
-
-                            {!loading && !videoUrl && !error && (
-                                <div className="gen-empty">
-                                    <div className="gen-empty-icon">🎬</div>
-                                    <div className="gen-empty-text">Your generated video will appear here</div>
-                                </div>
-                            )}
-                        </div>
+                        )}
                     </div>
-                </main>
+                </div>
 
-                <GuidePanel tool="video" isOpen={guideOpen} />
-            </div>
+                <div className="lk-dock">
+                    <div className="lk-dock__inner">
+                        {!loading && !videoUrl && !prompt && (
+                            <div className="lk-chips" aria-label="Example clips">
+                                {VIDEO_CHIPS.map(p => (
+                                    <Chip key={p} onClick={() => { setPrompt(p); document.getElementById('lk-composer')?.focus(); }}>{p}</Chip>
+                                ))}
+                            </div>
+                        )}
+                        <div className="lk-options" data-tour="video-duration">
+                            <div className="lk-options__group" role="group" aria-labelledby="video-length-label">
+                                <span id="video-length-label" className="lk-options__label">Length</span>
+                                {VIDEO_LENGTHS.map((sec) => (
+                                    <Chip key={sec} selected={duration === sec} onClick={() => setDuration(sec)} disabled={loading}>
+                                        {sec} seconds
+                                    </Chip>
+                                ))}
+                            </div>
+                            <span className="lk-options__cost">{formatCredits(creditCost)}</span>
+                        </div>
+                        <span data-tour="video-prompt">
+                            <Composer
+                                value={prompt}
+                                onChange={setPrompt}
+                                onSend={handleGenerate}
+                                disabled={loading}
+                                clearOnSend={false}
+                                label="Describe the scene"
+                                sendLabel="Make video"
+                                placeholder="A drone shot of a tropical island…"
+                                hint={`Using ${modelConfig.video.label}. Uses ${formatCredits(creditCost)}. Press Enter to make it.`}
+                                autoFocus
+                            />
+                        </span>
+                    </div>
+                </div>
+            </ToolLayout>
             <CoachmarkTour tool="video" />
         </div>
     );
