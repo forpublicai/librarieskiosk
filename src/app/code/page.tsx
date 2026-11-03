@@ -63,6 +63,8 @@ export default function CodePage() {
     const [activeConvId, setActiveConvId] = useState<string | null>(null);
     const [guideOpen, setGuideOpen] = useState(false);
     const abortRef = useRef<AbortController | null>(null);
+    // Error replies this page made in this visit, so only they show as a failure notice.
+    const [errorReplies, setErrorReplies] = useState<string[]>([]);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const isGuest = user?.role === 'GUEST';
@@ -261,9 +263,11 @@ export default function CodePage() {
                 scheduleSave(stoppedMessages, activeConvId);
                 await refreshUser();
             } else {
+                const errorContent = `Error: ${err instanceof Error ? err.message : 'Something went wrong'}`;
+                setErrorReplies((prev) => [...prev, errorContent]);
                 setMessages((prev) => [...prev.filter((m) => m.role !== 'assistant' || m.content !== ''), {
                     role: 'assistant',
-                    content: `Error: ${err instanceof Error ? err.message : 'Something went wrong'}`,
+                    content: errorContent,
                 }]);
             }
         } finally {
@@ -357,6 +361,7 @@ export default function CodePage() {
                                 <AssistantReply
                                     key={i}
                                     content={msg.content}
+                                    failed={errorReplies.includes(msg.content)}
                                     streaming={isStreaming && i === shownMessages.length - 1}
                                 />
                             ) : (
