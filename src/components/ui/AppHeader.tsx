@@ -35,7 +35,7 @@ interface AppHeaderProps {
     children?: ReactNode;
 }
 
-/** The top bar on every signed-in screen. Below 700px the account items move into a menu. */
+/** The top bar on every signed-in screen. Below 700px the extra and account items move into a menu. */
 export default function AppHeader({
     logoLight,
     logoDark,
@@ -98,7 +98,7 @@ export default function AppHeader({
     );
 
     return (
-        <header className="lk-header">
+        <header className={onBack ? 'lk-header lk-header--tool' : 'lk-header'}>
             <div className="lk-header__start">
                 {onBack && <Button variant="quiet" icon="back" onClick={onBack}>Home</Button>}
                 {logo && (logoHref ? (
@@ -114,7 +114,7 @@ export default function AppHeader({
                 )}
             </div>
             <div className="lk-header__end">
-                {children}
+                {children && <span className="lk-header__wide lk-header__end">{children}</span>}
                 {credits != null && <CreditBadge credits={credits} renewAt={renewAt} />}
                 {hasAccountItems && (
                     <>
@@ -129,6 +129,7 @@ export default function AppHeader({
                             />
                             {menuOpen && (
                                 <div className="lk-header__menu" onClick={() => setMenuOpen(false)}>
+                                    {children}
                                     {accountItems(true)}
                                 </div>
                             )}

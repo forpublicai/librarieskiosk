@@ -25,6 +25,7 @@ interface ComposerProps {
     /** Screen-reader label. Default "Message". */
     label?: string;
     id?: string;
+    autoFocus?: boolean;
     className?: string;
 }
 
@@ -41,6 +42,7 @@ export default function Composer({
     hint,
     label = 'Message',
     id = 'lk-composer',
+    autoFocus,
     className,
 }: ComposerProps) {
     const [ownValue, setOwnValue] = useState(defaultValue);
@@ -78,6 +80,7 @@ export default function Composer({
                     placeholder={placeholder}
                     className="lk-composer__input"
                     disabled={disabled}
+                    autoFocus={autoFocus}
                     onChange={(e) => setValue(e.target.value)}
                     onKeyDown={(e) => {
                         if (e.key === 'Enter' && !e.shiftKey) {
