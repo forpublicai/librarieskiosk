@@ -1,56 +1,51 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
-import CreditBadge from '@/components/CreditBadge';
-import ThemeToggle from '@/components/ThemeToggle';
+import AppHeader from '@/components/ui/AppHeader';
+import type { ToolName } from '@/components/ui/ToolShape';
+import { useTheme } from '@/hooks/useTheme';
 
 interface HeaderProps {
     title?: string;
+    /** Shows the tool's shape and color before the title. */
+    tool?: ToolName;
     showBack?: boolean;
-    actions?: React.ReactNode;
+    actions?: ReactNode;
 }
 
-export default function Header({ title, showBack = true, actions }: HeaderProps) {
+/** The signed-in app header, wired to auth, routing and the theme. */
+export default function Header({ title, tool, showBack = true, actions }: HeaderProps) {
     const { user, logout } = useAuth();
+    const { theme, toggleTheme } = useTheme();
     const router = useRouter();
 
     if (!user) return null;
 
+    const isGuest = user.role === 'GUEST';
+
     return (
-        <header className="page-header">
-            <div className="page-header-left">
-                {showBack && (
-                    <button className="back-btn" onClick={() => router.push('/dashboard')} style={{ marginRight: '8px' }}>
-                        ← Back
-                    </button>
-                )}
-                <img
-                    src="/images/logo.svg"
-                    alt="Public AI"
-                    className="header-logo"
-                    onClick={() => router.push('/dashboard')}
-                    style={{ cursor: 'pointer' }}
-                />
-                {title && (
-                    <span style={{ marginLeft: '16px', fontWeight: 'bold', fontSize: '0.85rem', letterSpacing: '0.04em' }}>
-                        {`// ${title}`}
-                    </span>
-                )}
-            </div>
-            <div className="page-header-right">
-                {actions}
-                <CreditBadge renewAt={user.creditsRenewAt}>{user.credits} Credits</CreditBadge>
-                {user.role !== 'GUEST' && (
-                    <button className="back-btn" onClick={() => router.push('/account')}>
-                        My Account
-                    </button>
-                )}
-                <ThemeToggle />
-                <button className="back-btn" onClick={logout}>
-                    Sign Out
-                </button>
-            </div>
-        </header>
+        <AppHeader
+            logoLight="/images/lib-logo.png"
+            logoDark="/images/logo.svg"
+            logoHref="/dashboard"
+            onLogoClick={(e) => {
+                e.preventDefault();
+                router.push('/dashboard');
+            }}
+            onBack={showBack ? () => router.push('/dashboard') : undefined}
+            title={title}
+            tool={tool}
+            credits={user.credits}
+            renewAt={user.creditsRenewAt}
+            onAccount={isGuest ? undefined : () => router.push('/account')}
+            onToggleTheme={toggleTheme}
+            theme={theme}
+            onSignOut={logout}
+            signOutLabel={isGuest ? 'End session' : 'Sign out'}
+        >
+            {actions}
+        </AppHeader>
     );
 }
