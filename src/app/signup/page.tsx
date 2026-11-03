@@ -18,6 +18,7 @@ const LIBRARIES = [
     'Grapevine, TX',
     'Adams Public Library, IN',
     'Jessamine County, KY',
+    'Fort Worth, TX',
 ];
 
 export default function SignupPage() {
