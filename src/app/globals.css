@@ -2046,3 +2046,10 @@ a.lk-btn--danger { color: var(--danger); }
   .lk-mode__shape { transition: none; }
   .lk-mode:hover .lk-mode__shape, .lk-mode:focus-visible .lk-mode__shape, .lk-mode:active .lk-mode__shape { transform: none; }
 }
+
+/* Review fixes: the dock scrolls when it is taller than the space (200% zoom),
+   links and the logo are 48px targets, and the patron's line breaks show. */
+.lk-dock { flex: none; max-height: 60%; overflow-y: auto; padding-top: var(--space-2); }
+.lk-link { display: inline-flex; align-items: center; min-height: var(--target-min); }
+.lk-header__logo { min-height: var(--target-min); }
+.lk-msg--user .lk-msg__body { white-space: pre-wrap; overflow-wrap: anywhere; }
