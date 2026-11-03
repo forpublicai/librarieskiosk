@@ -18,8 +18,12 @@ interface ComposerProps {
     /** The AI is working: shows Stop in place of Send. */
     busy?: boolean;
     onStop?: MouseEventHandler<HTMLButtonElement>;
-    /** Blocks sending, e.g. while signed out. */
+    /** Blocks sending, e.g. while a picture is being made. */
     disabled?: boolean;
+    /** Accessible name of the send button. Default "Send message". */
+    sendLabel?: string;
+    /** Empty the box after sending. Default true. Media tools keep the prompt for the next try. */
+    clearOnSend?: boolean;
     /** Line under the box. false hides it. */
     hint?: ReactNode | false;
     /** Screen-reader label. Default "Message". */
@@ -39,6 +43,8 @@ export default function Composer({
     busy,
     onStop,
     disabled,
+    sendLabel = 'Send message',
+    clearOnSend = true,
     hint,
     label = 'Message',
     id = 'lk-composer',
@@ -65,7 +71,7 @@ export default function Composer({
     const send = () => {
         if (busy || disabled || !value.trim()) return;
         onSend?.(value.trim());
-        setValue('');
+        if (clearOnSend) setValue('');
     };
 
     return (
@@ -92,7 +98,7 @@ export default function Composer({
                 {busy ? (
                     <IconButton icon="stop" label="Stop" variant="primary" size="lg" onClick={onStop} />
                 ) : (
-                    <IconButton icon="send" label="Send message" variant="primary" size="lg" type="submit" disabled={disabled || !value.trim()} />
+                    <IconButton icon="send" label={sendLabel} variant="primary" size="lg" type="submit" disabled={disabled || !value.trim()} />
                 )}
             </form>
             {hint !== false && (

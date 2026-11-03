@@ -10,6 +10,8 @@ export interface HistoryEntry {
     id: string;
     title: string;
     updatedAt: string;
+    /** Picture thumbnail, shown in place of the icon. */
+    thumbnailUrl?: string | null;
 }
 
 interface HistoryListProps {
@@ -20,6 +22,8 @@ interface HistoryListProps {
     onDelete: (id: string) => void;
     /** What one item is called, e.g. "chat" or "project". */
     noun: string;
+    /** A thumbnail failed to load, e.g. its signed URL expired. */
+    onThumbnailError?: (id: string) => void;
 }
 
 function isToday(iso: string): boolean {
@@ -31,7 +35,7 @@ function isToday(iso: string): boolean {
 }
 
 /** Past conversations, grouped into Today and Earlier. Delete asks once. */
-export default function HistoryList({ items, activeId, icon, onSelect, onDelete, noun }: HistoryListProps) {
+export default function HistoryList({ items, activeId, icon, onSelect, onDelete, noun, onThumbnailError }: HistoryListProps) {
     const [confirmId, setConfirmId] = useState<string | null>(null);
 
     const groups = [
@@ -65,6 +69,17 @@ export default function HistoryList({ items, activeId, icon, onSelect, onDelete,
                             <div key={c.id} className="lk-history__row">
                                 <ConversationItem
                                     icon={icon}
+                                    leading={c.thumbnailUrl ? (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img
+                                            src={c.thumbnailUrl}
+                                            alt=""
+                                            loading="lazy"
+                                            decoding="async"
+                                            className="lk-convo__thumb"
+                                            onError={() => onThumbnailError?.(c.id)}
+                                        />
+                                    ) : undefined}
                                     title={c.title}
                                     selected={c.id === activeId}
                                     onClick={() => onSelect(c.id)}

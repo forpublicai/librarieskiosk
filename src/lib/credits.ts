@@ -2,7 +2,7 @@ import 'server-only';
 
 import { prisma } from './db';
 import { getFixedWeeklyRenewalWindow, nextFixedWeeklyRenewAt } from './creditRenewalWindow';
-import { CREDIT_COSTS } from './creditCosts';
+import { CREDIT_COSTS, calculateCredits } from './creditCosts';
 
 export class InsufficientCreditsError extends Error {
     constructor() {
@@ -19,7 +19,7 @@ export class InsufficientCreditsError extends Error {
  * Chat: 0 (free model)
  * Code: 1 credit (flat)
  */
-export { CREDIT_COSTS };
+export { CREDIT_COSTS, calculateCredits };
 
 export const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -115,21 +115,6 @@ async function resetDueLibraryRows(libraries: DueLibrary[], resetBoundary: Date)
     )));
 
     return results.reduce((total, result) => total + result.count, 0);
-}
-
-/**
- * Calculate credits for a generation based on mode and duration.
- */
-export function calculateCredits(mode: string, durationSeconds?: number): number {
-    const baseCost = CREDIT_COSTS[mode] ?? 1;
-    if (baseCost === 0) return 0;
-    if (mode === 'image') return baseCost;
-
-    // For music/video, scale proportionally by duration (rate is per 10s)
-    if ((mode === 'music' || mode === 'video') && durationSeconds) {
-        return Math.max(1, Math.round((durationSeconds / 10) * baseCost));
-    }
-    return baseCost;
 }
 
 /**
