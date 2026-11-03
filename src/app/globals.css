@@ -715,117 +715,6 @@ textarea.input {
   font-weight: bold;
 }
 
-/* ── Coachmark tour ─────────────────────────────────── */
-.cm-root {
-  position: fixed;
-  inset: 0;
-  z-index: 9000;
-  pointer-events: none;
-}
-
-.cm-backdrop {
-  position: fixed;
-  background: rgba(0, 0, 0, 0.62);
-  pointer-events: all;
-  transition: top 0.28s ease, left 0.28s ease, right 0.28s ease,
-              width 0.28s ease, height 0.28s ease, bottom 0.28s ease;
-}
-
-.cm-ring {
-  position: fixed;
-  border: 2px solid var(--accent-indigo);
-  border-radius: 8px;
-  box-shadow: 0 0 0 4px var(--accent-indigo-soft), 0 0 24px var(--accent-indigo-medium);
-  pointer-events: none;
-  transition: top 0.28s ease, left 0.28s ease, width 0.28s ease, height 0.28s ease;
-}
-
-.cm-tooltip {
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: 10px;
-  padding: 18px 18px 14px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
-  pointer-events: all;
-  animation: cm-fade-in 0.18s ease;
-}
-
-@keyframes cm-fade-in {
-  from { opacity: 0; transform: translateY(4px); }
-  to   { opacity: 1; transform: translateY(0);   }
-}
-
-.cm-counter {
-  font-size: 0.66rem;
-  font-weight: 600;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  margin-bottom: 6px;
-}
-
-.cm-title {
-  font-size: 0.88rem;
-  font-weight: 700;
-  color: var(--text);
-  margin-bottom: 8px;
-}
-
-.cm-body {
-  font-size: 0.79rem;
-  line-height: 1.55;
-  color: var(--text-secondary, var(--text-muted));
-  margin: 0 0 14px;
-}
-
-.cm-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.cm-skip {
-  font-size: 0.72rem;
-  color: var(--text-muted);
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 4px 0;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-
-.cm-skip:hover { color: var(--text); }
-
-.cm-next {
-  font-size: 0.8rem;
-  font-weight: 600;
-  background: var(--accent-indigo);
-  color: #fff;
-  border: none;
-  border-radius: 6px;
-  padding: 8px 18px;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.cm-next:hover { background: var(--accent-indigo-strong); }
-
-.cm-back {
-  font-size: 0.8rem;
-  font-weight: 600;
-  background: transparent;
-  color: var(--text-muted);
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  padding: 8px 12px;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.cm-back:hover { background: var(--glass-bg, rgba(255,255,255,0.06)); }
-
 /* =============================================
    COMPONENTS (lk-*)
    Ported from design-system/components/bundle.css. The React side lives in
@@ -1510,3 +1399,23 @@ a.lk-btn--danger { color: var(--danger); }
   }
   .lk-guide__scrim { display: block; position: fixed; inset: 0; z-index: 55; background: var(--overlay); }
 }
+
+/* ---------- Page tour: shade, a cobalt ring on the target, and a dialog-style tip ---------- */
+.lk-tour { position: fixed; inset: 0; z-index: 9000; pointer-events: none; }
+.lk-tour__shade { position: fixed; background: var(--overlay); pointer-events: all; }
+.lk-tour__ring {
+  position: fixed; pointer-events: none;
+  border: 3px solid var(--focus); border-radius: var(--radius-md);
+}
+.lk-tour__tip {
+  position: fixed; pointer-events: all;
+  display: flex; flex-direction: column; gap: var(--space-2);
+  max-height: calc(100vh - 2 * var(--space-4)); overflow-y: auto;
+  padding: var(--space-5); color: var(--ink);
+  background: var(--surface-raised); border: 1px solid var(--border); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+}
+.lk-tour__count { font: 400 15px/22px var(--font-sans); color: var(--ink-muted); }
+.lk-tour__actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); margin-top: var(--space-2); }
+.lk-tour__actions > .lk-btn--quiet { margin-left: calc(var(--space-4) * -1); }
+.lk-tour__nav { display: flex; gap: var(--space-2); margin-left: auto; }

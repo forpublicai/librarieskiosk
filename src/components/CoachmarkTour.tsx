@@ -1,10 +1,13 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useLayoutEffect, useRef } from 'react';
 import { useAuth } from '@/components/AuthProvider';
+import Button from '@/components/ui/Button';
 
-const PAD = 10;
-const TIP_W = 300;
+const PAD = 8;
+const GAP = 16;
+const EDGE = 16;
+const TIP_MAX_W = 380;
 
 interface Step {
   target: string;
@@ -13,79 +16,132 @@ interface Step {
   pos: 'top' | 'bottom' | 'left' | 'right';
 }
 
+const GUIDE_STEP: Step = {
+  target: 'guide-btn',
+  title: 'Learning guide',
+  body: 'Open the guide for example prompts, tips and answers to common questions.',
+  pos: 'bottom',
+};
+
 const TOURS: Record<string, Step[]> = {
   chat: [
-    { target: 'chat-sidebar',  title: 'Chat history',        body: 'Your conversations are saved here. Click any to pick up where you left off.',                                                                       pos: 'right'  },
-    { target: 'chat-messages', title: 'Conversation area',   body: 'Messages from you and the AI appear here. Scroll up to review earlier in the chat.',                                                               pos: 'right'  },
-    { target: 'chat-input',    title: 'Type here',           body: 'Ask a question or make a request. Press Enter or click the arrow to send.',                                                                        pos: 'top'    },
-    { target: 'guide-btn',     title: 'Learning Guide',      body: 'Click here for guided support — prompts, examples, tips, and FAQs tailored to this tool.',                                                       pos: 'bottom' },
+    { target: 'chat-sidebar',  title: 'Your chats',         body: 'Your past chats are saved here. Pick one to carry on where you left off.',                     pos: 'right' },
+    { target: 'chat-messages', title: 'Your conversation',  body: 'Your messages and the AI’s replies show here. Scroll up to see earlier ones.',                  pos: 'left'  },
+    { target: 'chat-input',    title: 'Type here',          body: 'Ask a question or ask for help. Press Enter or the arrow button to send.',                      pos: 'top'   },
+    GUIDE_STEP,
   ],
   image: [
-    { target: 'image-sidebar', title: 'Image history',       body: 'Every image you generate is saved here. Click one to view it again.',                                                                              pos: 'right'  },
-    { target: 'image-prompt',  title: 'Describe your image', body: 'Type what you want to see. The more specific your description, the better the result.',                                                            pos: 'bottom' },
-    { target: 'image-result',  title: 'Generated image',     body: 'Your result appears here once ready. Use the Download button beneath it to save the file.',                                                        pos: 'top'    },
-    { target: 'guide-btn',     title: 'Learning Guide',      body: 'Click here for guided support — prompts, examples, art style suggestions, tips, and FAQs.',                                                        pos: 'bottom' },
+    { target: 'image-sidebar', title: 'Your pictures',        body: 'Every picture you make is saved here. Pick one to see it again.',                             pos: 'right' },
+    { target: 'image-prompt',  title: 'Describe your picture', body: 'Say what you want to see. More detail gives a better picture.',                              pos: 'top'   },
+    { target: 'image-result',  title: 'Your picture',         body: 'Your picture shows here when it is ready. Use Download under it to save it.',                 pos: 'left'  },
+    GUIDE_STEP,
   ],
   video: [
-    { target: 'video-sidebar',  title: 'Video history',      body: 'Your generated clips are saved here.',                                                                                                             pos: 'right'  },
-    { target: 'video-prompt',   title: 'Describe your scene',body: "Describe what's happening, the setting, and the mood. Including movement gives better results.",                                                   pos: 'bottom' },
-    { target: 'video-duration', title: 'Duration slider',    body: 'Choose clip length (3–15 seconds). Start short — shorter clips use fewer credits and generate faster.',                                            pos: 'top'    },
-    { target: 'video-result',   title: 'Generated clip',     body: 'Your video appears here once ready. Generation usually takes 1–4 minutes.',                                                                        pos: 'top'    },
-    { target: 'guide-btn',      title: 'Learning Guide',     body: 'Click here for guided support — prompts, examples, tips, and FAQs.',                                                                               pos: 'bottom' },
+    { target: 'video-sidebar',  title: 'Your videos',         body: 'Every clip you make is saved here.',                                                          pos: 'right' },
+    { target: 'video-prompt',   title: 'Describe your scene', body: 'Say what happens, where, and the mood. Mention movement for a better clip.',                   pos: 'top'   },
+    { target: 'video-duration', title: 'Clip length',         body: 'Choose how long the clip is. Shorter clips use fewer credits and are ready sooner.',           pos: 'top'   },
+    { target: 'video-result',   title: 'Your video',          body: 'Your clip shows here when it is ready. This usually takes 1 to 4 minutes.',                   pos: 'left'  },
+    GUIDE_STEP,
   ],
   music: [
-    { target: 'music-sidebar',      title: 'Track history',     body: 'Your generated tracks are saved here.',                                                                                                         pos: 'right'  },
-    { target: 'music-form',         title: 'Create your track', body: 'Describe the style, mood, or genre. Optionally add lyrics and adjust the duration before generating.',                                          pos: 'bottom' },
-    { target: 'music-instrumental', title: 'Instrumental only', body: 'Check this to generate a track without vocals. When unchecked, you can add your own lyrics above — or leave it blank for AI-generated lyrics.', pos: 'top'    },
-    { target: 'music-result',       title: 'Generated track',   body: 'Your audio appears here once ready. You can listen or download the track from here.',                                                           pos: 'top'    },
-    { target: 'guide-btn',          title: 'Learning Guide',    body: 'Click here for guided support — prompts, examples, tips, and music FAQs.',                                                                      pos: 'bottom' },
+    { target: 'music-sidebar',      title: 'Your songs',   body: 'Every song you make is saved here.',                                                                  pos: 'right' },
+    { target: 'music-form',         title: 'Make a song',  body: 'Describe the style, the mood or the kind of music. You can add your own words too.',                  pos: 'top'   },
+    { target: 'music-instrumental', title: 'Instrumental', body: 'Turn this on for music with no singing. Leave it off to add your own words, or let the AI write them.', pos: 'top'   },
+    { target: 'music-result',       title: 'Your song',    body: 'Your song shows here when it is ready. You can play it or download it.',                              pos: 'left'  },
+    GUIDE_STEP,
   ],
   code: [
-    { target: 'code-sidebar', title: 'Projects',              body: 'Your coding sessions are saved here. Start a new project or continue one from the list.',                                                         pos: 'right'  },
-    { target: 'code-chat',    title: 'Chat panel',            body: 'Describe what you want to build or ask a coding question. No coding knowledge needed.',                                                           pos: 'right'  },
-    { target: 'code-output',  title: 'Code output',           body: 'Generated code appears here. Copy it or ask follow-up questions in the chat to refine it.',                                                       pos: 'left'   },
-    { target: 'guide-btn',    title: 'Learning Guide',        body: 'Click here for guided support — prompts, examples, tips, and coding FAQs for creating websites, apps and scripts.',                               pos: 'bottom' },
+    { target: 'code-sidebar', title: 'Your projects', body: 'Your coding chats are saved here. Start a new one, or carry on with one from the list.',                   pos: 'right' },
+    { target: 'code-chat',    title: 'Chat',          body: 'Say what you want to build, or ask a coding question. You do not need to know how to code.',               pos: 'right' },
+    { target: 'code-output',  title: 'Code',          body: 'The code shows here. Copy it, or ask in the chat to change it.',                                           pos: 'left'  },
+    GUIDE_STEP,
   ],
 };
 
 interface Rect { top: number; left: number; width: number; height: number; }
 
+/** The first visible element for a tour target. Hidden ones (a closed drawer, a folded header item) do not count. */
+function findTarget(target: string): HTMLElement | null {
+  const all = Array.from(document.querySelectorAll<HTMLElement>(`[data-tour="${target}"]`));
+  return all.find((el) => {
+    if (el.closest('[hidden], [inert]')) return false;
+    const style = getComputedStyle(el);
+    if (style.visibility === 'hidden') return false;
+    const r = el.getBoundingClientRect();
+    if (r.width === 0 || r.height === 0) return false;
+    return r.right > 0 && r.bottom > 0 && r.left < window.innerWidth && r.top < window.innerHeight;
+  }) ?? null;
+}
+
 function getRect(target: string): Rect | null {
-  const el = document.querySelector(`[data-tour="${target}"]`);
+  const el = findTarget(target);
   if (!el) return null;
   const r = el.getBoundingClientRect();
   return { top: r.top, left: r.left, width: r.width, height: r.height };
 }
 
-function tipPos(rect: Rect, pos: Step['pos']): React.CSSProperties {
+/** Puts the tip on the preferred side; flips or clamps so it stays fully on screen. */
+function placeTip(rect: Rect, pos: Step['pos'], w: number, h: number): { top: number; left: number } {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
-  const cx = rect.left + rect.width / 2;
-  const clampX = (x: number) => Math.max(16, Math.min(x, vw - TIP_W - 16));
-  switch (pos) {
-    case 'bottom': return { top: rect.top + rect.height + PAD + 14,                                                   left: clampX(cx - TIP_W / 2) };
-    case 'top':    return { top: Math.max(16, rect.top - PAD - 14 - 180),                                             left: clampX(cx - TIP_W / 2) };
-    case 'right':  return { top: Math.max(16, Math.min(rect.top + rect.height / 2 - 80, vh - 220)), left: Math.min(rect.left + rect.width + PAD + 14, vw - TIP_W - 16) };
-    case 'left':   return { top: Math.max(16, Math.min(rect.top + rect.height / 2 - 80, vh - 220)), left: Math.max(16, rect.left - PAD - 14 - TIP_W) };
+  const clamp = (v: number, max: number) => Math.max(EDGE, Math.min(v, max - EDGE));
+  const cx = rect.left + rect.width / 2 - w / 2;
+  const cy = rect.top + rect.height / 2 - h / 2;
+  const below = rect.top + rect.height + PAD + GAP;
+  const above = rect.top - PAD - GAP - h;
+  const right = rect.left + rect.width + PAD + GAP;
+  const left = rect.left - PAD - GAP - w;
+
+  const fits = {
+    bottom: below + h <= vh - EDGE,
+    top: above >= EDGE,
+    right: right + w <= vw - EDGE,
+    left: left >= EDGE,
+  };
+  const order: Step['pos'][] = [pos, ...(['bottom', 'top', 'right', 'left'] as const).filter((p) => p !== pos)];
+  const side = order.find((p) => fits[p]);
+
+  switch (side) {
+    case 'bottom': return { top: below, left: clamp(cx, vw - w) };
+    case 'top': return { top: above, left: clamp(cx, vw - w) };
+    case 'right': return { top: clamp(cy, vh - h), left: right };
+    case 'left': return { top: clamp(cy, vh - h), left };
+    // Nothing fits (a large target on a small screen): sit at the bottom edge, over the target.
+    default: return { top: Math.max(EDGE, vh - h - EDGE), left: clamp(cx, vw - w) };
   }
 }
 
 export default function CoachmarkTour({ tool }: { tool: string }) {
   const { user } = useAuth();
-  const steps = TOURS[tool] ?? [];
+  const [steps, setSteps] = useState<Step[]>([]);
   const [stepIdx, setStepIdx] = useState(0);
   const [rect, setRect] = useState<Rect | null>(null);
+  const [tipPos, setTipPos] = useState<{ top: number; left: number } | null>(null);
   const [visible, setVisible] = useState(false);
+  const tipRef = useRef<HTMLDivElement>(null);
+  const hasTour = (TOURS[tool] ?? []).length > 0;
 
   // Key by username so each patron gets their own tour state, persists across sessions
   const storageKey = `cm_${user?.username ?? 'anon'}_${tool}`;
 
+  // Only steps whose target is on screen now. Hidden targets (the sidebar
+  // drawer on a phone, the guide button inside the header menu) are skipped.
+  const start = useCallback(() => {
+    const shown = (TOURS[tool] ?? []).filter((s) => findTarget(s.target));
+    if (!shown.length) return;
+    setSteps(shown);
+    setStepIdx(0);
+    setRect(null);
+    setTipPos(null);
+    setVisible(true);
+  }, [tool]);
+
   useEffect(() => {
-    if (!steps.length || !user) return;
+    if (!hasTour || !user) return;
     if (localStorage.getItem(storageKey)) return;
-    const t = setTimeout(() => setVisible(true), 500);
+    const t = setTimeout(start, 500);
     return () => clearTimeout(t);
-  }, [tool, steps.length, user, storageKey]);
+  }, [hasTour, user, storageKey, start]);
 
   const step = steps[stepIdx];
 
@@ -97,17 +153,22 @@ export default function CoachmarkTour({ tool }: { tool: string }) {
     return () => window.removeEventListener('resize', update);
   }, [visible, step]);
 
+  // Measure the tip after it renders, then place it next to the target.
+  useLayoutEffect(() => {
+    const tip = tipRef.current;
+    if (!tip || !rect || !step) return;
+    setTipPos(placeTip(rect, step.pos, tip.offsetWidth, tip.offsetHeight));
+  }, [rect, step]);
+
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail;
       if (detail?.tool !== tool) return;
-      setStepIdx(0);
-      setRect(null);
-      setVisible(true);
+      start();
     };
     window.addEventListener('cm-restart', handler);
     return () => window.removeEventListener('cm-restart', handler);
-  }, [tool]);
+  }, [tool, start]);
 
   const dismiss = useCallback(() => {
     setVisible(false);
@@ -123,31 +184,65 @@ export default function CoachmarkTour({ tool }: { tool: string }) {
     setStepIdx(i => Math.max(0, i - 1));
   }, []);
 
+  // Each step: focus the main button. Escape skips the tour; Tab stays in the tip.
+  useEffect(() => {
+    if (!visible || !tipPos) return;
+    const tip = tipRef.current;
+    tip?.querySelector<HTMLElement>('.lk-btn--primary')?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { dismiss(); return; }
+      if (e.key !== 'Tab' || !tip) return;
+      const buttons = Array.from(tip.querySelectorAll<HTMLElement>('button:not([disabled])'));
+      if (!buttons.length) return;
+      const first = buttons[0];
+      const last = buttons[buttons.length - 1];
+      if (e.shiftKey && (document.activeElement === first || !tip.contains(document.activeElement))) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && (document.activeElement === last || !tip.contains(document.activeElement))) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+    // tipPos changes once per step, after the tip is placed.
+  }, [visible, tipPos, dismiss]);
+
   if (!visible || !step || !rect) return null;
 
-  const ts = tipPos(rect, step.pos);
+  const isLast = stepIdx >= steps.length - 1;
 
   return (
-    <div className="cm-root">
-      <div className="cm-backdrop" style={{ top: 0, left: 0, right: 0, height: Math.max(0, rect.top - PAD) }} />
-      <div className="cm-backdrop" style={{ top: rect.top - PAD, left: 0, width: Math.max(0, rect.left - PAD), height: rect.height + PAD * 2 }} />
-      <div className="cm-backdrop" style={{ top: rect.top - PAD, left: rect.left + rect.width + PAD, right: 0, height: rect.height + PAD * 2 }} />
-      <div className="cm-backdrop" style={{ top: rect.top + rect.height + PAD, left: 0, right: 0, bottom: 0 }} />
-      <div className="cm-ring" style={{ top: rect.top - PAD, left: rect.left - PAD, width: rect.width + PAD * 2, height: rect.height + PAD * 2 }} />
-      <div key={stepIdx} className="cm-tooltip" style={{ position: 'fixed', width: TIP_W, ...ts }}>
-        <div className="cm-counter">{stepIdx + 1} / {steps.length}</div>
-        <div className="cm-title">{step.title}</div>
-        <p className="cm-body">{step.body}</p>
-        <div className="cm-actions">
-          <button className="cm-skip" onClick={dismiss}>Skip tour</button>
-          <div style={{ display: 'flex', gap: '6px' }}>
-            {stepIdx > 0 && (
-              <button className="cm-back" onClick={back}>← Back</button>
-            )}
-            <button className="cm-next" onClick={next}>
-              {stepIdx >= steps.length - 1 ? 'Got it!' : 'Next →'}
-            </button>
-          </div>
+    <div className="lk-tour">
+      <div className="lk-tour__shade" style={{ top: 0, left: 0, right: 0, height: Math.max(0, rect.top - PAD) }} />
+      <div className="lk-tour__shade" style={{ top: rect.top - PAD, left: 0, width: Math.max(0, rect.left - PAD), height: rect.height + PAD * 2 }} />
+      <div className="lk-tour__shade" style={{ top: rect.top - PAD, left: rect.left + rect.width + PAD, right: 0, height: rect.height + PAD * 2 }} />
+      <div className="lk-tour__shade" style={{ top: rect.top + rect.height + PAD, left: 0, right: 0, bottom: 0 }} />
+      <div className="lk-tour__ring" style={{ top: rect.top - PAD, left: rect.left - PAD, width: rect.width + PAD * 2, height: rect.height + PAD * 2 }} />
+      <div
+        ref={tipRef}
+        className="lk-tour__tip"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="lk-tour-title"
+        aria-describedby="lk-tour-body"
+        style={{
+          width: `min(${TIP_MAX_W}px, calc(100vw - ${EDGE * 2}px))`,
+          top: tipPos?.top ?? 0,
+          left: tipPos?.left ?? 0,
+          visibility: tipPos ? 'visible' : 'hidden',
+        }}
+      >
+        <p className="lk-tour__count">Step {stepIdx + 1} of {steps.length}</p>
+        <h2 id="lk-tour-title" className="lk-heading">{step.title}</h2>
+        <p id="lk-tour-body">{step.body}</p>
+        <div className="lk-tour__actions">
+          <Button variant="quiet" onClick={dismiss}>Skip tour</Button>
+          <span className="lk-tour__nav">
+            {stepIdx > 0 && <Button icon="back" onClick={back}>Back</Button>}
+            <Button variant="primary" onClick={next}>{isLast ? 'Done' : 'Next'}</Button>
+          </span>
         </div>
       </div>
     </div>
