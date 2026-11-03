@@ -1,14 +1,14 @@
 export const dynamic = 'force-dynamic';
-// Music models (e.g. Google Lyria) are async: we submit then poll for ~30s+
-// before the audio is ready. Without this, Vercel's short default timeout
-// (10–15s) would kill the request mid-poll. 60s is the universally-allowed
-// ceiling; raise toward 300 on Pro/Enterprise if longer tracks time out.
-export const maxDuration = 60;
+// Music models (e.g. Google Lyria) are async: we submit then poll, and a job
+// regularly takes ~45s+ before the audio is ready. Without this, Vercel's short
+// default timeout (10–15s) would kill the request mid-poll. Must stay above
+// MUSIC_POLL_BUDGET_MS plus headroom.
+export const maxDuration = 180;
 
-// Cap provider polling well under `maxDuration` so a controlled timeout is
-// thrown — and credits refunded — before the platform kills the request. Leaves
-// ~15s headroom for submit + R2 persistence + the response.
-const MUSIC_POLL_BUDGET_MS = 45_000;
+// Cap provider polling under `maxDuration` so a controlled timeout is thrown —
+// and credits refunded — before the platform kills the request. Leaves ~20s
+// headroom for submit + R2 persistence + the response.
+const MUSIC_POLL_BUDGET_MS = 160_000;
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireActiveSession, isAuthResult } from '@/lib/auth';
