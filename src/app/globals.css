@@ -631,7 +631,7 @@ a.lk-btn--danger { color: var(--danger); }
 .lk-tabs .lk-chip:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 
 .lk-table-wrap { overflow-x: auto; }
-.lk-table { width: 100%; border-collapse: collapse; font: 400 17px/24px var(--font-sans); color: var(--ink); }
+.lk-table { width: 100%; border-collapse: collapse; font: 400 18px/26px var(--font-sans); color: var(--ink); }
 .lk-table th {
   text-align: left; padding: var(--space-3) var(--space-3); white-space: nowrap;
   font: 700 15px/22px var(--font-sans); color: var(--ink-muted); border-bottom: 2px solid var(--border-strong);
@@ -707,7 +707,7 @@ a.lk-btn--danger { color: var(--danger); }
 .lk-table-wrap { position: relative; }
 .lk-table tbody th.lk-table__name {
   text-align: left; white-space: nowrap; padding: var(--space-3);
-  font: 700 17px/24px var(--font-sans); color: var(--ink); border-bottom: 1px solid var(--border);
+  font: 700 18px/26px var(--font-sans); color: var(--ink); border-bottom: 1px solid var(--border);
 }
 .lk-table__sub { display: block; font: 400 15px/22px var(--font-sans); color: var(--ink-muted); }
 .lk-status { display: inline-flex; align-items: center; gap: var(--space-2); font-weight: 700; white-space: nowrap; }

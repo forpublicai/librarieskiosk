@@ -119,6 +119,7 @@ export default function CoachmarkTour({ tool }: { tool: string }) {
   const [tipPos, setTipPos] = useState<{ top: number; left: number } | null>(null);
   const [visible, setVisible] = useState(false);
   const tipRef = useRef<HTMLDivElement>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
   const hasTour = (TOURS[tool] ?? []).length > 0;
 
   // Key by username so each patron gets their own tour state, persists across sessions
@@ -129,6 +130,7 @@ export default function CoachmarkTour({ tool }: { tool: string }) {
   const start = useCallback(() => {
     const shown = (TOURS[tool] ?? []).filter((s) => findTarget(s.target));
     if (!shown.length) return;
+    returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setSteps(shown);
     setStepIdx(0);
     setRect(null);
@@ -170,9 +172,16 @@ export default function CoachmarkTour({ tool }: { tool: string }) {
     return () => window.removeEventListener('cm-restart', handler);
   }, [tool, start]);
 
+  // Focus goes back where it was. If that control is gone or hidden (the guide
+  // drawer closed for the tour), it goes to the guide button or the header menu.
   const dismiss = useCallback(() => {
     setVisible(false);
     localStorage.setItem(storageKey, 'true');
+    const previous = returnFocusRef.current;
+    const target = previous && previous.isConnected && previous.offsetParent !== null && previous !== document.body
+      ? previous
+      : Array.from(document.querySelectorAll<HTMLElement>('[data-tour="guide-btn"], .lk-header__menu-btn')).find((el) => el.offsetParent !== null);
+    target?.focus();
   }, [storageKey]);
 
   const next = useCallback(() => {

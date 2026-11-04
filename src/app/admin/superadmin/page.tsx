@@ -277,9 +277,12 @@ function Stat({ label, value }: { label: string; value: number }) {
     );
 }
 
-/** Horizontal bars, one per tool, in Home order. Each bar uses its tool's color. */
+// Charts follow the brand's fixed color order (red, cobalt, sun, pink, green), so the tools go Chat, Video, Image, Music, Code.
+const CHART_ORDER = ['chat', 'video', 'image', 'music', 'code'];
+
+/** Horizontal bars, one per tool, in the fixed chart color order. Each bar uses its tool's color. */
 function UsageChart({ rows }: { rows: ModeUsage[] }) {
-    const order = TOOL_COLUMNS.map((t) => t.key as string);
+    const order = CHART_ORDER;
     const sorted = [...rows].sort((a, b) => {
         const ia = order.indexOf(a.mode);
         const ib = order.indexOf(b.mode);

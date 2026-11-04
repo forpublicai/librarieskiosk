@@ -58,6 +58,7 @@ export default function AdminPage() {
     const [loadingAction, setLoadingAction] = useState<string | null>(null);
     const [sendCreditsModal, setSendCreditsModal] = useState<{ userId: string; username: string } | null>(null);
     const [sendAmount, setSendAmount] = useState(10);
+    const [sendError, setSendError] = useState('');
     const [tab, setTab] = useState<AdminTab>('accounts');
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
@@ -126,8 +127,16 @@ export default function AdminPage() {
         finally { setLoadingAction(null); }
     };
 
+    const openSendCredits = (account: UserAccount) => {
+        setSendCreditsModal({ userId: account.id, username: account.username });
+        setSendAmount(10);
+        setSendError('');
+    };
+
+    // Errors show inside the dialog: the modal dialog hides the page behind it from screen readers.
     const handleSendCredits = async () => {
         if (!sendCreditsModal) return;
+        setSendError('');
         setLoadingAction(sendCreditsModal.userId);
         try {
             const res = await fetch('/api/admin/credit-pool', {
@@ -142,9 +151,9 @@ export default function AdminPage() {
                 refreshUser();
             } else {
                 const data = await res.json();
-                showMessage(data.error || 'The credits were not sent. Please try again.', true);
+                setSendError(data.error || 'The credits were not sent. Please try again.');
             }
-        } catch { showMessage('The credits were not sent. Please try again.', true); }
+        } catch { setSendError('The credits were not sent. Please try again.'); }
         finally { setLoadingAction(null); }
     };
 
@@ -279,7 +288,7 @@ export default function AdminPage() {
                                                             <Button
                                                                 variant="quiet"
                                                                 icon="credits"
-                                                                onClick={() => { setSendCreditsModal({ userId: u.id, username: u.username }); setSendAmount(10); }}
+                                                                onClick={() => openSendCredits(u)}
                                                             >
                                                                 Give credits
                                                             </Button>
@@ -363,6 +372,7 @@ export default function AdminPage() {
                     </>
                 }
             >
+                {sendError && <Notice tone="danger" title="That did not work">{sendError}</Notice>}
                 <TextField
                     label="How many credits"
                     type="number"

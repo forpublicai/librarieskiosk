@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, type FormEvent, type ReactNode } from 'react';
+import { useState, useEffect, useRef, useSyncExternalStore, type FormEvent, type ReactNode } from 'react';
 import { useAuth } from '@/components/AuthProvider';
 import CopyButton from '@/components/CopyButton';
 import Button from '@/components/ui/Button';
@@ -159,6 +159,19 @@ function isGuideContent(value: unknown): value is GuideContent {
 // Selector for anything Tab can reach inside the panel.
 const FOCUSABLE = 'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
+const DRAWER_QUERY = '(max-width: 900px)';
+
+function subscribeDrawer(onChange: () => void) {
+  const mq = window.matchMedia(DRAWER_QUERY);
+  mq.addEventListener('change', onChange);
+  return () => mq.removeEventListener('change', onChange);
+}
+
+/** True while the panel shows as a drawer (narrow screens and high zoom). */
+function useDrawerMode() {
+  return useSyncExternalStore(subscribeDrawer, () => window.matchMedia(DRAWER_QUERY).matches, () => false);
+}
+
 // After the panel closes, focus goes back to a visible guide button, or to
 // the header menu button when the guide button sits in the closed menu.
 function focusGuideButton() {
@@ -182,13 +195,15 @@ function GuideFrame({ isOpen, onClose, headerExtra, children }: {
   // Pages pass a new onClose each render; keep the latest one without re-running the effect.
   const onCloseRef = useRef(onClose);
   useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
+  const drawer = useDrawerMode();
 
   useEffect(() => {
     if (!isOpen) return;
     const panel = ref.current;
-    const drawer = window.matchMedia('(max-width: 900px)').matches;
-    if (drawer) panel?.querySelector<HTMLElement>('.lk-guide__close')?.focus();
+    if (window.matchMedia(DRAWER_QUERY).matches) panel?.querySelector<HTMLElement>('.lk-guide__close')?.focus();
     const onKey = (e: KeyboardEvent) => {
+      // Read the width on each key press: zoom can turn the column into a drawer while it is open.
+      const drawer = window.matchMedia(DRAWER_QUERY).matches;
       if (e.key === 'Escape' && (drawer || panel?.contains(document.activeElement))) {
         onCloseRef.current();
         focusGuideButton();
@@ -220,7 +235,14 @@ function GuideFrame({ isOpen, onClose, headerExtra, children }: {
   return (
     <>
       {isOpen && <div className="lk-guide__scrim" onClick={close} aria-hidden="true" />}
-      <section ref={ref} className="lk-guide" aria-labelledby="lk-guide-title" hidden={!isOpen}>
+      <section
+        ref={ref}
+        className="lk-guide"
+        aria-labelledby="lk-guide-title"
+        hidden={!isOpen}
+        role={drawer ? 'dialog' : undefined}
+        aria-modal={drawer && isOpen ? true : undefined}
+      >
         <div className="lk-guide__head">
           <h2 id="lk-guide-title" className="lk-heading">Learning guide</h2>
           <IconButton icon="close" label="Close the learning guide" className="lk-guide__close" onClick={close} />
@@ -297,6 +319,7 @@ function GuidePanelInner({ content, tool, isOpen, onClose }: GuidePanelProps & {
   const inputRef = useRef<HTMLInputElement>(null);
   const initializedRef = useRef(false);
   const tierStorageKey = guideTierKey(user, token);
+  const drawer = useDrawerMode();
 
   const allFaqs = content
     ? [...content.faqs.criticalUse, ...content.faqs.practical, ...content.faqs.concept]
@@ -669,6 +692,8 @@ function GuidePanelInner({ content, tool, isOpen, onClose }: GuidePanelProps & {
           <Button
             variant="quiet"
             onClick={() => {
+              // As a drawer the guide covers the page and traps focus: close it so the tour can run.
+              if (drawer) onClose();
               const key = `cm_${user?.username ?? 'anon'}_${tool}`;
               localStorage.removeItem(key);
               window.dispatchEvent(new CustomEvent('cm-restart', { detail: { tool } }));
