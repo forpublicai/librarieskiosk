@@ -726,13 +726,14 @@ function GuidePanelInner({ content, tool, isOpen, onClose }: GuidePanelProps & {
         <div className="lk-guide__options">
           {renderOptions()}
         </div>
+
+        {screen !== 'tier-select' && liveLimitReached && (
+          <Notice tone="info">{LIBRARIAN_REDIRECT}</Notice>
+        )}
       </div>
 
       {screen !== 'tier-select' && (
         <div className="lk-guide__ask">
-          {liveLimitReached && (
-            <Notice tone="info">{LIBRARIAN_REDIRECT}</Notice>
-          )}
           <form className="lk-guide__form" onSubmit={(e: FormEvent) => handleFreeInputSubmit(e)}>
             <label className="lk-field__label" htmlFor={`lk-guide-input-${tool}`}>
               {screen === 'open-question' ? 'Describe what you have in mind' : 'Ask your own question'}
@@ -747,7 +748,7 @@ function GuidePanelInner({ content, tool, isOpen, onClose }: GuidePanelProps & {
                 aria-invalid={tooLong ? true : undefined}
                 aria-describedby={nearLimit || tooLong ? `lk-guide-count-${tool}` : undefined}
               />
-              <IconButton icon="send" label="Ask the guide" variant="primary" type="submit" disabled={!freeInput.trim() || tooLong} />
+              <IconButton icon="send" label="Ask the guide" type="submit" disabled={!freeInput.trim() || tooLong} />
             </div>
             {(nearLimit || tooLong) && (
               <p

@@ -149,7 +149,14 @@ export default function CoachmarkTour({ tool }: { tool: string }) {
 
   useEffect(() => {
     if (!visible || !step) return;
-    const update = () => setRect(getRect(step.target));
+    // If the target goes away (a resize or zoom hides it), close the tour
+    // so its key handler does not trap focus behind nothing. It is not marked
+    // as seen; the guide can start it again.
+    const update = () => {
+      const next = getRect(step.target);
+      if (!next) setVisible(false);
+      setRect(next);
+    };
     update();
     window.addEventListener('resize', update);
     return () => window.removeEventListener('resize', update);
