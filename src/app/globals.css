@@ -755,7 +755,7 @@ a.lk-btn--danger { color: var(--danger); }
 .lk-chart__track { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--space-3); min-width: 0; }
 .lk-chart__lane { display: block; min-width: 0; }
 .lk-chart__bar { display: block; height: 20px; min-width: 4px; border-radius: var(--radius-sm); background: var(--tool, var(--border-strong)); }
-.lk-chart__value { font: 400 15px/22px var(--font-sans); color: var(--ink-muted); white-space: nowrap; }
+.lk-chart__value { font: 400 18px/26px var(--font-sans); color: var(--ink); white-space: nowrap; }
 .lk-series-1 { --tool: var(--red); }
 .lk-series-2 { --tool: var(--cobalt); }
 .lk-series-3 { --tool: var(--sun); }

@@ -322,6 +322,10 @@ function GuidePanelInner({ content, tool, isOpen, onClose }: GuidePanelProps & {
   const [liveLimitReached, setLiveLimitReached] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const optionsRef = useRef<HTMLDivElement>(null);
+  // Set when a choice is picked: the choices change with the screen, so the
+  // picked button goes away and focus would fall to the page.
+  const focusOptionsRef = useRef(false);
   const initializedRef = useRef(false);
   const tierStorageKey = guideTierKey(user, token);
 
@@ -524,6 +528,7 @@ function GuidePanelInner({ content, tool, isOpen, onClose }: GuidePanelProps & {
 
   async function handleFreeInputSubmit(e: { preventDefault(): void }) {
     e.preventDefault();
+    focusOptionsRef.current = false;  // typing keeps focus in the field
     const q = freeInput.trim();
     if (!q) return;
     if (countWords(q) > MAX_INPUT_WORDS) return;  // hard block; UI also disables submit
@@ -580,12 +585,18 @@ function GuidePanelInner({ content, tool, isOpen, onClose }: GuidePanelProps & {
         icon={kind === 'back' ? 'back' : icon}
         block
         className="lk-guide__option"
-        onClick={onClick}
+        onClick={() => { focusOptionsRef.current = true; onClick(); }}
       >
         {label}
       </Button>
     );
   }
+
+  useEffect(() => {
+    if (!focusOptionsRef.current) return;
+    focusOptionsRef.current = false;
+    optionsRef.current?.querySelector<HTMLElement>('.lk-guide__option')?.focus();
+  }, [screen]);
 
   function renderOptions() {
     const otherUseCase = content.useCases.find(uc => !uc.gettingStarted);
@@ -727,7 +738,7 @@ function GuidePanelInner({ content, tool, isOpen, onClose }: GuidePanelProps & {
           <div ref={messagesEndRef} />
         </div>
 
-        <div className="lk-guide__options">
+        <div className="lk-guide__options" ref={optionsRef}>
           {renderOptions()}
         </div>
 

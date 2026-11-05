@@ -131,6 +131,8 @@ export default function AdminPage() {
         setSendCreditsModal({ userId: account.id, username: account.username });
         setSendAmount(10);
         setSendError('');
+        // Reload so the pool cap is current (for example, after Monday's renewal).
+        loadData();
     };
 
     // Errors show inside the dialog: the modal dialog hides the page behind it from screen readers.
