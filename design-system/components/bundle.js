@@ -163,14 +163,14 @@
     var dark = theme === 'dark';
     return h('header', { className: 'lk-header' },
       h('div', { className: 'lk-header__start' },
-        props.onBack ? h(Button, { variant: 'quiet', icon: 'back', onClick: props.onBack }, 'Home') : null,
         props.logoLight || props.logoDark ? h('span', { className: 'lk-header__logo' },
           props.logoLight ? h('img', { src: props.logoLight, alt: 'Public AI Libraries Project', className: 'lk-logo-light' }) : null,
           props.logoDark ? h('img', { src: props.logoDark, alt: 'Public AI', className: 'lk-logo-dark' }) : null
         ) : null,
-        props.title ? h('span', { className: 'lk-header__title' }, props.tool ? h(ToolShape, { tool: props.tool, size: 28 }) : null, props.title) : null
+        props.onBack ? h(Button, { variant: 'quiet', icon: 'back', className: 'lk-header__home', onClick: props.onBack }, 'Home') : null
       ),
       h('div', { className: 'lk-header__end' },
+        props.title ? h('span', { className: 'lk-header__title' }, props.tool ? h(ToolShape, { tool: props.tool, size: 28 }) : null, props.title) : null,
         props.children,
         props.credits != null ? h(CreditBadge, { credits: props.credits, renewsAt: props.renewsAt }) : null,
         props.onAccount ? h(Button, { variant: 'quiet', icon: 'user', onClick: props.onAccount }, 'Account') : null,

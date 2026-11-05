@@ -38,9 +38,9 @@
   ],
   "lastChange": {
     "by": "Mohsin Y. K. Yousufi",
-    "at": "2026-11-03T20:12:37Z",
+    "at": "2026-11-05T17:36:47Z",
     "via": "Claude Code",
-    "note": "Gradients removed: no Backdrop, solid red Chat hero tile."
+    "note": "Header logo fixed first, tool name on the right; white tile outline in Dark; sign-in glow."
   },
   "layout": "files",
   "libraries": [

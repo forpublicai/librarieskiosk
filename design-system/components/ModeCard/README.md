@@ -14,7 +14,7 @@ A big tappable color field on the Home screen that opens one tool, with that too
 - Do keep one tool per color everywhere: the tile, the header swatch and any chart.
 - Do not add a shadow, a border or a gradient. The tint is the edge.
 - Do not use marketing words ("stunning", "advanced", "powerful").
-- Hover shows a 2px `ink` outline, and the shape tips up (see Motion). The tile itself does not lift.
+- Hover shows an `ink` outline on every tile, in both themes: 2px on tool tiles, 3px on the hero. In Dark, `ink` is white. The shape tips up (see Motion). The tile itself does not lift.
 
 ## Motion
 - On hover and keyboard focus, the shape tips up 4px and 6°. Press makes the shape dip. All of this stops with reduced motion.
