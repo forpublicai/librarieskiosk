@@ -634,7 +634,7 @@ a.lk-btn--danger { color: var(--danger); }
 .lk-table { width: 100%; border-collapse: collapse; font: 400 18px/26px var(--font-sans); color: var(--ink); }
 .lk-table th {
   text-align: left; padding: var(--space-3) var(--space-3); white-space: nowrap;
-  font: 700 15px/22px var(--font-sans); color: var(--ink-muted); border-bottom: 2px solid var(--border-strong);
+  font: 700 18px/26px var(--font-sans); color: var(--ink-muted); border-bottom: 2px solid var(--border-strong);
 }
 .lk-table td { padding: var(--space-3) var(--space-3); border-bottom: 1px solid var(--border); vertical-align: middle; }
 .lk-table__num { text-align: right; font-variant-numeric: tabular-nums; }

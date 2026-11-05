@@ -147,6 +147,16 @@ export default function CoachmarkTour({ tool }: { tool: string }) {
 
   const step = steps[stepIdx];
 
+  // Focus goes back where it was. If that control is gone or hidden (the guide
+  // drawer closed for the tour), it goes to the guide button or the header menu.
+  const restoreFocus = useCallback(() => {
+    const previous = returnFocusRef.current;
+    const target = previous && previous.isConnected && previous.offsetParent !== null && previous !== document.body
+      ? previous
+      : Array.from(document.querySelectorAll<HTMLElement>('[data-tour="guide-btn"], .lk-header__menu-btn')).find((el) => el.offsetParent !== null);
+    target?.focus();
+  }, []);
+
   useEffect(() => {
     if (!visible || !step) return;
     // If the target goes away (a resize or zoom hides it), close the tour
@@ -154,13 +164,27 @@ export default function CoachmarkTour({ tool }: { tool: string }) {
     // as seen; the guide can start it again.
     const update = () => {
       const next = getRect(step.target);
-      if (!next) setVisible(false);
+      if (!next) {
+        setVisible(false);
+        restoreFocus();
+      }
       setRect(next);
     };
     update();
-    window.addEventListener('resize', update);
-    return () => window.removeEventListener('resize', update);
-  }, [visible, step]);
+    // Check again after layout transitions settle: the history drawer slides
+    // out over 240ms when the screen gets narrow.
+    let settle: ReturnType<typeof setTimeout> | undefined;
+    const onResize = () => {
+      update();
+      clearTimeout(settle);
+      settle = setTimeout(update, 300);
+    };
+    window.addEventListener('resize', onResize);
+    return () => {
+      window.removeEventListener('resize', onResize);
+      clearTimeout(settle);
+    };
+  }, [visible, step, restoreFocus]);
 
   // Measure the tip after it renders, then place it next to the target.
   useLayoutEffect(() => {
@@ -179,17 +203,11 @@ export default function CoachmarkTour({ tool }: { tool: string }) {
     return () => window.removeEventListener('cm-restart', handler);
   }, [tool, start]);
 
-  // Focus goes back where it was. If that control is gone or hidden (the guide
-  // drawer closed for the tour), it goes to the guide button or the header menu.
   const dismiss = useCallback(() => {
     setVisible(false);
     localStorage.setItem(storageKey, 'true');
-    const previous = returnFocusRef.current;
-    const target = previous && previous.isConnected && previous.offsetParent !== null && previous !== document.body
-      ? previous
-      : Array.from(document.querySelectorAll<HTMLElement>('[data-tour="guide-btn"], .lk-header__menu-btn')).find((el) => el.offsetParent !== null);
-    target?.focus();
-  }, [storageKey]);
+    restoreFocus();
+  }, [storageKey, restoreFocus]);
 
   const next = useCallback(() => {
     if (stepIdx >= steps.length - 1) { dismiss(); return; }
