@@ -714,7 +714,11 @@ function GuidePanelInner({ content, tool, isOpen, onClose }: GuidePanelProps & {
               onClose();
               const key = `cm_${user?.username ?? 'anon'}_${tool}`;
               localStorage.removeItem(key);
-              window.dispatchEvent(new CustomEvent('cm-restart', { detail: { tool } }));
+              // Start the tour after the close renders, so it picks targets with the guide gone
+              // (on Code the guide hides the code pane).
+              setTimeout(() => {
+                window.dispatchEvent(new CustomEvent('cm-restart', { detail: { tool } }));
+              }, 0);
             }}
           >
             Show the page tour again
