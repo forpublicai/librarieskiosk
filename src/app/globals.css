@@ -839,6 +839,11 @@ a.lk-btn--danger { color: var(--danger); }
 @media (max-width: 1200px) {
   .lk-guide { width: 360px; }
 }
+/* Code: the sidebar, code pane and guide together would crush the chat column.
+   While the guide is open, the code pane steps aside (as it does below 1200px). */
+@media (max-width: 1700px) {
+  .lk-tool:has(.lk-guide:not([hidden])) .lk-code-pane { display: none; }
+}
 @media (max-width: 900px) {
   .lk-guide {
     position: fixed; top: 0; right: 0; bottom: 0; z-index: 60; width: min(420px, 92vw);
