@@ -39,7 +39,7 @@ export default function Dialog({ open, title, onClose, children, actions }: Dial
             {open && (
                 <div className="lk-dialog__inner">
                     <div className="lk-dialog__head">
-                        <h2 id={titleId} className="lk-heading">{title}</h2>
+                        <h2 id={titleId} className="lk-title">{title}</h2>
                         <IconButton icon="close" label="Close" onClick={onClose} />
                     </div>
                     {children}

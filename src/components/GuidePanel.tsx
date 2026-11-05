@@ -197,10 +197,15 @@ function GuideFrame({ isOpen, onClose, headerExtra, children }: {
   useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
   const drawer = useDrawerMode();
 
+  // Focus moves into the drawer when it opens, and when zoom turns the open
+  // column into a drawer that covers the composer.
+  useEffect(() => {
+    if (isOpen && drawer) ref.current?.querySelector<HTMLElement>('.lk-guide__close')?.focus();
+  }, [isOpen, drawer]);
+
   useEffect(() => {
     if (!isOpen) return;
     const panel = ref.current;
-    if (window.matchMedia(DRAWER_QUERY).matches) panel?.querySelector<HTMLElement>('.lk-guide__close')?.focus();
     const onKey = (e: KeyboardEvent) => {
       // Read the width on each key press: zoom can turn the column into a drawer while it is open.
       const drawer = window.matchMedia(DRAWER_QUERY).matches;

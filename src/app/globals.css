@@ -743,7 +743,9 @@ a.lk-btn--danger { color: var(--danger); }
 }
 .lk-dialog::backdrop { background: var(--overlay); }
 .lk-dialog__inner { display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-5) var(--space-5) var(--space-5) var(--space-6); }
-.lk-dialog__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.lk-dialog__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); }
+.lk-dialog__head .lk-title { min-width: 0; overflow-wrap: anywhere; }
+.lk-dialog__head .lk-iconbtn, .lk-guide__head .lk-iconbtn { flex: none; }
 .lk-dialog__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2); margin-top: var(--space-2); }
 
 /* Bar chart: each tool's bar uses the tool color; other series use the fixed order red, cobalt, sun, pink, green */
@@ -773,6 +775,8 @@ a.lk-btn--danger { color: var(--danger); }
 .lk-btn--current, .lk-btn--current:hover:not(:disabled) { background: var(--red-soft); color: var(--ink); }
 .lk-info__section { display: flex; flex-direction: column; gap: var(--space-4); margin-top: var(--space-4); }
 .lk-info .lk-lead { margin: var(--space-3) 0 0; }
+/* Help pages: stat labels carry facts a patron needs, so they use body size. */
+.lk-info .lk-stat__label { font-size: 18px; line-height: 26px; }
 .lk-row--start { justify-content: flex-start; align-items: flex-start; flex-wrap: nowrap; }
 .lk-step-num {
   display: inline-flex; align-items: center; justify-content: center; flex: none;
