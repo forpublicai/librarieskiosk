@@ -14,11 +14,11 @@ interface AppHeaderProps {
     /** Where the logo leads. Usually Home. */
     logoHref?: string;
     onLogoClick?: MouseEventHandler<HTMLAnchorElement>;
-    /** Current tool name. Omit on Home. */
+    /** Current tool name, shown on the right before the credits. Omit on Home. */
     title?: string;
     /** Shows the tool's small shape before the title. */
     tool?: ToolName;
-    /** Shows a Home button with a back arrow. */
+    /** Shows a Home button with a back arrow, after the logo. */
     onBack?: MouseEventHandler<HTMLButtonElement>;
     credits?: number;
     /** ISO time of the next credit renewal. */
@@ -100,20 +100,20 @@ export default function AppHeader({
     return (
         <header className={onBack ? 'lk-header lk-header--tool' : 'lk-header'}>
             <div className="lk-header__start">
-                {onBack && <Button variant="quiet" icon="back" onClick={onBack}>Home</Button>}
                 {logo && (logoHref ? (
                     <a className="lk-header__logo" href={logoHref} onClick={onLogoClick} aria-label="Home">{logo}</a>
                 ) : (
                     <span className="lk-header__logo">{logo}</span>
                 ))}
+                {onBack && <Button variant="quiet" icon="back" className="lk-header__home" onClick={onBack}>Home</Button>}
+            </div>
+            <div className="lk-header__end">
                 {title && (
                     <span className="lk-header__title">
                         {tool && <ToolShape tool={tool} size={28} />}
                         {title}
                     </span>
                 )}
-            </div>
-            <div className="lk-header__end">
                 {children && <span className="lk-header__wide lk-header__end">{children}</span>}
                 {credits != null && <CreditBadge credits={credits} renewAt={renewAt} />}
                 {hasAccountItems && (

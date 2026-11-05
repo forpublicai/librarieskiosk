@@ -63,7 +63,6 @@ export default function LoginPage() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/images/logo.svg" alt="Public AI Libraries Project" className="lk-logo-dark" />
         </span>
-        <h1 className="lk-display">Free AI tools at your library</h1>
         <p className="lk-lead" style={{ margin: 0 }}>
           Chat, make pictures, music and video, or write code. Sign in, or start right away as a guest.
         </p>
@@ -78,7 +77,7 @@ export default function LoginPage() {
       </section>
 
       <section className="lk-auth__panel" aria-labelledby="sign-in-title">
-        <h2 id="sign-in-title" className="lk-title">Sign in</h2>
+        <h1 id="sign-in-title" className="lk-title">Sign in</h1>
 
         {error && <Notice tone="danger" title="You could not sign in">{error}</Notice>}
 
