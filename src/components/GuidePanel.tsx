@@ -324,7 +324,6 @@ function GuidePanelInner({ content, tool, isOpen, onClose }: GuidePanelProps & {
   const inputRef = useRef<HTMLInputElement>(null);
   const initializedRef = useRef(false);
   const tierStorageKey = guideTierKey(user, token);
-  const drawer = useDrawerMode();
 
   const allFaqs = content
     ? [...content.faqs.criticalUse, ...content.faqs.practical, ...content.faqs.concept]
@@ -697,8 +696,8 @@ function GuidePanelInner({ content, tool, isOpen, onClose }: GuidePanelProps & {
           <Button
             variant="quiet"
             onClick={() => {
-              // As a drawer the guide covers the page and traps focus: close it so the tour can run.
-              if (drawer) onClose();
+              // Close the guide first: as a drawer (now, or after zoom) it traps focus and would fight the tour.
+              onClose();
               const key = `cm_${user?.username ?? 'anon'}_${tool}`;
               localStorage.removeItem(key);
               window.dispatchEvent(new CustomEvent('cm-restart', { detail: { tool } }));
