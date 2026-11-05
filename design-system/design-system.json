@@ -38,9 +38,9 @@
   ],
   "lastChange": {
     "by": "Mohsin Y. K. Yousufi",
-    "at": "2026-11-05T17:36:47Z",
+    "at": "2026-11-05T17:57:55Z",
     "via": "Claude Code",
-    "note": "Header logo fixed first, tool name on the right; white tile outline in Dark; sign-in glow."
+    "note": "Sign-in: brand and form card centered in one row."
   },
   "layout": "files",
   "libraries": [
