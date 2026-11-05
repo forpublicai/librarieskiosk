@@ -99,11 +99,11 @@ export interface AppHeaderProps {
   logoLight?: string;
   /** Logo for the dark theme (logo.svg, white letters). */
   logoDark?: string;
-  /** Current tool name. Omit on Home. */
+  /** Current tool name, shown on the right before the credits. Omit on Home. */
   title?: string;
   /** Shows the tool's small shape before the title. */
   tool?: ToolName;
-  /** Shows a Home button with a back arrow. */
+  /** Shows a Home button with a back arrow, after the logo. */
   onBack?: MouseEventHandler;
   credits?: number;
   renewsAt?: string;

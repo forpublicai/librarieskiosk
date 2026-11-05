@@ -1,6 +1,6 @@
 The kiosk is a shared computer in a public library. The person at it may be eight or eighty, may never have used AI, or may build software for a living. Every screen must work for all of them on the first try, without help from staff.
 
-The look is **civic and playful**: the bold, plain clarity of good public signage, with the color and shape of a children's library. Public AI red leads. Cobalt, sunflower, pink and leaf green give each tool its own color, so a patron can say "the yellow one" and find Image again. Solid color, big type, real shapes, and buttons with a soft modern finish. Nothing glows, floats or blurs.
+The look is **civic and playful**: the bold, plain clarity of good public signage, with the color and shape of a children's library. Public AI red leads. Cobalt, sunflower, pink and leaf green give each tool its own color, so a patron can say "the yellow one" and find Image again. Solid color, big type, real shapes, and buttons with a soft modern finish. Nothing floats or blurs. Only the sign-in page has a faint glow.
 
 ## Principles
 
@@ -18,7 +18,7 @@ These patterns make an interface look machine-made and generic. Check every scre
 - **No loud gradients or glowing buttons.** A filled button is one hue. It may carry one soft sheen of that hue (a lighter top edge, a slightly deeper base) and a 1px lift. Never two hues, never a glow.
 - **No emoji as icons.** Use the `Icon` set.
 - **No heavy or stacked shadows.** Tiles have none. Buttons have only a 1px lift. Only the composer, menus (`shadow-sm`) and dialogs (`shadow-lg`) lift more.
-- **No glassmorphism, no decorative gradients, no floating animations.** Backgrounds and tiles are solid color.
+- **No glassmorphism, no decorative gradients, no floating animations.** Backgrounds and tiles are solid color. The one exception is the faint red glow on the sign-in page (see Layout).
 - **No neon glow on dark.** Dark mode uses the same fills, lighter.
 - **No purple, indigo or muted amber.** The palette is red, cobalt, sun, pink and green on navy-ink neutrals.
 - **No colored side borders.** Selected rows use a full tint; notices are a neutral box. Never a stripe on one edge.
@@ -99,7 +99,8 @@ The kiosk has real shapes, not soft blobs. They come from three sources: the log
 
 ## Layout
 
-- **Header** (64px, `surface-raised`, bottom `border`): logo or Home button, then a color swatch and the tool name. On the right: credits, account, theme, sign out, each with a label.
+- **Header** (64px, `surface-raised`, bottom `border`): the logo always comes first, in the same place on every screen. On tool screens a Home button follows it. On the right: the tool's shape and name, then any tool actions, credits, account, theme and sign out, each with a label. Below 820px the Home button hides, and the logo still leads Home.
+- **Sign-in**: the brand side (logo, one short line, help links) sits on `surface` with a faint glow: a red radial wash at 8% behind the logo and a green wash at 6% to the upper right. The form sits on `surface-sunken`. There is no display headline. "Sign in" is the page's only `h1`.
 - **Home**: the `display` greeting with one sun `Highlight` on a key word, then the tool tiles. Chat is the wide red hero tile. Image, Music, Video and Code follow as tinted tiles, each with its shape. On narrow screens, one tile per row.
 - **Tool screens**: a `sidebar-width` history panel on `surface-sunken`, the thread centered at `content-max`, the composer docked at the bottom. Below 900px the sidebar becomes a drawer behind a "Conversations" button.
 - **Spacing** uses the `space-*` steps only, the same way every time: rows pad `space-3` `space-4`, tiles pad `space-5`, sections sit `space-6` apart.

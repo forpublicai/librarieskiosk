@@ -168,10 +168,11 @@ textarea.lk-field__control { min-height: 120px; resize: vertical; }
 .lk-header__start, .lk-header__end { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
 .lk-header__logo { display: inline-flex; align-items: center; margin-right: var(--space-2); }
 .lk-header__logo img { height: 34px; width: auto; display: block; }
+@media (max-width: 820px) { .lk-header__home { display: none; } }
 .lk-logo-dark { display: none !important; }
 [data-theme="dark"] .lk-logo-light { display: none !important; }
 [data-theme="dark"] .lk-logo-dark { display: block !important; }
-.lk-header__title { display: inline-flex; align-items: center; gap: var(--space-3); margin-left: var(--space-2); font: 900 24px/30px var(--font-sans); color: var(--ink); white-space: nowrap; }
+.lk-header__title { display: inline-flex; align-items: center; gap: var(--space-3); margin-right: var(--space-3); font: 900 24px/30px var(--font-sans); color: var(--ink); white-space: nowrap; }
 
 /* ---------- Highlight: a sun marker behind one key word ---------- */
 .lk-highlight {
@@ -194,7 +195,6 @@ textarea.lk-field__control { min-height: 120px; resize: vertical; }
 .lk-mode .lk-fill-main { fill: var(--tile-shape); }
 .lk-mode .lk-stroke-main { stroke: var(--tile-shape); }
 .lk-mode:hover { outline: 2px solid var(--ink); outline-offset: -2px; }
-[data-theme="dark"] .lk-mode:hover { outline-color: var(--tool-on); }
 .lk-mode__text { position: relative; z-index: 1; flex: 1; display: flex; flex-direction: column; gap: var(--space-1); }
 .lk-mode__title { font: 700 22px/28px var(--font-sans); }
 .lk-mode__desc { font: 400 18px/26px var(--font-sans); color: var(--tile-muted); }
@@ -210,7 +210,6 @@ textarea.lk-field__control { min-height: 120px; resize: vertical; }
 .lk-mode--hero .lk-mode__desc { font-size: 20px; line-height: 30px; max-width: 60%; }
 .lk-mode--hero .lk-mode__shape { right: var(--space-6); bottom: var(--space-5); }
 .lk-mode--hero:hover, [data-theme="dark"] .lk-mode--hero:hover { outline: 3px solid var(--ink); }
-/* Warmth: the hero red shifts a little warmer on the shape side. The text side stays solid red-strong. */
 
 
 /* ---------- ConversationItem ---------- */
