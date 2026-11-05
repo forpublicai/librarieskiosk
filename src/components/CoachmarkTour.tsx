@@ -268,9 +268,12 @@ export default function CoachmarkTour({ tool }: { tool: string }) {
           visibility: tipPos ? 'visible' : 'hidden',
         }}
       >
-        <p className="lk-tour__count">Step {stepIdx + 1} of {steps.length}</p>
-        <h2 id="lk-tour-title" className="lk-heading">{step.title}</h2>
-        <p id="lk-tour-body">{step.body}</p>
+        {/* Next and Back keep focus on the same button, so a live region reads each new step. */}
+        <div className="lk-tour__text" aria-live="polite">
+          <p className="lk-tour__count">Step {stepIdx + 1} of {steps.length}</p>
+          <h2 id="lk-tour-title" className="lk-heading">{step.title}</h2>
+          <p id="lk-tour-body">{step.body}</p>
+        </div>
         <div className="lk-tour__actions">
           <Button variant="quiet" onClick={dismiss}>Skip tour</Button>
           <span className="lk-tour__nav">

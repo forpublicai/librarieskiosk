@@ -595,7 +595,10 @@ function GuidePanelInner({ content, tool, isOpen, onClose }: GuidePanelProps & {
   useEffect(() => {
     if (!focusOptionsRef.current) return;
     focusOptionsRef.current = false;
-    optionsRef.current?.querySelector<HTMLElement>('.lk-guide__option')?.focus();
+    // Only rescue focus that was lost; never pull it out of the question field or elsewhere.
+    const active = document.activeElement;
+    const lost = !active || active === document.body || optionsRef.current?.contains(active);
+    if (lost) optionsRef.current?.querySelector<HTMLElement>('.lk-guide__option')?.focus();
   }, [screen]);
 
   function renderOptions() {

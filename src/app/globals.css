@@ -862,6 +862,7 @@ a.lk-btn--danger { color: var(--danger); }
   background: var(--surface-raised); border: 1px solid var(--border); border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
 }
+.lk-tour__text { display: flex; flex-direction: column; gap: var(--space-2); }
 .lk-tour__count { font: 400 15px/22px var(--font-sans); color: var(--ink-muted); }
 .lk-tour__actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); margin-top: var(--space-2); }
 .lk-tour__actions > .lk-btn--quiet { margin-left: calc(var(--space-4) * -1); }
