@@ -6,7 +6,6 @@ import { useAuth } from '@/components/AuthProvider';
 import FloatingThemeToggle from '@/components/FloatingThemeToggle';
 import Header from '@/components/Header';
 import Button, { ButtonLink } from '@/components/ui/Button';
-import Highlight from '@/components/ui/Highlight';
 import ModeCard from '@/components/ui/ModeCard';
 import Notice from '@/components/ui/Notice';
 import Spinner from '@/components/ui/Spinner';
@@ -85,12 +84,8 @@ export default function DashboardPage() {
 
             <main className="lk-home">
                 <h1 className="lk-display">
-                    What would you like to do <Highlight>today</Highlight>?
+                    {isGuest ? 'What would you like to do today?' : `Hi ${user.username}, what would you like to do today?`}
                 </h1>
-                <p className="lk-lead">
-                    {isGuest ? '' : `Hi, ${user.username}. `}
-                    Pick a tool to begin. The Home button always brings you back here.
-                </p>
 
                 <div className="lk-home__grid">
                     {modes.map((mode, i) => (
