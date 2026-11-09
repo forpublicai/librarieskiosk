@@ -469,6 +469,7 @@ a.lk-btn--danger { color: var(--danger); }
 .lk-heading { font: 700 22px/28px var(--font-sans); color: var(--ink); }
 .lk-lead { color: var(--ink-muted); margin: var(--space-4) 0 var(--space-6); }
 .lk-home__grid {
+  margin-top: var(--space-6);
   display: grid; gap: var(--space-4);
   grid-template-columns: 1.3fr 1.3fr 1fr 1fr; grid-template-rows: auto auto;
 }
