@@ -94,14 +94,14 @@ The kiosk has real shapes, not soft blobs. They come from three sources: the log
 
 - Shapes are solid fills in a tool color, drawn as SVG from circles, arches, quarter-circles and rounded polygons.
 - Shapes sit in the corner of a tile, fully inside it, with clear space from the edge (`space-3` on small tiles). They never sit behind text.
-- Use one shape per tile, plus the single `Highlight` in the Home greeting. Never scatter shapes as background confetti.
+- Use one shape per tile. Never scatter shapes as background confetti.
 - Shapes stay still until a patron points at their tile. Then they tip up a little (4px and 6°) and settle back.
 
 ## Layout
 
 - **Header** (64px, `surface-raised`, bottom `border`): the logo always comes first, in the same place on every screen. On tool screens a Home button follows it. On the right: the tool's shape and name, then any tool actions, credits, account, theme and sign out, each with a label. Below 820px the Home button hides, and the logo still leads Home.
 - **Sign-in**: the brand side (logo, one short line, help links) sits on `surface` with a faint glow: a red radial wash at 8% behind the logo and a green wash at 6% to the upper right. The brand side (up to 560px) and the form card (up to 460px, `surface-raised`, `border`, `radius-lg`) sit side by side in one centered row, `space-8` apart, so a wide screen has no empty middle. Below 900px they stack. There is no display headline. "Sign in" is the page's only `h1`.
-- **Home**: the `display` greeting with one sun `Highlight` on a key word, then the tool tiles. Chat is the wide red hero tile. Image, Music, Video and Code follow as tinted tiles, each with its shape. On narrow screens, one tile per row.
+- **Home**: one `display` greeting that names a signed-in patron ("Hi Sam, what would you like to do today?"), with no line under it and no `Highlight`. Guests see the same question with no name. The tool tiles follow, `space-6` below. Chat is the wide red hero tile. Image, Music, Video and Code follow as tinted tiles, each with its shape. On narrow screens, one tile per row.
 - **Tool screens**: a `sidebar-width` history panel on `surface-sunken`, the thread centered at `content-max`, the composer docked at the bottom. Below 900px the sidebar becomes a drawer behind a "Conversations" button.
 - **Spacing** uses the `space-*` steps only, the same way every time: rows pad `space-3` `space-4`, tiles pad `space-5`, sections sit `space-6` apart.
 
