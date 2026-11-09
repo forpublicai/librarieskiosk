@@ -59,9 +59,7 @@ export default function LoginPage() {
       <section className="lk-auth__brand">
         <span className="lk-auth__logo">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/images/lib-logo.png" alt="Public AI Libraries Project" className="lk-logo-light" />
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/images/logo.svg" alt="Public AI Libraries Project" className="lk-logo-dark" />
+          <img src="/images/lib-logo.png" alt="Public AI Libraries Project" />
         </span>
         <p className="lk-lead" style={{ margin: 0 }}>
           Chat, make pictures, music and video, or write code. Sign in, or start right away as a guest.

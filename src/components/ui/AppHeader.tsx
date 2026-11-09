@@ -7,10 +7,8 @@ import IconButton from './IconButton';
 import ToolShape, { type ToolName } from './ToolShape';
 
 interface AppHeaderProps {
-    /** Logo for the light theme (lib-logo.png). */
-    logoLight?: string;
-    /** Logo for the dark theme (logo.svg, white letters). */
-    logoDark?: string;
+    /** The Public AI Libraries Project logo. */
+    logoSrc?: string;
     /** Where the logo leads. Usually Home. */
     logoHref?: string;
     onLogoClick?: MouseEventHandler<HTMLAnchorElement>;
@@ -37,8 +35,7 @@ interface AppHeaderProps {
 
 /** The top bar on every signed-in screen. Below 820px (1200px on tool screens) the extra and account items move into a menu. */
 export default function AppHeader({
-    logoLight,
-    logoDark,
+    logoSrc,
     logoHref,
     onLogoClick,
     title,
@@ -88,14 +85,8 @@ export default function AppHeader({
         </>
     );
 
-    const logo = (logoLight || logoDark) && (
-        <>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            {logoLight && <img src={logoLight} alt="Public AI Libraries Project" className="lk-logo-light" />}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            {logoDark && <img src={logoDark} alt="Public AI" className="lk-logo-dark" />}
-        </>
-    );
+    // eslint-disable-next-line @next/next/no-img-element
+    const logo = logoSrc && <img src={logoSrc} alt="Public AI Libraries Project" />;
 
     return (
         <header className={onBack ? 'lk-header lk-header--tool' : 'lk-header'}>

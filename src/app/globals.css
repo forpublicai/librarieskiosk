@@ -319,9 +319,6 @@ textarea.lk-field__control { min-height: 120px; resize: vertical; }
 .lk-header__start, .lk-header__end { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
 .lk-header__logo { display: inline-flex; align-items: center; margin-right: var(--space-2); }
 .lk-header__logo img { height: 34px; width: auto; display: block; }
-.lk-logo-dark { display: none !important; }
-[data-theme="dark"] .lk-logo-light { display: none !important; }
-[data-theme="dark"] .lk-logo-dark { display: block !important; }
 .lk-header__title { display: inline-flex; align-items: center; gap: var(--space-3); margin-right: var(--space-3); font: 900 24px/30px var(--font-sans); color: var(--ink); white-space: nowrap; }
 
 /* ---------- Highlight: a sun marker behind one key word ---------- */

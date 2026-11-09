@@ -27,8 +27,7 @@ export default function Header({ title, tool, showBack = true, actions }: Header
 
     return (
         <AppHeader
-            logoLight="/images/lib-logo.png"
-            logoDark="/images/logo.svg"
+            logoSrc="/images/lib-logo.png"
             logoHref="/dashboard"
             onLogoClick={(e) => {
                 e.preventDefault();

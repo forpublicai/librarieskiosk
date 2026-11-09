@@ -16,8 +16,7 @@ export default function InfoHeader({ current }: { current: string }) {
 
     return (
         <AppHeader
-            logoLight="/images/lib-logo.png"
-            logoDark="/images/logo.svg"
+            logoSrc="/images/lib-logo.png"
             logoHref="/"
             onToggleTheme={toggleTheme}
             theme={theme}
