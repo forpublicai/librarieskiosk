@@ -18,6 +18,7 @@ import { formatModeCost } from '@/lib/creditCosts';
 import { useGenerationProgress, formatElapsed } from '@/hooks/useGenerationProgress';
 import { loadGuestState, saveGuestState } from '@/lib/guestSession';
 import modelConfig from '@/config/models.json';
+import { createSseDataParser } from '@/lib/sseLines';
 
 interface Message {
     role: 'user' | 'assistant';
@@ -223,30 +224,36 @@ export default function CodePage() {
             if (!reader) throw new Error('No stream reader');
 
             const decoder = new TextDecoder();
+            const sse = createSseDataParser();
             setMessages((prev) => [...prev, { role: 'assistant', content: '' }]);
 
+            const handleData = (data: string): boolean => {
+                if (data === '[DONE]') return true;
+                try {
+                    const parsed = JSON.parse(data);
+                    const content = parsed.choices?.[0]?.delta?.content;
+                    if (content) {
+                        assistantContent += content;
+                        setMessages((prev) => {
+                            const updated = [...prev];
+                            updated[updated.length - 1] = { role: 'assistant', content: assistantContent };
+                            return updated;
+                        });
+                    }
+                } catch { }
+                return false;
+            };
+
+            let finished = false;
             while (true) {
                 const { done, value } = await reader.read();
-                if (done) break;
-                const chunk = decoder.decode(value, { stream: true });
-                for (const line of chunk.split('\n')) {
-                    if (line.startsWith('data: ')) {
-                        const data = line.slice(6);
-                        if (data === '[DONE]') break;
-                        try {
-                            const parsed = JSON.parse(data);
-                            const content = parsed.choices?.[0]?.delta?.content;
-                            if (content) {
-                                assistantContent += content;
-                                setMessages((prev) => {
-                                    const updated = [...prev];
-                                    updated[updated.length - 1] = { role: 'assistant', content: assistantContent };
-                                    return updated;
-                                });
-                            }
-                        } catch { }
-                    }
+                const text = done ? decoder.decode() : decoder.decode(value, { stream: true });
+                const payloads = done ? [...sse.push(text), ...sse.flush()] : sse.push(text);
+                for (const data of payloads) {
+                    if (finished) break;
+                    if (handleData(data)) finished = true;
                 }
+                if (done) break;
             }
 
             const finalMessages = [...newMessages, { role: 'assistant' as const, content: assistantContent }];
