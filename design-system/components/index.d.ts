@@ -95,10 +95,8 @@ export interface CreditBadgeProps {
 export declare function CreditBadge(props: CreditBadgeProps): JSX.Element;
 
 export interface AppHeaderProps {
-  /** Logo for the light theme (lib-logo.png). */
-  logoLight?: string;
-  /** Logo for the dark theme (logo.svg, white letters). */
-  logoDark?: string;
+  /** The Public AI Libraries Project logo (lib-logo.png), the same in both themes. */
+  logoSrc?: string;
   /** Current tool name, shown on the right before the credits. Omit on Home. */
   title?: string;
   /** Shows the tool's small shape before the title. */

@@ -19,7 +19,7 @@
       setTimeout(function () { busy[1](false); s[1](function (m) { return m.concat([{ role: 'assistant', text: ['Here is a shorter version you can send.'] }]); }); }, 1500);
     }
     return h(React.Fragment, null,
-      h(K.AppHeader, { logoLight: '/_blob/94aadda89d397e091a23d6a22e48edad', logoDark: '/_blob/4aa0921299c599770d95d20e70462a30', onBack: noop, tool: 'chat', title: 'Chat', credits: 42, renewsAt: 'Monday at 12:00 AM', onToggleTheme: noop, onSignOut: noop }),
+      h(K.AppHeader, { logoSrc: '/_blob/94aadda89d397e091a23d6a22e48edad', onBack: noop, tool: 'chat', title: 'Chat', credits: 42, renewsAt: 'Monday at 12:00 AM', onToggleTheme: noop, onSignOut: noop }),
       h('div', { style: { flex: 1, display: 'flex', minHeight: 0 } },
         h('aside', { style: { width: 'var(--sidebar-width)', flex: 'none', background: 'var(--surface-sunken)', borderRight: '1px solid var(--border)', padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' } },
           h(K.Button, { variant: 'secondary', icon: 'plus', block: true, onClick: noop }, 'Start a new chat'),

@@ -3,7 +3,7 @@
 The top bar on every signed-in screen: the logo, a Home button on tool screens, then on the right the tool name, credits and account actions.
 
 ## Props
-- `logoLight`, `logoDark`: logo image URLs. Light uses `lib-logo.png`, Dark uses `logo.svg` (white letters). The header swaps them by `data-theme`.
+- `logoSrc`: the logo image URL, always `lib-logo.png`. The header shows the same logo in Light and in Dark.
 - `title`: the current tool ("Chat", "Image"). It sits on the right, before `children` and the credits. Leave it out on Home.
 - `tool`: `chat | image | music | video | code`. Shows the small `ToolShape` before the title, so the header carries the tool's color.
 - `onBack`: shows a "Home" button with a back arrow, just after the logo. Use it on tool screens.
