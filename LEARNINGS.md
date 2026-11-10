@@ -36,6 +36,12 @@ The same library name has to produce the same env-var slug, URL slug, cookie val
 
 Kiosks that haven't been re-provisioned to the `/l/<slug>` start URL still load. The guest endpoint falls back to a legacy shared `guest` user instead of 500-ing. The server logs a warning so ops can fix it, but the patron-facing flow keeps working. **Why:** rolling out a multi-tenancy change across N library sites with N different IT teams is slow; you cannot ship a change that makes "old URL" mean "broken kiosk". **How to apply:** when introducing per-tenant identity to a previously-untenanted system, design the fallback path *first* and log loudly so it doesn't become permanent.
 
+## Security
+
+### A gate cookie must be unforgeable — never a boolean flag
+
+The kiosk gate once set `kiosk_access=true` after a correct `?access=` token and trusted any request carrying that value, so anyone could bypass it with `document.cookie` or `curl -b`. It now stores a short-lived JWT signed with a key derived from the gate secret ([src/lib/kioskAccess.ts](src/lib/kioskAccess.ts)). **Why:** the client controls every cookie value; `httpOnly` stops page scripts from reading a cookie, not users from writing one. **How to apply:** any cookie that grants access must carry a value only the server can mint (signature or random ID looked up server-side), enforce expiry server-side, and become invalid when the secret rotates.
+
 ## Server / client boundary
 
 ### Use `'server-only'` aggressively for env- and DB-touching modules
