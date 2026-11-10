@@ -163,9 +163,8 @@
     var dark = theme === 'dark';
     return h('header', { className: 'lk-header' },
       h('div', { className: 'lk-header__start' },
-        props.logoLight || props.logoDark ? h('span', { className: 'lk-header__logo' },
-          props.logoLight ? h('img', { src: props.logoLight, alt: 'Public AI Libraries Project', className: 'lk-logo-light' }) : null,
-          props.logoDark ? h('img', { src: props.logoDark, alt: 'Public AI', className: 'lk-logo-dark' }) : null
+        props.logoSrc ? h('span', { className: 'lk-header__logo' },
+          h('img', { src: props.logoSrc, alt: 'Public AI Libraries Project' })
         ) : null,
         props.onBack ? h(Button, { variant: 'quiet', icon: 'back', className: 'lk-header__home', onClick: props.onBack }, 'Home') : null
       ),

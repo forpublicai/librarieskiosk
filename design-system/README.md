@@ -134,7 +134,7 @@ The `Icon` component holds the kiosk's own line icons: 24px grid, 2px stroke, ro
 
 ## Logos
 
-Use the Public AI logo from the Logos group. In Light, use `lib-logo.png` (all red). The `logo.svg` lockup has white letters: use it only in Dark or on a `red` block. Keep clear space around the mark equal to half the height of the red square. Do not recolor, stretch or add effects.
+Use the Public AI Libraries Project logo, `lib-logo.png` (all red), from the Logos group. Use the same file on every screen, in Light and in Dark: it reads on Dark grounds at 4.7:1. Do not use the compact `logo.svg` lockup in the kiosk. Keep clear space around the mark equal to half the height of the red square. Do not recolor, stretch or add effects.
 
 ## Accessibility checklist
 

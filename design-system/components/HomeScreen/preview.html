@@ -9,7 +9,7 @@
   function noop() {}
   function at(col, row, el) { return h('div', { style: { gridColumn: col, gridRow: row, display: 'flex' } }, el); }
   ReactDOM.createRoot(document.getElementById('root')).render(h(React.Fragment, null,
-    h(K.AppHeader, { logoLight: '/_blob/94aadda89d397e091a23d6a22e48edad', logoDark: '/_blob/4aa0921299c599770d95d20e70462a30', credits: 42, renewsAt: 'Monday at 12:00 AM', onAccount: noop, onToggleTheme: noop, onSignOut: noop }),
+    h(K.AppHeader, { logoSrc: '/_blob/94aadda89d397e091a23d6a22e48edad', credits: 42, renewsAt: 'Monday at 12:00 AM', onAccount: noop, onToggleTheme: noop, onSignOut: noop }),
     h('main', { style: { maxWidth: 1120, margin: '0 auto', padding: 'var(--space-7) var(--space-6)' } },
       h('h1', { style: { font: '900 48px/52px var(--font-sans)', letterSpacing: '-0.015em', margin: '0 0 32px' } }, 'Hi Sam, what would you like to do today?'),
       h('div', { style: { display: 'grid', gridTemplateColumns: '1.3fr 1.3fr 1fr 1fr', gridTemplateRows: 'auto auto', gap: 'var(--space-4)' } },
