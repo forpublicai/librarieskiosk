@@ -1,0 +1,55 @@
+<!-- @dsCard group="Screens" height=760 width=1280 page subtitle="The chat tool: history sidebar, thread, docked composer" -->
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Chat screen preview</title></head>
+<body style="margin:0">
+<div id="root" class="lk-app" style="height:760px;display:flex;flex-direction:column"></div>
+<script>
+  var K = window.Kiosk, h = React.createElement;
+  function noop() {}
+  function Screen() {
+    var s = React.useState([
+      { role: 'user', text: 'Can you help me write an email to my landlord about a broken heater?' },
+      { role: 'assistant', text: ['Of course. Here is a short, polite email you can change as you like:', 'Hello Ms. Lopez, the heater in apartment 4B stopped working on Sunday night. Could someone come to look at it this week? I am home after 3 PM most days. Thank you, Ana.'] }
+    ]);
+    var busy = React.useState(false);
+    function send(t) {
+      s[1](s[0].concat([{ role: 'user', text: t }]));
+      busy[1](true);
+      setTimeout(function () { busy[1](false); s[1](function (m) { return m.concat([{ role: 'assistant', text: ['Here is a shorter version you can send.'] }]); }); }, 1500);
+    }
+    return h(React.Fragment, null,
+      h(K.AppHeader, { logoSrc: '/_blob/94aadda89d397e091a23d6a22e48edad', onBack: noop, tool: 'chat', title: 'Chat', credits: 42, renewsAt: 'Monday at 12:00 AM', onToggleTheme: noop, onSignOut: noop }),
+      h('div', { style: { flex: 1, display: 'flex', minHeight: 0 } },
+        h('aside', { style: { width: 'var(--sidebar-width)', flex: 'none', background: 'var(--surface-sunken)', borderRight: '1px solid var(--border)', padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' } },
+          h(K.Button, { variant: 'secondary', icon: 'plus', block: true, onClick: noop }, 'Start a new chat'),
+          h('p', { style: { font: '400 15px/22px var(--font-sans)', color: 'var(--ink-subtle)', margin: '24px 0 4px 16px' } }, 'Today'),
+          h(K.ConversationItem, { icon: 'chat', title: 'Email to my landlord about the heater', selected: true }),
+          h(K.ConversationItem, { icon: 'chat', title: 'Bus routes to the community college' }),
+          h('p', { style: { font: '400 15px/22px var(--font-sans)', color: 'var(--ink-subtle)', margin: '16px 0 4px 16px' } }, 'Earlier'),
+          h(K.ConversationItem, { icon: 'chat', title: 'Explain photosynthesis for a 5th grader' }),
+          h(K.ConversationItem, { icon: 'chat', title: 'Resume tips for a first job' })
+        ),
+        h('main', { style: { flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 } },
+          h('div', { style: { flex: 1, overflowY: 'auto', padding: 'var(--space-6) var(--space-6) var(--space-4)' } },
+            h('div', { style: { maxWidth: 'var(--content-max)', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' } },
+              s[0].map(function (m, i) {
+                return h(K.ChatMessage, { key: i, role: m.role, actions: m.role === 'assistant' ? h(K.Button, { variant: 'quiet', icon: 'copy', onClick: noop }, 'Copy') : null },
+                  Array.isArray(m.text) ? m.text.map(function (p, j) { return h('p', { key: j }, p); }) : m.text);
+              }),
+              busy[0] ? h(K.ChatMessage, { thinking: true }) : null
+            )
+          ),
+          h('div', { style: { padding: '0 var(--space-6) var(--space-4)' } },
+            h('div', { style: { maxWidth: 'var(--content-max)', margin: '0 auto' } },
+              h(K.Composer, { placeholder: 'Ask anything…', busy: busy[0], onSend: send, onStop: function () { busy[1](false); } })
+            )
+          )
+        )
+      )
+    );
+  }
+  ReactDOM.createRoot(document.getElementById('root')).render(h(Screen));
+</script>
+</body>
+</html>

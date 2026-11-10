@@ -1,0 +1,13 @@
+<!-- @dsCard group="Actions" height=90 -->
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Chip preview</title></head>
+<body style="margin:0">
+<div id="root" class="lk-app" style="padding:16px"></div>
+<script>
+  var K = window.Kiosk, h = React.createElement;
+  
+  ReactDOM.createRoot(document.getElementById('root')).render(h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' } }, h(K.Chip, { icon: 'help' }, 'Explain how credit scores work'), h(K.Chip, null, 'Help me write a cover letter'), h(K.Chip, { selected: true }, 'Square'), h(K.Chip, { selected: false }, 'Wide')));
+</script>
+</body>
+</html>

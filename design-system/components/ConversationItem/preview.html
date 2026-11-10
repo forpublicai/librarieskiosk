@@ -1,0 +1,13 @@
+<!-- @dsCard group="Navigation" height=240 -->
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>ConversationItem preview</title></head>
+<body style="margin:0">
+<div id="root" class="lk-app" style="padding:16px"></div>
+<script>
+  var K = window.Kiosk, h = React.createElement;
+  
+  ReactDOM.createRoot(document.getElementById('root')).render(h('div', { style: { width: 300, padding: 12, background: 'var(--surface-sunken)', borderRadius: 'var(--radius-lg)', display: 'flex', flexDirection: 'column', gap: 4 } }, h(K.ConversationItem, { icon: 'chat', title: 'How do I renew a passport?', meta: 'Today', selected: true }), h(K.ConversationItem, { icon: 'chat', title: 'Recipe ideas with lentils and spinach', meta: 'Yesterday' }), h(K.ConversationItem, { icon: 'chat', title: 'Cover letter for a library assistant job', meta: 'Oct 28' })));
+</script>
+</body>
+</html>

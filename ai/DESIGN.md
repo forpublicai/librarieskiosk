@@ -2,6 +2,8 @@
 
 The visual + interaction design system for Libraries Kiosk. The system is encoded in [src/app/globals.css](../src/app/globals.css); this file is the *intent* that the CSS implements.
 
+> **New design system.** The redesign lives in [design-system/](../design-system/README.md): tokens, brand rules and reference components. It is locked as the target. Until it is built into `globals.css`, this file still describes what ships today.
+
 If you change the CSS in a way that contradicts this document, update this document. If you find yourself reaching for a one-off style on a page, first check whether the design system already covers it.
 
 ---

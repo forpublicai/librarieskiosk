@@ -1,9 +1,13 @@
 'use client';
 
-import { useState, FormEvent } from 'react';
+import Link from 'next/link';
+import { useEffect, useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
 import FloatingThemeToggle from '@/components/FloatingThemeToggle';
+import Button, { ButtonLink } from '@/components/ui/Button';
+import Notice from '@/components/ui/Notice';
+import TextField from '@/components/ui/TextField';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
@@ -13,10 +17,13 @@ export default function LoginPage() {
   const { login, loginAsGuest, user } = useAuth();
   const router = useRouter();
 
-  if (user) {
-    router.push('/dashboard');
-    return null;
-  }
+  // Redirect in an effect, not during render, so React does not warn about a
+  // router update while rendering.
+  useEffect(() => {
+    if (user) router.push('/dashboard');
+  }, [user, router]);
+
+  if (user) return null;
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -46,100 +53,75 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="landing-root">
+    <div className="lk-auth">
       <FloatingThemeToggle />
-      <div className="landing-main">
-        {/* Left: branding + nav */}
-        <div className="landing-hero-inner">
-          <img src="/images/lib-logo.png" alt="Public AI" className="landing-logo-img" />
 
-          <nav className="landing-nav">
-            <a href="/getting-started" className="landing-nav-link">Get Started</a>
-            <a href="/resources" className="landing-nav-link">Resources</a>
-            <a href="/faqs" className="landing-nav-link">FAQs</a>
-          </nav>
+      <section className="lk-auth__brand">
+        <span className="lk-auth__logo">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/images/lib-logo.png" alt="Public AI Libraries Project" />
+        </span>
+        <p className="lk-lead" style={{ margin: 0 }}>
+          Chat, make pictures, music and video, or write code. Sign in, or start right away as a guest.
+        </p>
+        <nav className="lk-auth__nav" aria-label="Help">
+          <ButtonLink variant="quiet" icon="help" href="/getting-started">Get started</ButtonLink>
+          <ButtonLink variant="quiet" href="/resources">Resources</ButtonLink>
+          <ButtonLink variant="quiet" href="/faqs">FAQs</ButtonLink>
+        </nav>
+        <a className="lk-link" href="https://publicai.network/libraries.html" target="_blank" rel="noopener noreferrer">
+          Learn more about the program
+        </a>
+      </section>
 
-          <a
-            href="https://publicai.network/libraries.html"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="landing-learn-more"
-          >
-            Learn more about the program
+      <section className="lk-auth__panel" aria-labelledby="sign-in-title">
+        <h1 id="sign-in-title" className="lk-title">Sign in</h1>
+
+        {error && <Notice tone="danger" title="You could not sign in">{error}</Notice>}
+
+        <form className="lk-form" onSubmit={handleSubmit}>
+          <TextField
+            id="username"
+            label="Username"
+            type="text"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            autoComplete="username"
+            autoFocus
+            required
+          />
+          <TextField
+            id="password"
+            label="Password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="current-password"
+            required
+          />
+          <Button variant="primary" size="lg" block type="submit" disabled={loading || !username || !password}>
+            {loading ? 'Signing in…' : 'Sign in'}
+          </Button>
+        </form>
+
+        <div className="lk-auth__links">
+          <Link className="lk-link" href="/signup">Create an account</Link>
+          <Link className="lk-link" href="/forgot-password">Forgot your password?</Link>
+        </div>
+
+        <p className="lk-divider">or</p>
+
+        <Button variant="secondary" size="lg" block icon="user" onClick={handleGuestLogin} disabled={loading}>
+          {loading ? 'Starting…' : 'Continue as guest'}
+        </Button>
+        <p className="lk-fine">100 free credits. No account needed. Your work is not saved when you leave.</p>
+
+        <p className="lk-auth__footer">
+          <a className="lk-link" href="https://publicai.network/" target="_blank" rel="noopener noreferrer">
+            &copy; 2026 Public AI Libraries Project
           </a>
-        </div>
-
-        {/* Right: floating login card */}
-        <div className="landing-login-panel">
-          <div className="landing-login-card">
-            {error && <div className="login-error" style={{ marginBottom: '16px' }}>{error}</div>}
-
-            <form onSubmit={handleSubmit}>
-              <div className="landing-field">
-                <label className="landing-label" htmlFor="username">USERNAME</label>
-                <input
-                  id="username"
-                  className="landing-input"
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="ENTER USERNAME"
-                  autoFocus
-                  required
-                />
-              </div>
-
-              <div className="landing-field">
-                <label className="landing-label" htmlFor="password">PASSWORD</label>
-                <input
-                  id="password"
-                  className="landing-input"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="ENTER PASSWORD"
-                  required
-                />
-              </div>
-
-              <button
-                className="landing-signin-btn"
-                type="submit"
-                disabled={loading || !username || !password}
-              >
-                {loading ? 'AUTHENTICATING...' : 'SIGN IN'}
-              </button>
-            </form>
-
-            <p className="landing-create-account">
-              <a href="/signup">CREATE AN ACCOUNT</a>
-            </p>
-            <p className="landing-create-account" style={{ marginTop: '8px' }}>
-              <a href="/forgot-password">FORGOT PASSWORD?</a>
-            </p>
-
-            <div className="landing-guest-divider" />
-
-            <button
-              className="landing-guest-btn"
-              type="button"
-              onClick={handleGuestLogin}
-              disabled={loading}
-            >
-              <span className="landing-guest-icon">👤</span>
-              {loading ? 'LOADING...' : 'CONTINUE AS GUEST'}
-            </button>
-            <p className="landing-guest-note">100 FREE CREDITS · NO ACCOUNT NEEDED</p>
-          </div>
-        </div>
-      </div>
-
-      <footer className="landing-footer">
-        <span>           <a href="https://publicai.network/" target="_blank" rel="noopener noreferrer">
-              &copy; 2026 Public AI Libraries Project
-            </a>
-          </span>
-      </footer>
+        </p>
+      </section>
     </div>
   );
 }

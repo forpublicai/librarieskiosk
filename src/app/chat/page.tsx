@@ -5,8 +5,14 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
 import Header from '@/components/Header';
 import GuidePanel from '@/components/GuidePanel';
+import AssistantReply from '@/components/AssistantReply';
 import CoachmarkTour from '@/components/CoachmarkTour';
-import { formatAssistantMessage } from '@/lib/formatMessage';
+import HistoryList from '@/components/HistoryList';
+import ToolLayout from '@/components/ToolLayout';
+import Button from '@/components/ui/Button';
+import ChatMessage from '@/components/ui/ChatMessage';
+import Chip from '@/components/ui/Chip';
+import Composer from '@/components/ui/Composer';
 import { loadGuestState, saveGuestState } from '@/lib/guestSession';
 import modelConfig from '@/config/models.json';
 
@@ -44,8 +50,9 @@ export default function ChatPage() {
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const [guideOpen, setGuideOpen] = useState(false);
-    const [chipsVisible, setChipsVisible] = useState(true);
-    const [usedChips, setUsedChips] = useState<Set<string>>(new Set());
+    const abortRef = useRef<AbortController | null>(null);
+    // Error replies this page made in this visit, so only they show as a failure notice.
+    const [errorReplies, setErrorReplies] = useState<string[]>([]);
     const isGuest = user?.role === 'GUEST';
     const hydratedRef = useRef(false);
 
@@ -56,10 +63,6 @@ export default function ChatPage() {
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
-
-    useEffect(() => {
-        if (messages.length === 0) setChipsVisible(true);
-    }, [messages.length]);
 
     useEffect(() => {
         if (token && !isGuest) loadConversations();
@@ -141,7 +144,6 @@ export default function ChatPage() {
     const handleNewChat = () => {
         setMessages([]);
         setActiveConvId(null);
-        setUsedChips(new Set());
     };
 
     const handleDeleteConversation = async (id: string) => {
@@ -183,11 +185,16 @@ export default function ChatPage() {
         setInput('');
         setIsStreaming(true);
 
+        const controller = new AbortController();
+        abortRef.current = controller;
+        let assistantContent = '';
+
         try {
             const res = await fetch('/api/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
                 body: JSON.stringify({ messages: newMessages }),
+                signal: controller.signal,
             });
 
             if (!res.ok) {
@@ -200,7 +207,6 @@ export default function ChatPage() {
             if (!reader) throw new Error('No stream reader');
 
             const decoder = new TextDecoder();
-            let assistantContent = '';
             // SSE events can be split across network chunks; buffer until we see a
             // newline so a `data:` line straddling a chunk boundary isn't dropped
             // (which previously left the assistant reply blank).
@@ -261,149 +267,129 @@ export default function ChatPage() {
             scheduleSave(finalMessages, activeConvId);
             await refreshUser();
         } catch (err) {
-            setMessages((prev) => [...prev, {
-                role: 'assistant',
-                content: `Error: ${err instanceof Error ? err.message : 'Something went wrong'}`,
-            }]);
+            if (controller.signal.aborted) {
+                // Stopped by the patron: keep what arrived so far.
+                const stoppedMessages = assistantContent.trim()
+                    ? [...newMessages, { role: 'assistant' as const, content: assistantContent }]
+                    : newMessages;
+                setMessages(stoppedMessages);
+                scheduleSave(stoppedMessages, activeConvId);
+                await refreshUser();
+            } else {
+                const errorContent = `Error: ${err instanceof Error ? err.message : 'Something went wrong'}`;
+                setErrorReplies((prev) => [...prev, errorContent]);
+                setMessages((prev) => [...prev.filter((m) => m.role !== 'assistant' || m.content !== ''), {
+                    role: 'assistant',
+                    content: errorContent,
+                }]);
+            }
         } finally {
+            abortRef.current = null;
             setIsStreaming(false);
         }
     };
 
-    const handleSubmit = (e: { preventDefault(): void }) => {
-        e.preventDefault();
-        sendMessage(input);
-    };
-
     if (isLoading || !user) return null;
+
+    const last = messages[messages.length - 1];
+    const waitingForFirstToken = isStreaming && (last?.role !== 'assistant' || last.content === '');
+    const shownMessages = waitingForFirstToken && last?.role === 'assistant' ? messages.slice(0, -1) : messages;
 
     return (
         <div className="page-container">
-            <Header title="Chat" actions={
-                <button
-                    className={`guide-toggle-btn${guideOpen ? ' guide-toggle-btn--active' : ''}`}
+            <Header title="Chat" tool="chat" actions={
+                <Button
+                    variant="quiet"
+                    icon="help"
+                    aria-pressed={guideOpen}
                     onClick={() => setGuideOpen(o => !o)}
                     data-tour="guide-btn"
                 >
-                    <span className="guide-toggle-icon">?</span>
-                    Learning Guide
-                </button>
+                    Learning guide
+                </Button>
             } />
-            <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', padding: '8px 24px 0', margin: 0, letterSpacing: '0.03em' }}>
-                Currently using: {modelConfig.chat.label}
-            </p>
 
-            <div className="chat-container">
-                {/* Sidebar */}
-                <aside className="gen-sidebar" style={{ width: '320px', minWidth: '320px' }} data-tour="chat-sidebar">
-                    <button className="btn btn-primary" onClick={handleNewChat} style={{ width: '100%', marginBottom: '24px' }}>
-                        + New Chat
-                    </button>
-                    <h2 className="form-label" style={{ marginBottom: '16px' }}>History</h2>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        {conversations.map((c) => (
-                            <div
-                                key={c.id}
-                                style={{
-                                    display: 'flex', alignItems: 'center', gap: '8px',
-                                    padding: '10px 12px',
-                                    background: c.id === activeConvId ? 'var(--glass-bg)' : 'transparent',
-                                    border: '1px solid var(--border-light)',
-                                    cursor: 'pointer', transition: 'background 0.2s',
-                                }}
-                            >
-                                <div
-                                    style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.8rem', fontWeight: 'bold' }}
-                                    onClick={() => loadConversation(c.id)}
-                                >
-                                    {c.title}
-                                </div>
-                                <button
-                                    onClick={() => handleDeleteConversation(c.id)}
-                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.85rem' }}
-                                >✕</button>
-                            </div>
-                        ))}
-                    </div>
-                </aside>
-
-                {/* Chat main */}
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
-                    <div className="chat-messages" style={{ flex: 1, overflowY: 'auto' }} data-tour="chat-messages">
-                        {messages.length === 0 && (
-                            <div className="gen-empty" style={{ margin: 'auto' }}>
-                                <div className="gen-empty-icon">💬</div>
-                                <div className="gen-empty-text">Start a conversation with AI</div>
-                            </div>
-                        )}
-                        {messages.map((msg, i) => (
-                            <div key={i} className={`chat-message ${msg.role}`}>
-                                {msg.role === 'assistant' ? (
-                                    <div dangerouslySetInnerHTML={{ __html: formatAssistantMessage(msg.content, 'chat') }} />
-                                ) : (
-                                    msg.content
-                                )}
-                            </div>
-                        ))}
-                        {isStreaming && messages[messages.length - 1]?.role !== 'assistant' && (
-                            <div className="chat-message assistant">
-                                <div className="typing-indicator">
-                                    <div className="typing-dot" />
-                                    <div className="typing-dot" />
-                                    <div className="typing-dot" />
-                                </div>
-                            </div>
-                        )}
-                        <div ref={messagesEndRef} />
-                    </div>
-
-                    <div className="chat-input-area" data-tour="chat-input">
-                        {messages.filter(m => m.role === 'user').length < 2 && !isStreaming && chipsVisible && CHAT_CHIPS.some(p => !usedChips.has(p)) && (
-                            <div className="example-prompts" style={{ marginBottom: '8px' }}>
-                                <span className="example-prompts-label">Try:</span>
-                                {CHAT_CHIPS.filter(p => !usedChips.has(p)).map(p => (
-                                    <button
-                                        key={p}
-                                        type="button"
-                                        className="example-chip"
-                                        onClick={() => {
-                                            setUsedChips(prev => new Set([...prev, p]));
-                                            setInput(p);
-                                        }}
-                                    >{p}</button>
-                                ))}
-                            </div>
-                        )}
-                        <form className="chat-input-wrapper" onSubmit={handleSubmit}>
-                            <input
-                                className="chat-input"
-                                value={input}
-                                onChange={(e) => { setInput(e.target.value); setChipsVisible(false); }}
-                                placeholder="Type your message..."
-                                disabled={isStreaming}
-                                autoFocus
+            <ToolLayout
+                sidebarLabel="Conversations"
+                sidebarTour="chat-sidebar"
+                sidebar={
+                    <>
+                        <Button variant="secondary" icon="plus" block onClick={handleNewChat} data-drawer-close>
+                            Start a new chat
+                        </Button>
+                        {isGuest ? (
+                            <p className="lk-tool__note">Guest chats are not saved after you leave.</p>
+                        ) : conversations.length === 0 ? (
+                            <p className="lk-tool__note">Your past chats will show here.</p>
+                        ) : (
+                            <HistoryList
+                                items={conversations}
+                                activeId={activeConvId}
+                                icon="chat"
+                                noun="chat"
+                                onSelect={loadConversation}
+                                onDelete={handleDeleteConversation}
                             />
-                            <button
-                                className="chat-send-btn"
-                                type="submit"
-                                disabled={isStreaming || !input.trim()}
-                            >
-                                ➤
-                            </button>
-                        </form>
+                        )}
                         {messages.length > 0 && (
-                            <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-                                <button className="back-btn" onClick={() => handleExport('text')} style={{ fontSize: '0.7rem', padding: '4px 10px' }}>Export TXT</button>
-                                <button className="back-btn" onClick={() => handleExport('json')} style={{ fontSize: '0.7rem', padding: '4px 10px' }}>Export JSON</button>
+                            <div className="lk-tool__footer">
+                                <p className="lk-tool__footer-label">Download this chat</p>
+                                <Button variant="quiet" icon="download" onClick={() => handleExport('text')}>As a text file</Button>
+                                <Button variant="quiet" icon="download" onClick={() => handleExport('json')}>As a JSON file</Button>
                             </div>
                         )}
+                    </>
+                }
+                after={<GuidePanel tool="chat" isOpen={guideOpen} onClose={() => setGuideOpen(false)} />}
+            >
+                <div className="lk-thread" data-tour="chat-messages">
+                    <div className="lk-thread__inner">
+                        {messages.length === 0 && (
+                            <div className="lk-empty">
+                                <h1 className="lk-display">What would you like to ask?</h1>
+                                <p>Ask a question, get help writing, or plan something. Chat is free.</p>
+                            </div>
+                        )}
+                        {shownMessages.map((msg, i) => (
+                            msg.role === 'assistant' ? (
+                                <AssistantReply
+                                    key={i}
+                                    content={msg.content}
+                                    failed={errorReplies.includes(msg.content)}
+                                    streaming={isStreaming && i === shownMessages.length - 1}
+                                />
+                            ) : (
+                                <ChatMessage key={i} role="user">{msg.content}</ChatMessage>
+                            )
+                        ))}
+                        {waitingForFirstToken && <ChatMessage thinking />}
+                        <div ref={messagesEndRef} />
                     </div>
                 </div>
 
-                <GuidePanel tool="chat" isOpen={guideOpen} />
-            </div>
+                <div className="lk-dock" data-tour="chat-input">
+                    <div className="lk-dock__inner">
+                        {messages.length === 0 && !input && (
+                            <div className="lk-chips" aria-label="Example questions">
+                                {CHAT_CHIPS.map(p => (
+                                    <Chip key={p} onClick={() => { setInput(p); document.getElementById('lk-composer')?.focus(); }}>{p}</Chip>
+                                ))}
+                            </div>
+                        )}
+                        <Composer
+                            value={input}
+                            onChange={setInput}
+                            onSend={sendMessage}
+                            busy={isStreaming}
+                            onStop={() => abortRef.current?.abort()}
+                            placeholder="Ask anything…"
+                            hint={`Using ${modelConfig.chat.label}. Press Enter to send. Shift + Enter for a new line.`}
+                            autoFocus
+                        />
+                    </div>
+                </div>
+            </ToolLayout>
             <CoachmarkTour tool="chat" />
         </div>
     );
 }
-

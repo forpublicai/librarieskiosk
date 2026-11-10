@@ -1,13 +1,22 @@
 'use client';
 
-import { useState, FormEvent, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
 import Header from '@/components/Header';
 import GuidePanel from '@/components/GuidePanel';
 import CoachmarkTour from '@/components/CoachmarkTour';
+import GenerationWait from '@/components/GenerationWait';
+import HistoryList from '@/components/HistoryList';
+import ToolLayout from '@/components/ToolLayout';
+import Button from '@/components/ui/Button';
+import ChatMessage from '@/components/ui/ChatMessage';
+import Chip from '@/components/ui/Chip';
+import Composer from '@/components/ui/Composer';
+import Notice from '@/components/ui/Notice';
+import { formatModeCost } from '@/lib/creditCosts';
 import { refreshMediaUrl, downloadMedia } from '@/lib/mediaClient';
-import { useGenerationProgress, formatElapsed } from '@/hooks/useGenerationProgress';
+import { useGenerationProgress } from '@/hooks/useGenerationProgress';
 import { loadGuestState, saveGuestState } from '@/lib/guestSession';
 import modelConfig from '@/config/models.json';
 
@@ -34,6 +43,11 @@ interface SessionItem {
 
 const GUEST_KEY = 'image';
 
+const IMAGE_CHIPS = [
+    'A peaceful sunset over the ocean',
+    'A friendly robot exploring a forest',
+];
+
 interface GuestImageState {
     imageUrl: string | null;
     sessions: SessionItem[];
@@ -49,7 +63,8 @@ export default function ImagePage() {
     const [error, setError] = useState('');
     const [sessions, setSessions] = useState<SessionItem[]>([]);
     const [guideOpen, setGuideOpen] = useState(false);
-    const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+    // The prompt behind the picture on screen, shown as the patron's bubble.
+    const [resultPrompt, setResultPrompt] = useState<string | null>(null);
     const isGuest = user?.role === 'GUEST';
     const hydratedRef = useRef(false);
     const progress = useGenerationProgress({
@@ -128,8 +143,7 @@ export default function ImagePage() {
     const handleDeleteSession = useCallback(async (id: string) => {
         if (id.startsWith('guest_')) {
             setSessions((prev) => prev.filter((s) => s.id !== id));
-            if (currentSessionId === id) { setCurrentSessionId(null); setImageUrl(null); }
-            setConfirmDelete(null);
+            if (currentSessionId === id) { setCurrentSessionId(null); setImageUrl(null); setResultPrompt(null); }
             return;
         }
         await fetch(`/api/media-sessions/${id}`, {
@@ -137,18 +151,28 @@ export default function ImagePage() {
             headers: { Authorization: `Bearer ${token}` },
         });
         setSessions((prev) => prev.filter((s) => s.id !== id));
-        if (currentSessionId === id) { setCurrentSessionId(null); setImageUrl(null); }
-        setConfirmDelete(null);
+        if (currentSessionId === id) { setCurrentSessionId(null); setImageUrl(null); setResultPrompt(null); }
     }, [token, currentSessionId]);
 
-    const handleGenerate = async (e: FormEvent) => {
-        e.preventDefault();
-        if (!prompt.trim() || loading) return;
+    const selectSession = async (s: SessionItem) => {
+        setCurrentSessionId(s.id);
+        setResultPrompt(s.prompt);
+        setError('');
+        if (s.url) { setImageUrl(s.url); return; }
+        if (s.hasObject && token) {
+            const fresh = await refreshMediaUrl(s.id, token);
+            if (fresh?.url) setImageUrl(fresh.url);
+        }
+    };
+
+    const handleGenerate = async (text: string) => {
+        if (!text.trim() || loading) return;
 
         setLoading(true);
         setError('');
         setImageUrl(null);
         setCurrentSessionId(null);
+        setResultPrompt(text.trim());
 
         try {
             const res = await fetch('/api/image', {
@@ -157,7 +181,7 @@ export default function ImagePage() {
                     'Content-Type': 'application/json',
                     Authorization: `Bearer ${token}`,
                 },
-                body: JSON.stringify({ prompt: prompt.trim() }),
+                body: JSON.stringify({ prompt: text.trim() }),
             });
 
             if (!res.ok) {
@@ -187,7 +211,7 @@ export default function ImagePage() {
                 if (finalUrl) {
                     const item: SessionItem = {
                         id: `guest_${Date.now()}`,
-                        prompt: prompt.trim(),
+                        prompt: text.trim(),
                         url: finalUrl,
                         thumbnailUrl: finalUrl,
                         createdAt: new Date().toISOString(),
@@ -207,161 +231,110 @@ export default function ImagePage() {
 
     if (isLoading || !user) return null;
 
+    const sessionById = new Map(sessions.map((s) => [s.id, s]));
+
     return (
         <div className="page-container">
-            <Header title="Images" actions={
-                <button
-                    className={`guide-toggle-btn${guideOpen ? ' guide-toggle-btn--active' : ''}`}
+            <Header title="Image" tool="image" actions={
+                <Button
+                    variant="quiet"
+                    icon="help"
+                    aria-pressed={guideOpen}
                     onClick={() => setGuideOpen(o => !o)}
                     data-tour="guide-btn"
                 >
-                    <span className="guide-toggle-icon">?</span>
-                    Learning Guide
-                </button>
+                    Learning guide
+                </Button>
             } />
-            <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', padding: '8px 24px 0', margin: 0, letterSpacing: '0.03em' }}>
-                Currently using: {modelConfig.image.label}
-            </p>
 
-            <div className="gen-container">
-                <aside className="gen-sidebar" data-tour="image-sidebar">
-                    <h2 className="form-label" style={{ marginBottom: '20px' }}>History</h2>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        {sessions.length === 0 && (
-                            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                                No images generated yet.
-                            </p>
+            <ToolLayout
+                sidebarLabel="Your images"
+                sidebarTour="image-sidebar"
+                sidebar={
+                    <>
+                        {isGuest && <p className="lk-tool__note">Guest images are cleared when you leave.</p>}
+                        {sessions.length === 0 ? (
+                            <p className="lk-tool__note">Your images will show here.</p>
+                        ) : (
+                            <HistoryList
+                                items={sessions.map((s) => ({
+                                    id: s.id,
+                                    title: s.prompt || 'Untitled image',
+                                    updatedAt: s.createdAt,
+                                    thumbnailUrl: s.thumbnailUrl || s.url,
+                                }))}
+                                activeId={currentSessionId}
+                                icon="image"
+                                noun="image"
+                                onSelect={(id) => { const s = sessionById.get(id); if (s) selectSession(s); }}
+                                onDelete={handleDeleteSession}
+                                onThumbnailError={refreshSessionItemUrl}
+                            />
                         )}
-                        {sessions.map((s) => (
-                            <div
-                                key={s.id}
-                                style={{
-                                    position: 'relative',
-                                    border: '1px solid var(--border-color)',
-                                    padding: '10px',
-                                    background: 'var(--bg-card)',
-                                    transition: 'background 0.2s',
-                                }}
-                            >
-                                {confirmDelete === s.id ? (
-                                    <div style={{ fontSize: '0.75rem' }}>
-                                        <div style={{ marginBottom: '8px', fontWeight: 'bold' }}>Delete this image?</div>
-                                        <div style={{ display: 'flex', gap: '6px' }}>
-                                            <button className="btn btn-primary" style={{ flex: 1, fontSize: '0.72rem', padding: '4px' }} onClick={() => handleDeleteSession(s.id)}>Delete</button>
-                                            <button className="btn" style={{ flex: 1, fontSize: '0.72rem', padding: '4px' }} onClick={() => setConfirmDelete(null)}>Cancel</button>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <>
-                                        <button
-                                            onClick={() => setConfirmDelete(s.id)}
-                                            style={{ position: 'absolute', top: '6px', right: '6px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.8rem', lineHeight: 1, padding: '2px 4px' }}
-                                            title="Delete"
-                                        >✕</button>
-                                        <div
-                                            style={{ cursor: 'pointer' }}
-                                            onClick={async () => {
-                                                setCurrentSessionId(s.id);
-                                                if (s.url) { setImageUrl(s.url); return; }
-                                                if (s.hasObject && token) {
-                                                    const fresh = await refreshMediaUrl(s.id, token);
-                                                    if (fresh?.url) setImageUrl(fresh.url);
-                                                }
-                                            }}
-                                        >
-                                            {(s.thumbnailUrl || s.url) && (
-                                                <img
-                                                    src={s.thumbnailUrl || s.url || undefined}
-                                                    alt={s.prompt}
-                                                    loading="lazy"
-                                                    decoding="async"
-                                                    style={{ width: '100%', maxHeight: '110px', objectFit: 'cover', marginBottom: '8px' }}
-                                                    onError={() => refreshSessionItemUrl(s.id)}
-                                                />
-                                            )}
-                                            <div style={{ fontSize: '0.75rem', fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                {s.prompt}
-                                            </div>
-                                        </div>
-                                    </>
-                                )}
+                    </>
+                }
+                after={<GuidePanel tool="image" isOpen={guideOpen} onClose={() => setGuideOpen(false)} />}
+            >
+                <div className="lk-thread" data-tour="image-result">
+                    <div className="lk-thread__inner">
+                        {!loading && !imageUrl && !error && (
+                            <div className="lk-empty">
+                                <h1 className="lk-display">What should the picture show?</h1>
+                                <p>Describe a picture. The AI draws it.</p>
                             </div>
-                        ))}
-                    </div>
-                </aside>
-
-                <main className="gen-main">
-                    <div style={{ width: '100%', maxWidth: '800px' }}>
-                        <form className="gen-prompt-area" onSubmit={handleGenerate} data-tour="image-prompt">
-                            <label className="form-label">Describe the image you want to create</label>
-                            <div style={{ display: 'flex' }}>
-                                <input
-                                    className="input"
-                                    value={prompt}
-                                    onChange={(e) => setPrompt(e.target.value)}
-                                    placeholder="A serene lake at sunset with mountains..."
-                                    disabled={loading}
-                                    autoFocus
-                                    style={{ flex: 1, borderRight: 'none' }}
+                        )}
+                        {resultPrompt && (loading || imageUrl || error) && (
+                            <ChatMessage role="user">{resultPrompt}</ChatMessage>
+                        )}
+                        {loading && (
+                            <GenerationWait message={progress.message} elapsedSec={progress.elapsedSec} typical="10 to 30 seconds" />
+                        )}
+                        {error && (
+                            <Notice tone="danger" title="The image could not be made">
+                                {error} Please try again, or change your description.
+                            </Notice>
+                        )}
+                        {!loading && imageUrl && (
+                            <div className="lk-media">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                    src={imageUrl}
+                                    alt={resultPrompt ? `Image of: ${resultPrompt}` : 'Your image'}
+                                    className="lk-media__image"
+                                    onError={refreshMainUrl}
                                 />
-                                <button
-                                    className="btn btn-primary"
-                                    type="submit"
-                                    disabled={loading || !prompt.trim()}
-                                    style={{ padding: '14px 32px' }}
-                                >
-                                    {loading ? '...' : 'Generate'}
-                                </button>
+                                <div className="lk-media__actions">
+                                    <Button variant="quiet" icon="download" onClick={handleDownload}>Download</Button>
+                                </div>
                             </div>
-                            <div className="example-prompts">
-                                <span className="example-prompts-label">Try:</span>
-                                <button type="button" className="example-chip" onClick={() => setPrompt('A peaceful sunset over the ocean')}>A peaceful sunset over the ocean</button>
-                                <button type="button" className="example-chip" onClick={() => setPrompt('A friendly robot exploring a forest')}>A friendly robot exploring a forest</button>
-                            </div>
-                        </form>
-
-                        {error && <div className="gen-error" style={{ marginBottom: '20px' }}>{error}</div>}
-
-                        <div className="gen-result-area" data-tour="image-result">
-                            {loading && (
-                                <div className="gen-loading">
-                                    <div className="gen-spinner" />
-                                    <div className="gen-loading-text">{progress.message}</div>
-                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', letterSpacing: '0.05em' }}>
-                                        {formatElapsed(progress.elapsedSec)} elapsed · typically 10–30s
-                                    </div>
-                                </div>
-                            )}
-
-                            {!loading && imageUrl && (
-                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px', width: '100%', padding: '24px' }}>
-                                    <img
-                                        src={imageUrl}
-                                        alt="Generated image"
-                                        className="gen-image-result"
-                                        onError={refreshMainUrl}
-                                    />
-                                    <button
-                                        className="btn"
-                                        onClick={handleDownload}
-                                    >
-                                        Download Image
-                                    </button>
-                                </div>
-                            )}
-
-                            {!loading && !imageUrl && !error && (
-                                <div className="gen-empty">
-                                    <div className="gen-empty-icon">🎨</div>
-                                    <div className="gen-empty-text">Your generated image will appear here</div>
-                                </div>
-                            )}
-                        </div>
+                        )}
                     </div>
-                </main>
+                </div>
 
-                <GuidePanel tool="image" isOpen={guideOpen} />
-            </div>
+                <div className="lk-dock" data-tour="image-prompt">
+                    <div className="lk-dock__inner">
+                        {!loading && !imageUrl && !prompt && (
+                            <div className="lk-chips" aria-label="Example pictures">
+                                {IMAGE_CHIPS.map(p => (
+                                    <Chip key={p} onClick={() => { setPrompt(p); document.getElementById('lk-composer')?.focus(); }}>{p}</Chip>
+                                ))}
+                            </div>
+                        )}
+                        <Composer
+                            value={prompt}
+                            onChange={setPrompt}
+                            onSend={handleGenerate}
+                            disabled={loading}
+                            clearOnSend={false}
+                            label="Describe the picture"
+                            sendLabel="Make image"
+                            placeholder="A calm lake at sunset with mountains…"
+                            hint={`Using ${modelConfig.image.label}. Uses ${formatModeCost('image')} per image. Press Enter to make it.`}
+                            autoFocus
+                        />
+                    </div>
+                </div>
+            </ToolLayout>
             <CoachmarkTour tool="image" />
         </div>
     );

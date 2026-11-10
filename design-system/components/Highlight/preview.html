@@ -1,0 +1,13 @@
+<!-- @dsCard group="Foundations" height=110 -->
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Highlight preview</title></head>
+<body style="margin:0">
+<div id="root" class="lk-app" style="padding:16px"></div>
+<script>
+  var K = window.Kiosk, h = React.createElement;
+  
+  ReactDOM.createRoot(document.getElementById('root')).render(h('h1', { style: { font: '900 48px/52px var(--font-sans)', letterSpacing: '-0.015em' } }, 'What would you like to do ', h(K.Highlight, null, 'today'), '?'));
+</script>
+</body>
+</html>

@@ -4,7 +4,7 @@ import ThemeToggle from '@/components/ThemeToggle';
 
 export default function FloatingThemeToggle() {
     return (
-        <div className="floating-theme-toggle">
+        <div className="lk-floating-theme">
             <ThemeToggle />
         </div>
     );

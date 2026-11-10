@@ -1,29 +1,19 @@
-import Link from 'next/link';
-import ThemeToggle from '@/components/ThemeToggle';
+import InfoHeader from '@/components/InfoHeader';
+import { ButtonLink } from '@/components/ui/Button';
 
 export default function ResourcesPage() {
-  return (
-    <div className="info-page">
-      <header className="info-topbar">
-        <Link href="/">
-          <img src="/images/lib-logo.png" alt="Public AI" className="info-topbar-logo" />
-        </Link>
-        <nav className="info-topbar-nav">
-          <Link href="/getting-started">Get Started</Link>
-          <Link href="/resources" className="active">Resources</Link>
-          <Link href="/faqs">FAQs</Link>
-        </nav>
-        <div className="info-topbar-actions">
-          <Link href="/" className="info-topbar-back">← Back to Sign In</Link>
-          <ThemeToggle />
-        </div>
-      </header>
+    return (
+        <div className="lk-info">
+            <InfoHeader current="/resources" />
 
-      <div className="under-construction">
-        <span className="under-construction-icon">🚧</span>
-        <p className="under-construction-title">Under Construction</p>
-        <p className="under-construction-sub">Resources are being prepared. Check back soon.</p>
-      </div>
-    </div>
-  );
+            <main className="lk-page">
+                <h1 className="lk-title">Resources</h1>
+                <p className="lk-lead">We are still putting this page together. Please check back soon.</p>
+                <div className="lk-home__actions">
+                    <ButtonLink variant="secondary" icon="help" href="/getting-started">Read how to get started</ButtonLink>
+                    <ButtonLink variant="quiet" href="/faqs">See the FAQs</ButtonLink>
+                </div>
+            </main>
+        </div>
+    );
 }

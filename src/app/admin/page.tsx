@@ -1,10 +1,15 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
+import { ROLE_NAMES, StatusLabel, TOOL_COLUMNS } from '@/components/AdminParts';
+import Dialog from '@/components/Dialog';
 import Header from '@/components/Header';
-import CreditBadge from '@/components/CreditBadge';
+import Tabs from '@/components/Tabs';
+import Button from '@/components/ui/Button';
+import Notice from '@/components/ui/Notice';
+import TextField from '@/components/ui/TextField';
 import { formatCreditRenewalTitle } from '@/lib/creditRenewal';
 
 interface UserAccount {
@@ -37,6 +42,12 @@ interface LibraryPool {
     poolRenewAt: string | null;
 }
 
+type AdminTab = 'accounts' | 'requests';
+
+const MESSAGE_MS = 8000;
+
+const plural = (n: number, word: string) => `${n} ${n === 1 ? word : `${word}s`}`;
+
 export default function AdminPage() {
     const { user, token, isLoading, refreshUser } = useAuth();
     const router = useRouter();
@@ -47,15 +58,19 @@ export default function AdminPage() {
     const [loadingAction, setLoadingAction] = useState<string | null>(null);
     const [sendCreditsModal, setSendCreditsModal] = useState<{ userId: string; username: string } | null>(null);
     const [sendAmount, setSendAmount] = useState(10);
-    const [tab, setTab] = useState<'accounts' | 'requests'>('accounts');
+    const [sendError, setSendError] = useState('');
+    const [tab, setTab] = useState<AdminTab>('accounts');
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
+    const messageTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
         if (!isLoading && (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN'))) {
             router.push('/dashboard');
         }
     }, [user, isLoading, router]);
+
+    useEffect(() => () => { if (messageTimer.current) clearTimeout(messageTimer.current); }, []);
 
     const loadData = useCallback(async () => {
         if (!token) return;
@@ -89,25 +104,41 @@ export default function AdminPage() {
     const showMessage = (msg: string, isError = false) => {
         if (isError) { setError(msg); setSuccess(''); }
         else { setSuccess(msg); setError(''); }
-        setTimeout(() => { setError(''); setSuccess(''); }, 3000);
+        if (messageTimer.current) clearTimeout(messageTimer.current);
+        messageTimer.current = setTimeout(() => { setError(''); setSuccess(''); }, MESSAGE_MS);
     };
 
-    const handleStatusChange = async (userId: string, status: string) => {
-        setLoadingAction(userId);
+    const handleStatusChange = async (account: UserAccount, status: 'APPROVED' | 'BANNED') => {
+        setLoadingAction(account.id);
         try {
             const res = await fetch('/api/admin/accounts', {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                body: JSON.stringify({ userId, status }),
+                body: JSON.stringify({ userId: account.id, status }),
             });
-            if (res.ok) { showMessage(`User ${status.toLowerCase()} successfully`); loadData(); }
-            else { const data = await res.json(); showMessage(data.error || 'Failed to update status', true); }
-        } catch { showMessage('Failed to update status', true); }
+            if (res.ok) {
+                showMessage(status === 'APPROVED' ? `${account.username} can now use the kiosk.` : `${account.username} is suspended.`);
+                loadData();
+            } else {
+                const data = await res.json();
+                showMessage(data.error || 'The account did not change. Please try again.', true);
+            }
+        } catch { showMessage('The account did not change. Please try again.', true); }
         finally { setLoadingAction(null); }
     };
 
+    const openSendCredits = (account: UserAccount) => {
+        setSendCreditsModal({ userId: account.id, username: account.username });
+        setSendAmount(10);
+        setSendError('');
+        // Reload so the pool cap is current (for example, after Monday's renewal).
+        loadData();
+    };
+
+    // Errors show inside the dialog: the modal dialog hides the page behind it from screen readers.
     const handleSendCredits = async () => {
         if (!sendCreditsModal) return;
+        setSendError('');
         setLoadingAction(sendCreditsModal.userId);
         try {
             const res = await fetch('/api/admin/credit-pool', {
@@ -115,235 +146,247 @@ export default function AdminPage() {
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
                 body: JSON.stringify({ userId: sendCreditsModal.userId, amount: sendAmount }),
             });
-            if (res.ok) { showMessage(`Sent ${sendAmount} credits to ${sendCreditsModal.username}`); setSendCreditsModal(null); loadData(); refreshUser(); }
-            else { const data = await res.json(); showMessage(data.error || 'Failed to send credits', true); }
-        } catch { showMessage('Failed to send credits', true); }
+            if (res.ok) {
+                showMessage(`${sendCreditsModal.username} got ${plural(sendAmount, 'credit')}.`);
+                setSendCreditsModal(null);
+                loadData();
+                refreshUser();
+            } else {
+                const data = await res.json();
+                setSendError(data.error || 'The credits were not sent. Please try again.');
+            }
+        } catch { setSendError('The credits were not sent. Please try again.'); }
         finally { setLoadingAction(null); }
     };
 
-    const handleCreditRequest = async (requestId: string, action: 'APPROVED' | 'DECLINED') => {
-        setLoadingAction(requestId);
+    const handleCreditRequest = async (req: CreditRequestItem, action: 'APPROVED' | 'DECLINED') => {
+        setLoadingAction(req.id);
         try {
             const res = await fetch('/api/admin/credit-requests', {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                body: JSON.stringify({ requestId, action }),
+                body: JSON.stringify({ requestId: req.id, action }),
             });
-            if (res.ok) { showMessage(`Request ${action.toLowerCase()}`); loadData(); refreshUser(); }
-            else { const data = await res.json(); showMessage(data.error || 'Failed', true); }
-        } catch { showMessage('Failed to handle request', true); }
+            if (res.ok) {
+                showMessage(action === 'APPROVED'
+                    ? `${req.user.username} got ${plural(req.amount, 'credit')}.`
+                    : `You declined the request from ${req.user.username}.`);
+                loadData();
+                refreshUser();
+            } else {
+                const data = await res.json();
+                showMessage(data.error || 'The request did not change. Please try again.', true);
+            }
+        } catch { showMessage('The request did not change. Please try again.', true); }
         finally { setLoadingAction(null); }
     };
 
     if (isLoading || !user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) return null;
 
     const pendingUsers = users.filter((u) => u.status === 'PENDING');
-    const modes = ['chat', 'image', 'video', 'music', 'coding'];
+    // The server checks the pool too; the cap here only applies once the pool has loaded.
+    const overPool = pool !== null && sendAmount > pool.poolRemaining;
+    const amountValid = Number.isInteger(sendAmount) && sendAmount > 0 && !overPool;
 
     return (
         <div className="page-container" style={{ overflow: 'auto' }}>
             <Header title="Admin" />
 
-            <div style={{ padding: '24px 32px' }}>
-                {/* Pool info bar */}
-                <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <main className="lk-page lk-page--wide">
+                <div>
+                    <h1 className="lk-title">Library admin</h1>
+                    {adminLibrary && <p className="lk-page__meta">{adminLibrary}</p>}
+                </div>
+
+                <div className="lk-stats">
                     {pool && (
-                        <CreditBadge renewAt={pool.poolRenewAt}>
-                            🏦 {pool.poolRemaining}/{pool.weeklyPool} pool
-                        </CreditBadge>
+                        <div className="lk-stat" title={formatCreditRenewalTitle(pool.poolRenewAt)}>
+                            <span className="lk-stat__value">{pool.poolRemaining} of {pool.weeklyPool}</span>
+                            <span className="lk-stat__label">Credits left in the weekly pool</span>
+                        </div>
                     )}
-                    <div className="credit-badge">
-                        📚 {adminLibrary}
+                    <div className="lk-stat">
+                        <span className="lk-stat__value">{users.length}</span>
+                        <span className="lk-stat__label">Accounts</span>
+                    </div>
+                    <div className="lk-stat">
+                        <span className="lk-stat__value">{creditRequests.length}</span>
+                        <span className="lk-stat__label">Requests for credits</span>
                     </div>
                 </div>
 
-                {/* Messages */}
-                {error && <div className="gen-error" style={{ marginBottom: '16px' }}>{error}</div>}
-                {success && <div className="alert-success" style={{ marginBottom: '16px' }}>{success}</div>}
+                {(error || success) && (
+                    <div className="lk-form">
+                        {error && <Notice tone="danger" title="That did not work">{error}</Notice>}
+                        {success && <Notice tone="success" title="Done">{success}</Notice>}
+                    </div>
+                )}
 
-                {/* Pending alert */}
                 {pendingUsers.length > 0 && (
-                    <div className="alert-warning" style={{ marginBottom: '16px' }}>
-                        ⚠️ {pendingUsers.length} account{pendingUsers.length > 1 ? 's' : ''} pending approval
-                    </div>
+                    <Notice
+                        tone="warning"
+                        title={`${plural(pendingUsers.length, 'account')} ${pendingUsers.length === 1 ? 'is' : 'are'} waiting for approval`}
+                    >
+                        Approve them in the list of accounts below.
+                    </Notice>
                 )}
 
-                {/* Tabs */}
-                <div style={{ display: 'flex', gap: '0', borderBottom: '1px solid var(--border-color)', marginBottom: '24px' }}>
-                    <button
-                        className={tab === 'accounts' ? 'btn btn-primary' : 'btn'}
-                        onClick={() => setTab('accounts')}
-                        style={{ borderBottom: 'none', fontSize: '0.8rem' }}
-                    >
-                        Accounts ({users.length})
-                    </button>
-                    <button
-                        className={tab === 'requests' ? 'btn btn-primary' : 'btn'}
-                        onClick={() => setTab('requests')}
-                        style={{ borderBottom: 'none', fontSize: '0.8rem' }}
-                    >
-                        Credit Requests ({creditRequests.length})
-                    </button>
-                </div>
+                <Tabs<AdminTab>
+                    label="Admin sections"
+                    value={tab}
+                    onChange={setTab}
+                    items={[
+                        { id: 'accounts', label: `Accounts (${users.length})` },
+                        { id: 'requests', label: `Requests for credits (${creditRequests.length})` },
+                    ]}
+                />
 
-                {/* Accounts tab */}
                 {tab === 'accounts' && (
-                    <div style={{ overflowX: 'auto' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
-                            <thead>
-                                <tr style={{ borderBottom: '2px solid var(--border-strong)' }}>
-                                    <th style={thStyle}>User</th>
-                                    <th style={thStyle}>Status</th>
-                                    <th style={thStyle}>Credits</th>
-                                    <th style={thStyle}>Usage</th>
-                                    {modes.map((m) => (
-                                        <th key={m} style={thStyle}>{m}</th>
-                                    ))}
-                                    <th style={thStyle}>Joined</th>
-                                    <th style={thStyle}>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {users.map((u) => (
-                                    <tr key={u.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                                        <td style={tdStyle}>
-                                            <strong>{u.username}</strong>
-                                            {u.role === 'ADMIN' && <span style={{ fontSize: '0.7rem', color: 'var(--accent-orange)', marginLeft: '4px' }}>ADMIN</span>}
-                                        </td>
-                                        <td style={tdStyle}>
-                                            <span style={{
-                                                padding: '2px 8px', fontSize: '0.75rem', fontWeight: 600,
-                                                background: u.status === 'APPROVED' ? 'rgba(16,185,129,0.1)' : u.status === 'BANNED' ? 'rgba(239,68,68,0.1)' : 'rgba(255,77,0,0.1)',
-                                                color: u.status === 'APPROVED' ? 'var(--accent-green)' : u.status === 'BANNED' ? 'var(--accent-red)' : 'var(--accent-orange)',
-                                            }}>
-                                                {u.status}
-                                            </span>
-                                        </td>
-                                        <td style={tdStyle} title={formatCreditRenewalTitle(u.creditsRenewAt)}>
-                                            {u.credits}
-                                        </td>
-                                        <td style={tdStyle}>{u.totalUsage}</td>
-                                        {modes.map((m) => (
-                                            <td key={m} style={tdStyle}>{u.usageByMode[m]?.count || 0}</td>
-                                        ))}
-                                        <td style={tdStyle}>{new Date(u.createdAt).toLocaleDateString()}</td>
-                                        <td style={{ ...tdStyle, display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                                            {u.role !== 'ADMIN' && (
-                                                <>
-                                                    {u.status !== 'APPROVED' && (
-                                                        <button className="btn btn-primary" style={{ padding: '4px 8px', fontSize: '0.7rem' }}
-                                                            onClick={() => handleStatusChange(u.id, 'APPROVED')} disabled={loadingAction === u.id}>
-                                                            ✓ Approve
-                                                        </button>
-                                                    )}
-                                                    {u.status !== 'BANNED' && (
-                                                        <button className="btn btn-danger" style={{ padding: '4px 8px', fontSize: '0.7rem' }}
-                                                            onClick={() => handleStatusChange(u.id, 'BANNED')} disabled={loadingAction === u.id}>
-                                                            Ban
-                                                        </button>
-                                                    )}
-                                                    <button className="btn" style={{ padding: '4px 8px', fontSize: '0.7rem' }}
-                                                        onClick={() => { setSendCreditsModal({ userId: u.id, username: u.username }); setSendAmount(10); }}>
-                                                        Credits
-                                                    </button>
-                                                </>
-                                            )}
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-
-                {/* Requests tab */}
-                {tab === 'requests' && (
-                    <div>
-                        {creditRequests.length === 0 ? (
-                            <div className="gen-empty" style={{ padding: '48px' }}>
-                                <div className="gen-empty-icon">💰</div>
-                                <div className="gen-empty-text">No pending credit requests</div>
-                            </div>
+                    <section id="panel-accounts" role="tabpanel" aria-labelledby="tab-accounts">
+                        {users.length === 0 ? (
+                            <p className="lk-fine">No accounts yet.</p>
                         ) : (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                {creditRequests.map((req) => (
-                                    <div key={req.id} style={{
-                                        padding: '16px', background: 'var(--bg-card)', border: '1px solid var(--border-color)',
-                                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                                    }}>
-                                        <div>
-                                            <strong>{req.user.username}</strong> requests <strong>{req.amount}</strong> credits
-                                            {req.reason && <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>Reason: {req.reason}</div>}
-                                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                                                Balance: {req.user.credits} · {new Date(req.createdAt).toLocaleString()}
-                                            </div>
-                                        </div>
-                                        <div style={{ display: 'flex', gap: '8px' }}>
-                                            <button className="btn btn-primary" style={{ padding: '6px 12px', fontSize: '0.8rem' }}
-                                                onClick={() => handleCreditRequest(req.id, 'APPROVED')} disabled={loadingAction === req.id}>
-                                                ✓ Approve
-                                            </button>
-                                            <button className="btn btn-danger" style={{ padding: '6px 12px', fontSize: '0.8rem' }}
-                                                onClick={() => handleCreditRequest(req.id, 'DECLINED')} disabled={loadingAction === req.id}>
-                                                ✕ Decline
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
+                            <div className="lk-table-wrap">
+                                <table className="lk-table">
+                                    <thead>
+                                        <tr>
+                                            <th scope="col">Account</th>
+                                            <th scope="col">Status</th>
+                                            <th scope="col" className="lk-table__num">Credits</th>
+                                            <th scope="col" className="lk-table__num">Times used</th>
+                                            {TOOL_COLUMNS.map((t) => (
+                                                <th key={t.key} scope="col" className="lk-table__num">{t.label}</th>
+                                            ))}
+                                            <th scope="col">Joined</th>
+                                            <th scope="col"><span className="lk-sr">Actions</span></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {users.map((u) => (
+                                            <tr key={u.id}>
+                                                <th scope="row" className="lk-table__name">
+                                                    {u.username}
+                                                    {u.role === 'ADMIN' && <span className="lk-table__sub">{ROLE_NAMES.ADMIN}</span>}
+                                                </th>
+                                                <td><StatusLabel status={u.status} /></td>
+                                                <td className="lk-table__num" title={formatCreditRenewalTitle(u.creditsRenewAt)}>{u.credits}</td>
+                                                <td className="lk-table__num">{u.totalUsage}</td>
+                                                {TOOL_COLUMNS.map((t) => (
+                                                    <td key={t.key} className="lk-table__num">{u.usageByMode[t.key]?.count || 0}</td>
+                                                ))}
+                                                <td>{new Date(u.createdAt).toLocaleDateString()}</td>
+                                                <td>
+                                                    {u.role !== 'ADMIN' && (
+                                                        <div className="lk-row-actions">
+                                                            {u.status !== 'APPROVED' && (
+                                                                <Button
+                                                                    icon="check"
+                                                                    onClick={() => handleStatusChange(u, 'APPROVED')}
+                                                                    disabled={loadingAction === u.id}
+                                                                >
+                                                                    Approve
+                                                                </Button>
+                                                            )}
+                                                            <Button
+                                                                variant="quiet"
+                                                                icon="credits"
+                                                                onClick={() => openSendCredits(u)}
+                                                            >
+                                                                Give credits
+                                                            </Button>
+                                                            {u.status !== 'BANNED' && (
+                                                                <Button
+                                                                    variant="danger"
+                                                                    onClick={() => handleStatusChange(u, 'BANNED')}
+                                                                    disabled={loadingAction === u.id}
+                                                                >
+                                                                    Suspend
+                                                                </Button>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
                             </div>
                         )}
-                    </div>
+                    </section>
                 )}
-            </div>
 
-            {/* Send credits modal */}
-            {sendCreditsModal && (
-                <div style={{
-                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                    background: 'var(--overlay-bg)', zIndex: 200,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    backdropFilter: 'blur(4px)',
-                }} onClick={() => setSendCreditsModal(null)}>
-                    <div style={{
-                        background: 'var(--bg-elevated)', border: '1px solid var(--border-color)',
-                        padding: '32px', width: '360px', maxWidth: '90vw',
-                    }} onClick={(e) => e.stopPropagation()}>
-                        <h3 style={{ marginBottom: '16px', fontWeight: 'bold' }}>Send Credits to {sendCreditsModal.username}</h3>
-                        <div className="form-group" style={{ marginBottom: '16px' }}>
-                            <label className="form-label">Amount</label>
-                            <input className="input" type="number" min={1} max={pool?.poolRemaining || 100}
-                                value={sendAmount} onChange={(e) => setSendAmount(Number(e.target.value))} />
-                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                                Pool remaining: {pool?.poolRemaining || 0}
-                            </span>
-                        </div>
-                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                            <button className="btn" onClick={() => setSendCreditsModal(null)}>Cancel</button>
-                            <button className="btn btn-primary"
-                                onClick={handleSendCredits}
-                                disabled={sendAmount <= 0 || loadingAction === sendCreditsModal.userId}>
-                                Send Credits
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+                {tab === 'requests' && (
+                    <section id="panel-requests" role="tabpanel" aria-labelledby="tab-requests">
+                        {creditRequests.length === 0 ? (
+                            <p className="lk-fine">No one is asking for credits right now.</p>
+                        ) : (
+                            <ul className="lk-rows">
+                                {creditRequests.map((req) => (
+                                    <li key={req.id} className="lk-row">
+                                        <div className="lk-row__text">
+                                            <p className="lk-row__title">
+                                                {req.user.username} asks for {plural(req.amount, 'credit')}
+                                            </p>
+                                            {req.reason && <p className="lk-row__body">“{req.reason}”</p>}
+                                            <p className="lk-fine">
+                                                Has {plural(req.user.credits, 'credit')} now · {new Date(req.createdAt).toLocaleString()}
+                                            </p>
+                                        </div>
+                                        <div className="lk-row-actions">
+                                            <Button
+                                                icon="check"
+                                                onClick={() => handleCreditRequest(req, 'APPROVED')}
+                                                disabled={loadingAction === req.id}
+                                            >
+                                                Approve
+                                            </Button>
+                                            <Button
+                                                variant="quiet"
+                                                onClick={() => handleCreditRequest(req, 'DECLINED')}
+                                                disabled={loadingAction === req.id}
+                                            >
+                                                Decline
+                                            </Button>
+                                        </div>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </section>
+                )}
+            </main>
+
+            <Dialog
+                open={sendCreditsModal !== null}
+                title={sendCreditsModal ? `Give credits to ${sendCreditsModal.username}` : 'Give credits'}
+                onClose={() => setSendCreditsModal(null)}
+                actions={
+                    <>
+                        <Button variant="quiet" onClick={() => setSendCreditsModal(null)}>Cancel</Button>
+                        <Button
+                            variant="primary"
+                            icon="credits"
+                            onClick={handleSendCredits}
+                            disabled={!amountValid || loadingAction === sendCreditsModal?.userId}
+                        >
+                            Give credits
+                        </Button>
+                    </>
+                }
+            >
+                {sendError && <Notice tone="danger" title="That did not work">{sendError}</Notice>}
+                <TextField
+                    label="How many credits"
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    max={pool?.poolRemaining}
+                    value={Number.isNaN(sendAmount) ? '' : sendAmount}
+                    onChange={(e) => setSendAmount(e.target.valueAsNumber)}
+                    hint={pool ? `The weekly pool has ${plural(pool.poolRemaining, 'credit')} left.` : undefined}
+                    error={overPool && pool ? `The pool has only ${plural(pool.poolRemaining, 'credit')} left.` : undefined}
+                />
+            </Dialog>
         </div>
     );
 }
-
-const thStyle: React.CSSProperties = {
-    textAlign: 'left',
-    padding: '10px 8px',
-    fontWeight: 600,
-    fontSize: '0.75rem',
-    textTransform: 'uppercase',
-    letterSpacing: '0.04em',
-    color: 'var(--text-secondary)',
-    whiteSpace: 'nowrap',
-};
-
-const tdStyle: React.CSSProperties = {
-    padding: '10px 8px',
-    verticalAlign: 'middle',
-};

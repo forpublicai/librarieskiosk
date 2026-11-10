@@ -1,13 +1,23 @@
 'use client';
 
-import { useState, FormEvent, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
 import Header from '@/components/Header';
 import GuidePanel from '@/components/GuidePanel';
 import CoachmarkTour from '@/components/CoachmarkTour';
+import GenerationWait from '@/components/GenerationWait';
+import HistoryList from '@/components/HistoryList';
+import ToolLayout from '@/components/ToolLayout';
+import Button from '@/components/ui/Button';
+import ChatMessage from '@/components/ui/ChatMessage';
+import Chip from '@/components/ui/Chip';
+import Composer from '@/components/ui/Composer';
+import Notice from '@/components/ui/Notice';
+import TextField from '@/components/ui/TextField';
+import { calculateCredits, formatCredits } from '@/lib/creditCosts';
 import { refreshMediaUrl, downloadMedia } from '@/lib/mediaClient';
-import { useGenerationProgress, formatElapsed } from '@/hooks/useGenerationProgress';
+import { useGenerationProgress } from '@/hooks/useGenerationProgress';
 import { loadGuestState, saveGuestState } from '@/lib/guestSession';
 import modelConfig from '@/config/models.json';
 
@@ -33,6 +43,18 @@ interface SessionItem {
 
 const GUEST_KEY = 'music';
 
+const MUSIC_CHIPS = [
+    'Calm piano music for focus',
+    'Upbeat jazz with a happy mood',
+];
+
+function formatLength(sec: number): string {
+    if (sec < 60) return `${sec} sec`;
+    const min = Math.floor(sec / 60);
+    const rest = sec % 60;
+    return rest ? `${min} min ${rest} sec` : `${min} min`;
+}
+
 interface GuestMusicState {
     audioUrl: string | null;
     sessions: SessionItem[];
@@ -51,7 +73,9 @@ export default function MusicPage() {
     const [error, setError] = useState('');
     const [sessions, setSessions] = useState<SessionItem[]>([]);
     const [guideOpen, setGuideOpen] = useState(false);
-    const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+    const [lyricsOpen, setLyricsOpen] = useState(false);
+    // The prompt behind the track on screen, shown as the patron's bubble.
+    const [resultPrompt, setResultPrompt] = useState<string | null>(null);
     const isGuest = user?.role === 'GUEST';
     const hydratedRef = useRef(false);
     const progress = useGenerationProgress({
@@ -60,7 +84,7 @@ export default function MusicPage() {
         intervalSec: 3.5,
     });
 
-    const creditCost = Math.round((duration / 10) * 5);
+    const creditCost = calculateCredits('music', duration);
 
     // Some models (e.g. Google Lyria) ignore the requested duration and always
     // return a full-length track, so the slider would be misleading. When the
@@ -122,8 +146,7 @@ export default function MusicPage() {
     const handleDeleteSession = useCallback(async (id: string) => {
         if (id.startsWith('guest_')) {
             setSessions((prev) => prev.filter((s) => s.id !== id));
-            if (currentSessionId === id) { setCurrentSessionId(null); setAudioUrl(null); }
-            setConfirmDelete(null);
+            if (currentSessionId === id) { setCurrentSessionId(null); setAudioUrl(null); setResultPrompt(null); }
             return;
         }
         await fetch(`/api/media-sessions/${id}`, {
@@ -131,18 +154,28 @@ export default function MusicPage() {
             headers: { Authorization: `Bearer ${token}` },
         });
         setSessions((prev) => prev.filter((s) => s.id !== id));
-        if (currentSessionId === id) { setCurrentSessionId(null); setAudioUrl(null); }
-        setConfirmDelete(null);
+        if (currentSessionId === id) { setCurrentSessionId(null); setAudioUrl(null); setResultPrompt(null); }
     }, [token, currentSessionId]);
 
-    const handleGenerate = async (e: FormEvent) => {
-        e.preventDefault();
-        if (!prompt.trim() || loading) return;
+    const selectSession = async (s: SessionItem) => {
+        setCurrentSessionId(s.id);
+        setResultPrompt(s.prompt);
+        setError('');
+        if (s.url) { setAudioUrl(s.url); return; }
+        if (s.hasObject && token) {
+            const fresh = await refreshMediaUrl(s.id, token);
+            if (fresh?.url) setAudioUrl(fresh.url);
+        }
+    };
+
+    const handleGenerate = async (text: string) => {
+        if (!text.trim() || loading) return;
 
         setLoading(true);
         setError('');
         setAudioUrl(null);
         setCurrentSessionId(null);
+        setResultPrompt(text.trim());
 
         try {
             const res = await fetch('/api/music', {
@@ -152,7 +185,7 @@ export default function MusicPage() {
                     Authorization: `Bearer ${token}`,
                 },
                 body: JSON.stringify({
-                    prompt: prompt.trim(),
+                    prompt: text.trim(),
                     lyrics: instrumental ? undefined : lyrics.trim() || undefined,
                     duration,
                 }),
@@ -173,7 +206,7 @@ export default function MusicPage() {
                 if (isGuest) {
                     const item: SessionItem = {
                         id: `guest_${Date.now()}`,
-                        prompt: prompt.trim(),
+                        prompt: text.trim(),
                         url,
                         createdAt: new Date().toISOString(),
                     };
@@ -194,125 +227,115 @@ export default function MusicPage() {
 
     if (isLoading || !user) return null;
 
+    const sessionById = new Map(sessions.map((s) => [s.id, s]));
+    const showLyrics = !instrumental && (lyricsOpen || lyrics.length > 0);
+
     return (
         <div className="page-container">
-            <Header title="Music" actions={
-                <button
-                    className={`guide-toggle-btn${guideOpen ? ' guide-toggle-btn--active' : ''}`}
+            <Header title="Music" tool="music" actions={
+                <Button
+                    variant="quiet"
+                    icon="help"
+                    aria-pressed={guideOpen}
                     onClick={() => setGuideOpen(o => !o)}
                     data-tour="guide-btn"
                 >
-                    <span className="guide-toggle-icon">?</span>
-                    Learning Guide
-                </button>
+                    Learning guide
+                </Button>
             } />
-            <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', padding: '8px 24px 0', margin: 0, letterSpacing: '0.03em' }}>
-                Currently using: {modelConfig.music.label}
-            </p>
 
-            <div className="gen-container">
-                <aside className="gen-sidebar" data-tour="music-sidebar">
-                    <h2 className="form-label" style={{ marginBottom: '20px' }}>History</h2>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        {sessions.length === 0 && (
-                            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                                No music generated yet.
-                            </p>
+            <ToolLayout
+                sidebarLabel="Your songs"
+                sidebarTour="music-sidebar"
+                sidebar={
+                    <>
+                        {isGuest && <p className="lk-tool__note">Guest songs are cleared when you leave.</p>}
+                        {sessions.length === 0 ? (
+                            <p className="lk-tool__note">Your songs will show here.</p>
+                        ) : (
+                            <HistoryList
+                                items={sessions.map((s) => ({ id: s.id, title: s.prompt || 'Untitled song', updatedAt: s.createdAt }))}
+                                activeId={currentSessionId}
+                                icon="music"
+                                noun="song"
+                                onSelect={(id) => { const s = sessionById.get(id); if (s) selectSession(s); }}
+                                onDelete={handleDeleteSession}
+                            />
                         )}
-                        {sessions.map((s) => (
-                            <div
-                                key={s.id}
-                                style={{
-                                    position: 'relative',
-                                    border: '1px solid var(--border-color)',
-                                    padding: '10px',
-                                    background: 'var(--bg-card)',
-                                    transition: 'background 0.2s',
-                                }}
-                            >
-                                {confirmDelete === s.id ? (
-                                    <div style={{ fontSize: '0.75rem' }}>
-                                        <div style={{ marginBottom: '8px', fontWeight: 'bold' }}>Delete this track?</div>
-                                        <div style={{ display: 'flex', gap: '6px' }}>
-                                            <button className="btn btn-primary" style={{ flex: 1, fontSize: '0.72rem', padding: '4px' }} onClick={() => handleDeleteSession(s.id)}>Delete</button>
-                                            <button className="btn" style={{ flex: 1, fontSize: '0.72rem', padding: '4px' }} onClick={() => setConfirmDelete(null)}>Cancel</button>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <>
-                                        <button
-                                            onClick={() => setConfirmDelete(s.id)}
-                                            style={{ position: 'absolute', top: '6px', right: '6px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.8rem', lineHeight: 1, padding: '2px 4px' }}
-                                            title="Delete"
-                                        >✕</button>
-                                        <div
-                                            style={{ cursor: 'pointer' }}
-                                            onClick={async () => {
-                                                setCurrentSessionId(s.id);
-                                                if (s.url) { setAudioUrl(s.url); return; }
-                                                if (s.hasObject && token) {
-                                                    const fresh = await refreshMediaUrl(s.id, token);
-                                                    if (fresh?.url) setAudioUrl(fresh.url);
-                                                }
-                                            }}
-                                        >
-                                            <div style={{ fontSize: '0.75rem', fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: '16px' }}>
-                                                {s.prompt}
-                                            </div>
-                                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                                                {new Date(s.createdAt).toLocaleDateString()}
-                                            </div>
-                                        </div>
-                                    </>
-                                )}
+                    </>
+                }
+                after={<GuidePanel tool="music" isOpen={guideOpen} onClose={() => setGuideOpen(false)} />}
+            >
+                <div className="lk-thread" data-tour="music-result">
+                    <div className="lk-thread__inner">
+                        {!loading && !audioUrl && !error && (
+                            <div className="lk-empty">
+                                <h1 className="lk-display">What should your song sound like?</h1>
+                                <p>Describe a style and a mood. You can add your own words, or let the AI write them.</p>
                             </div>
-                        ))}
-                    </div>
-                </aside>
-
-                <main className="gen-main">
-                    <div style={{ width: '100%', maxWidth: '800px' }}>
-                        <form className="gen-prompt-area" onSubmit={handleGenerate} data-tour="music-form">
-                            <div className="form-group">
-                                <label className="form-label">Style &amp; Mood</label>
-                                <input
-                                    className="input"
-                                    value={prompt}
-                                    onChange={(e) => setPrompt(e.target.value)}
-                                    placeholder="e.g., 90s hip hop with lo-fi vibes..."
-                                    disabled={loading}
-                                    autoFocus
+                        )}
+                        {resultPrompt && (loading || audioUrl || error) && (
+                            <ChatMessage role="user">{resultPrompt}</ChatMessage>
+                        )}
+                        {loading && (
+                            <GenerationWait message={progress.message} elapsedSec={progress.elapsedSec} typical="30 to 60 seconds" />
+                        )}
+                        {error && (
+                            <Notice tone="danger" title="The song could not be made">
+                                {error} Please try again, or change your description.
+                            </Notice>
+                        )}
+                        {!loading && audioUrl && (
+                            <div className="lk-media">
+                                <audio
+                                    src={audioUrl}
+                                    controls
+                                    preload="metadata"
+                                    onError={refreshMainUrl}
+                                    className="lk-media__audio"
+                                    aria-label={resultPrompt ? `Song: ${resultPrompt}` : 'Your song'}
                                 />
-                            </div>
-                            <div className="example-prompts">
-                                <span className="example-prompts-label">Try:</span>
-                                <button type="button" className="example-chip" onClick={() => setPrompt('Calm piano music for focus')}>Calm piano music for focus</button>
-                                <button type="button" className="example-chip" onClick={() => setPrompt('Upbeat jazz with a happy mood')}>Upbeat jazz with a happy mood</button>
-                            </div>
-
-                            {!instrumental && (
-                                <div className="form-group">
-                                    <label className="form-label">Lyrics (optional)</label>
-                                    <textarea
-                                        className="input"
-                                        style={{ height: '120px', resize: 'none' }}
-                                        value={lyrics}
-                                        onChange={(e) => setLyrics(e.target.value)}
-                                        placeholder="Enter lyrics or leave blank for AI-generated..."
-                                        disabled={loading}
-                                    />
+                                <div className="lk-media__actions">
+                                    <Button variant="quiet" icon="download" onClick={handleDownload}>Download</Button>
                                 </div>
-                            )}
+                            </div>
+                        )}
+                    </div>
+                </div>
 
+                <div className="lk-dock" data-tour="music-form">
+                    <div className="lk-dock__inner">
+                        {!loading && !audioUrl && !prompt && (
+                            <div className="lk-chips" aria-label="Example songs">
+                                {MUSIC_CHIPS.map(p => (
+                                    <Chip key={p} onClick={() => { setPrompt(p); document.getElementById('lk-composer')?.focus(); }}>{p}</Chip>
+                                ))}
+                            </div>
+                        )}
+                        <div className="lk-options">
+                            <span data-tour="music-instrumental">
+                                <Chip
+                                    icon={instrumental ? 'check' : undefined}
+                                    selected={instrumental}
+                                    onClick={() => setInstrumental((v) => !v)}
+                                    disabled={loading}
+                                >
+                                    Instrumental only
+                                </Chip>
+                            </span>
+                            {!instrumental && !showLyrics && (
+                                <Button variant="quiet" icon="plus" onClick={() => setLyricsOpen(true)} disabled={loading}>
+                                    Add your own words
+                                </Button>
+                            )}
                             {showDurationSlider ? (
-                                <div className="duration-slider">
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <label className="form-label" style={{ margin: 0 }}>Duration: {duration}s</label>
-                                        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>
-                                            Cost: {creditCost} {creditCost === 1 ? 'credit' : 'credits'}
-                                        </span>
+                                <div className="lk-range">
+                                    <div className="lk-range__row">
+                                        <label className="lk-options__label" htmlFor="music-length">Length: {formatLength(duration)}</label>
+                                        <span className="lk-options__cost">{formatCredits(creditCost)}</span>
                                     </div>
                                     <input
+                                        id="music-length"
                                         type="range"
                                         min={10}
                                         max={300}
@@ -320,87 +343,40 @@ export default function MusicPage() {
                                         value={duration}
                                         onChange={(e) => setDuration(Number(e.target.value))}
                                         disabled={loading}
-                                        className="slider"
+                                        aria-valuetext={formatLength(duration)}
                                     />
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                                        <span>10s</span>
-                                        <span>5m</span>
-                                    </div>
+                                    <div className="lk-range__ends" aria-hidden="true"><span>10 sec</span><span>5 min</span></div>
                                 </div>
                             ) : (
-                                <div className="duration-slider" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Generates a full-length track</span>
-                                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>
-                                        Cost: {creditCost} {creditCost === 1 ? 'credit' : 'credits'}
-                                    </span>
-                                </div>
-                            )}
-
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem' }} data-tour="music-instrumental">
-                                    <input
-                                        type="checkbox"
-                                        checked={instrumental}
-                                        onChange={(e) => setInstrumental(e.target.checked)}
-                                        disabled={loading}
-                                    />
-                                    Instrumental Only
-                                </label>
-
-                                <button
-                                    className="btn btn-primary"
-                                    type="submit"
-                                    disabled={loading || !prompt.trim()}
-                                    style={{ padding: '14px 40px' }}
-                                >
-                                    {loading ? '...' : 'Generate Music'}
-                                </button>
-                            </div>
-                        </form>
-
-                        {error && <div className="gen-error" style={{ marginBottom: '20px' }}>{error}</div>}
-
-                        <div className="gen-result-area" style={{ minHeight: '250px' }} data-tour="music-result">
-                            {loading && (
-                                <div className="gen-loading">
-                                    <div className="gen-spinner" />
-                                    <div className="gen-loading-text">{progress.message}</div>
-                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', letterSpacing: '0.05em' }}>
-                                        {formatElapsed(progress.elapsedSec)} elapsed · typically 30–60s
-                                    </div>
-                                </div>
-                            )}
-
-                            {!loading && audioUrl && (
-                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px', width: '100%', padding: '24px' }}>
-                                    <audio
-                                        src={audioUrl}
-                                        controls
-                                        preload="metadata"
-                                        onError={refreshMainUrl}
-                                        style={{ width: '100%', maxWidth: '600px' }}
-                                    />
-                                    <button
-                                        className="btn"
-                                        onClick={handleDownload}
-                                    >
-                                        Download Audio
-                                    </button>
-                                </div>
-                            )}
-
-                            {!loading && !audioUrl && !error && (
-                                <div className="gen-empty">
-                                    <div className="gen-empty-icon">🎵</div>
-                                    <div className="gen-empty-text">Your audio track will appear here</div>
-                                </div>
+                                <span className="lk-options__cost">Makes a full-length song for {formatCredits(creditCost)}.</span>
                             )}
                         </div>
+                        {showLyrics && (
+                            <TextField
+                                multiline
+                                label="Your words (optional)"
+                                hint="Leave this empty and the AI writes the words."
+                                value={lyrics}
+                                onChange={(e) => setLyrics(e.target.value)}
+                                placeholder="Type your words here…"
+                                disabled={loading}
+                            />
+                        )}
+                        <Composer
+                            value={prompt}
+                            onChange={setPrompt}
+                            onSend={handleGenerate}
+                            disabled={loading}
+                            clearOnSend={false}
+                            label="Describe the style and mood"
+                            sendLabel="Make music"
+                            placeholder="90s hip hop with lo-fi vibes…"
+                            hint={`Using ${modelConfig.music.label}. Uses ${formatCredits(creditCost)}. Press Enter to make it.`}
+                            autoFocus
+                        />
                     </div>
-                </main>
-
-                <GuidePanel tool="music" isOpen={guideOpen} />
-            </div>
+                </div>
+            </ToolLayout>
             <CoachmarkTour tool="music" />
         </div>
     );

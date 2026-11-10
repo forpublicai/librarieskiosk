@@ -1,12 +1,20 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback, FormEvent } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
 import Header from '@/components/Header';
 import GuidePanel from '@/components/GuidePanel';
+import AssistantReply from '@/components/AssistantReply';
 import CoachmarkTour from '@/components/CoachmarkTour';
-import { formatAssistantMessage } from '@/lib/formatMessage';
+import CopyButton from '@/components/CopyButton';
+import HistoryList from '@/components/HistoryList';
+import ToolLayout from '@/components/ToolLayout';
+import Button from '@/components/ui/Button';
+import ChatMessage from '@/components/ui/ChatMessage';
+import Chip from '@/components/ui/Chip';
+import Composer from '@/components/ui/Composer';
+import { formatModeCost } from '@/lib/creditCosts';
 import { useGenerationProgress, formatElapsed } from '@/hooks/useGenerationProgress';
 import { loadGuestState, saveGuestState } from '@/lib/guestSession';
 import modelConfig from '@/config/models.json';
@@ -34,6 +42,11 @@ const CODE_PROGRESS_MESSAGES = [
 
 const GUEST_KEY = 'code';
 
+const CODE_CHIPS = [
+    'Build a simple to-do list webpage',
+    'Write a function to reverse a string',
+];
+
 interface GuestCodeState {
     messages: Message[];
     activeConvId: string | null;
@@ -49,6 +62,9 @@ export default function CodePage() {
     const [conversations, setConversations] = useState<ConversationSummary[]>([]);
     const [activeConvId, setActiveConvId] = useState<string | null>(null);
     const [guideOpen, setGuideOpen] = useState(false);
+    const abortRef = useRef<AbortController | null>(null);
+    // Error replies this page made in this visit, so only they show as a failure notice.
+    const [errorReplies, setErrorReplies] = useState<string[]>([]);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const isGuest = user?.role === 'GUEST';
@@ -177,21 +193,25 @@ export default function CodePage() {
         } catch { /* ignore */ }
     };
 
-    const handleSubmit = async (e: FormEvent) => {
-        e.preventDefault();
-        if (!input.trim() || isStreaming) return;
+    const sendMessage = async (content: string) => {
+        if (!content.trim() || isStreaming) return;
 
-        const userMessage: Message = { role: 'user', content: input.trim() };
+        const userMessage: Message = { role: 'user', content: content.trim() };
         const newMessages = [...messages, userMessage];
         setMessages(newMessages);
         setInput('');
         setIsStreaming(true);
+
+        const controller = new AbortController();
+        abortRef.current = controller;
+        let assistantContent = '';
 
         try {
             const res = await fetch('/api/code', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
                 body: JSON.stringify({ messages: newMessages }),
+                signal: controller.signal,
             });
 
             if (!res.ok) {
@@ -203,7 +223,6 @@ export default function CodePage() {
             if (!reader) throw new Error('No stream reader');
 
             const decoder = new TextDecoder();
-            let assistantContent = '';
             setMessages((prev) => [...prev, { role: 'assistant', content: '' }]);
 
             while (true) {
@@ -235,167 +254,149 @@ export default function CodePage() {
             scheduleSave(finalMessages, activeConvId);
             await refreshUser();
         } catch (err) {
-            setMessages((prev) => [...prev, {
-                role: 'assistant',
-                content: `Error: ${err instanceof Error ? err.message : 'Something went wrong'}`,
-            }]);
+            if (controller.signal.aborted) {
+                // Stopped by the patron: keep what arrived so far.
+                const stoppedMessages = assistantContent.trim()
+                    ? [...newMessages, { role: 'assistant' as const, content: assistantContent }]
+                    : newMessages;
+                setMessages(stoppedMessages);
+                scheduleSave(stoppedMessages, activeConvId);
+                await refreshUser();
+            } else {
+                const errorContent = `Error: ${err instanceof Error ? err.message : 'Something went wrong'}`;
+                setErrorReplies((prev) => [...prev, errorContent]);
+                setMessages((prev) => [...prev.filter((m) => m.role !== 'assistant' || m.content !== ''), {
+                    role: 'assistant',
+                    content: errorContent,
+                }]);
+            }
         } finally {
+            abortRef.current = null;
             setIsStreaming(false);
         }
-    };
-
-    const copyCode = (code: string) => {
-        navigator.clipboard.writeText(code);
     };
 
     if (isLoading || !user) return null;
 
     const latestCode = codeBlocks.length > 0 ? codeBlocks[codeBlocks.length - 1] : null;
+    const last = messages[messages.length - 1];
+    const waitingForFirstToken = isStreaming && (last?.role !== 'assistant' || last.content === '');
+    const shownMessages = waitingForFirstToken && last?.role === 'assistant' ? messages.slice(0, -1) : messages;
 
     return (
         <div className="page-container">
-            <Header title="Code Assistant" actions={
-                <button
-                    className={`guide-toggle-btn${guideOpen ? ' guide-toggle-btn--active' : ''}`}
+            <Header title="Code" tool="code" actions={
+                <Button
+                    variant="quiet"
+                    icon="help"
+                    aria-pressed={guideOpen}
                     onClick={() => setGuideOpen(o => !o)}
                     data-tour="guide-btn"
                 >
-                    <span className="guide-toggle-icon">?</span>
-                    Learning Guide
-                </button>
+                    Learning guide
+                </Button>
             } />
-            <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', padding: '8px 24px 0', margin: 0, letterSpacing: '0.03em' }}>
-                Currently using: {modelConfig.coding.label}
-            </p>
 
-            <div className="gen-container">
-            <div className="code-container" style={{ gridTemplateColumns: '260px 1fr 1fr', flex: 1 }}>
-                {/* History sidebar */}
-                <aside className="gen-sidebar" style={{ width: 'auto', minWidth: 0 }} data-tour="code-sidebar">
-                    <button className="btn btn-primary" onClick={handleNewChat} style={{ width: '100%', marginBottom: '24px', fontSize: '0.8rem' }}>
-                        + New Project
-                    </button>
-                    <h2 className="form-label" style={{ marginBottom: '12px' }}>Projects</h2>
-                    {isGuest && (
-                        <p style={{ color: 'var(--text-muted)', fontSize: '0.7rem', marginBottom: '12px' }}>
-                            Guest session — history resets when you sign out.
-                        </p>
-                    )}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        {conversations.map((c) => (
-                            <div
-                                key={c.id}
-                                style={{
-                                    display: 'flex', alignItems: 'center', gap: '6px',
-                                    padding: '8px 10px',
-                                    background: c.id === activeConvId ? 'var(--glass-bg)' : 'transparent',
-                                    border: '1px solid var(--border-light)',
-                                    cursor: 'pointer',
-                                }}
-                            >
-                                <div
-                                    style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.75rem', fontWeight: 'bold' }}
-                                    onClick={() => loadConversation(c.id)}
-                                >
-                                    {c.title}
-                                </div>
-                                <button
-                                    onClick={() => handleDeleteConversation(c.id)}
-                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.8rem' }}
-                                >✕</button>
+            <ToolLayout
+                sidebarLabel="Projects"
+                sidebarTour="code-sidebar"
+                sidebar={
+                    <>
+                        <Button variant="secondary" icon="plus" block onClick={handleNewChat} data-drawer-close>
+                            Start a new project
+                        </Button>
+                        {isGuest ? (
+                            <p className="lk-tool__note">Guest projects are not saved after you leave.</p>
+                        ) : conversations.length === 0 ? (
+                            <p className="lk-tool__note">Your past projects will show here.</p>
+                        ) : (
+                            <HistoryList
+                                items={conversations}
+                                activeId={activeConvId}
+                                icon="code"
+                                noun="project"
+                                onSelect={loadConversation}
+                                onDelete={handleDeleteConversation}
+                            />
+                        )}
+                    </>
+                }
+                after={
+                    <>
+                        <section className="lk-code-pane" data-tour="code-output" aria-label="Code output">
+                            <div className="lk-code-pane__head">
+                                <h2 className="lk-heading">
+                                    Code
+                                    {latestCode && <span className="lk-code-pane__lang">{latestCode.lang}</span>}
+                                </h2>
+                                {latestCode && <CopyButton text={latestCode.code} label="Copy code" />}
                             </div>
-                        ))}
-                    </div>
-                </aside>
-
-                {/* Chat pane */}
-                <div className="code-chat-pane" data-tour="code-chat">
-                    <div className="chat-messages" style={{ flex: 1, overflowY: 'auto' }}>
+                            {latestCode ? (
+                                <pre className="lk-code-pane__body">
+                                    {latestCode.code.split('\n').map((line, i) => (
+                                        <span key={i} className="lk-code-pane__line">
+                                            <span className="lk-code-pane__num" aria-hidden="true">{i + 1}</span>
+                                            {line}
+                                        </span>
+                                    ))}
+                                </pre>
+                            ) : (
+                                <p className="lk-code-pane__empty">The newest code from the chat shows here.</p>
+                            )}
+                        </section>
+                        <GuidePanel tool="code" isOpen={guideOpen} onClose={() => setGuideOpen(false)} />
+                    </>
+                }
+            >
+                <div className="lk-thread" data-tour="code-chat">
+                    <div className="lk-thread__inner">
                         {messages.length === 0 && (
-                            <div className="gen-empty" style={{ margin: 'auto' }}>
-                                <div className="gen-empty-icon">💻</div>
-                                <div className="gen-empty-text">Ask me to write, debug, or explain code</div>
+                            <div className="lk-empty">
+                                <h1 className="lk-display">What would you like to build?</h1>
+                                <p>Describe a web page, a program or a fix. You do not need to know how to code.</p>
                             </div>
                         )}
-                        {messages.map((msg, i) => (
-                            <div key={i} className={`chat-message ${msg.role}`}>
-                                {msg.role === 'assistant' ? (
-                                    <div dangerouslySetInnerHTML={{ __html: formatAssistantMessage(msg.content, 'code') }} />
-                                ) : (
-                                    msg.content
-                                )}
-                            </div>
+                        {shownMessages.map((msg, i) => (
+                            msg.role === 'assistant' ? (
+                                <AssistantReply
+                                    key={i}
+                                    content={msg.content}
+                                    failed={errorReplies.includes(msg.content)}
+                                    streaming={isStreaming && i === shownMessages.length - 1}
+                                />
+                            ) : (
+                                <ChatMessage key={i} role="user">{msg.content}</ChatMessage>
+                            )
                         ))}
-                        {isStreaming && messages[messages.length - 1]?.role !== 'assistant' && (
-                            <div className="chat-message assistant">
-                                <div className="gen-loading" style={{ padding: '12px 0', alignItems: 'flex-start', gap: '10px' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                        <div className="gen-spinner" style={{ width: 22, height: 22, borderWidth: 2 }} />
-                                        <div className="gen-loading-text">{progress.message}</div>
-                                    </div>
-                                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', letterSpacing: '0.05em' }}>
-                                        {formatElapsed(progress.elapsedSec)} elapsed
-                                    </div>
-                                </div>
-                            </div>
+                        {waitingForFirstToken && (
+                            <ChatMessage thinking={`${progress.message} ${formatElapsed(progress.elapsedSec)}`} />
                         )}
                         <div ref={messagesEndRef} />
                     </div>
-
-                    <div className="chat-input-area">
-                        {messages.length === 0 && !isStreaming && (
-                            <div className="example-prompts" style={{ marginBottom: '8px' }}>
-                                <span className="example-prompts-label">Try:</span>
-                                <button type="button" className="example-chip" onClick={() => setInput('Build a simple to-do list webpage')}>Build a simple to-do list webpage</button>
-                                <button type="button" className="example-chip" onClick={() => setInput('Write a function to reverse a string')}>Write a function to reverse a string</button>
-                            </div>
-                        )}
-                        <form className="chat-input-wrapper" onSubmit={handleSubmit}>
-                            <input
-                                className="chat-input"
-                                value={input}
-                                onChange={(e) => setInput(e.target.value)}
-                                placeholder="Write a Python function to..."
-                                disabled={isStreaming}
-                                autoFocus
-                            />
-                            <button className="chat-send-btn" type="submit" disabled={isStreaming || !input.trim()}>
-                                ➤
-                            </button>
-                        </form>
-                    </div>
                 </div>
 
-                {/* Code output pane */}
-                <div className="code-editor-pane" data-tour="code-output">
-                    <div className="code-editor-header">
-                        <span>{latestCode ? `// ${latestCode.lang}` : '// Code Output'}</span>
-                        {latestCode && (
-                            <button className="back-btn" style={{ fontSize: '0.7rem', padding: '4px 10px' }} onClick={() => copyCode(latestCode.code)}>
-                                Copy
-                            </button>
-                        )}
-                    </div>
-                    <div className="code-editor-content">
-                        {latestCode ? (
-                            latestCode.code.split('\n').map((line, i) => (
-                                <div key={i}>
-                                    <span className="line-number">{i + 1}</span>
-                                    {line}
-                                </div>
-                            ))
-                        ) : (
-                            <div className="gen-empty" style={{ height: '100%', justifyContent: 'center' }}>
-                                <div className="gen-empty-icon">📝</div>
-                                <div className="gen-empty-text">Generated code will appear here</div>
+                <div className="lk-dock">
+                    <div className="lk-dock__inner">
+                        {messages.length === 0 && !input && (
+                            <div className="lk-chips" aria-label="Example requests">
+                                {CODE_CHIPS.map(p => (
+                                    <Chip key={p} onClick={() => { setInput(p); document.getElementById('lk-composer')?.focus(); }}>{p}</Chip>
+                                ))}
                             </div>
                         )}
+                        <Composer
+                            value={input}
+                            onChange={setInput}
+                            onSend={sendMessage}
+                            busy={isStreaming}
+                            onStop={() => abortRef.current?.abort()}
+                            placeholder="Write a Python function to…"
+                            hint={`Using ${modelConfig.coding.label}. Uses ${formatModeCost('code')} per message. Press Enter to send. Shift + Enter for a new line.`}
+                            autoFocus
+                        />
                     </div>
                 </div>
-            </div>
-
-                <GuidePanel tool="code" isOpen={guideOpen} />
-            </div>
+            </ToolLayout>
             <CoachmarkTour tool="code" />
         </div>
     );

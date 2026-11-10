@@ -1,48 +1,23 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, type MouseEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
-import CreditBadge from '@/components/CreditBadge';
 import FloatingThemeToggle from '@/components/FloatingThemeToggle';
-import ThemeToggle from '@/components/ThemeToggle';
+import Header from '@/components/Header';
+import Button, { ButtonLink } from '@/components/ui/Button';
+import ModeCard from '@/components/ui/ModeCard';
+import Notice from '@/components/ui/Notice';
+import Spinner from '@/components/ui/Spinner';
+import type { ToolName } from '@/components/ui/ToolShape';
+import { formatModeCost } from '@/lib/creditCosts';
 
-const modes = [
-    {
-        key: 'chat',
-        label: 'Public AI Chat',
-        description: 'Have a conversation with AI. Ask questions, get explanations, brainstorm ideas.',
-        href: '/chat',
-        span: 'span 4',
-    },
-    {
-        key: 'code',
-        label: 'Code',
-        description: 'Code, collaborate, and deploy projects in an instant online IDE.',
-        href: '/code',
-        span: 'span 4',
-    },
-    {
-        key: 'music',
-        label: 'Music',
-        description: 'Create music and audio content with AI-powered tools.',
-        href: '/music',
-        span: 'span 4',
-    },
-    {
-        key: 'image',
-        label: 'Images',
-        description: 'Generate stunning images with advanced AI models.',
-        href: '/image',
-        span: 'span 6',
-    },
-    {
-        key: 'video',
-        label: 'Videos',
-        description: 'Create and edit video content with AI.',
-        href: '/video',
-        span: 'span 6',
-    },
+const modes: { tool: ToolName; title: string; description: string; href: string }[] = [
+    { tool: 'chat', title: 'Chat', description: 'Ask a question, get help writing, or plan something.', href: '/chat' },
+    { tool: 'image', title: 'Image', description: 'Describe a picture. The AI draws it.', href: '/image' },
+    { tool: 'music', title: 'Music', description: 'Make a short song.', href: '/music' },
+    { tool: 'video', title: 'Video', description: 'Turn an idea into a clip.', href: '/video' },
+    { tool: 'code', title: 'Code', description: 'Write and fix code.', href: '/code' },
 ];
 
 export default function DashboardPage() {
@@ -55,10 +30,15 @@ export default function DashboardPage() {
         }
     }, [user, isLoading, router]);
 
+    const go = (href: string) => (e: MouseEvent) => {
+        e.preventDefault();
+        router.push(href);
+    };
+
     if (isLoading || !user) {
         return (
-            <div className="login-container">
-                <div className="gen-spinner" />
+            <div className="lk-center">
+                <Spinner label="Loading…" />
             </div>
         );
     }
@@ -68,14 +48,15 @@ export default function DashboardPage() {
     // Pending approval screen (skip for guests)
     if (!isGuest && user.status === 'PENDING') {
         return (
-            <div className="login-container">
+            <div className="lk-center">
                 <FloatingThemeToggle />
-                <div className="login-card" style={{ textAlign: 'center' }}>
-                    <h2 style={{ marginBottom: '20px', fontSize: '1.5rem', fontWeight: 'bold', textTransform: 'uppercase' }}>Waiting for Approval</h2>
-                    <p style={{ color: 'var(--text-secondary)', marginBottom: '32px' }}>
-                        Your account is waiting for approval from the <strong>{user.library}</strong> library administrator.
+                <div className="lk-panel">
+                    <h1 className="lk-title">Your account is waiting for approval</h1>
+                    <p>
+                        The <strong>{user.library}</strong> library administrator must approve your account first.
+                        Please ask a librarian, or come back later.
                     </p>
-                    <button className="btn btn-primary" onClick={logout}>Sign Out</button>
+                    <Button variant="primary" icon="signout" onClick={logout}>Sign out</Button>
                 </div>
             </div>
         );
@@ -84,127 +65,89 @@ export default function DashboardPage() {
     // Banned screen (skip for guests)
     if (!isGuest && user.status === 'BANNED') {
         return (
-            <div className="login-container">
+            <div className="lk-center">
                 <FloatingThemeToggle />
-                <div className="login-card" style={{ textAlign: 'center' }}>
-                    <h2 style={{ marginBottom: '20px', fontSize: '1.5rem', fontWeight: 'bold', textTransform: 'uppercase' }}>Account Suspended</h2>
-                    <p style={{ color: 'var(--text-secondary)', marginBottom: '32px' }}>
-                        Your account has been suspended. Please contact your library administrator.
-                    </p>
-                    <button className="btn btn-primary" onClick={logout}>Sign Out</button>
+                <div className="lk-panel">
+                    <h1 className="lk-title">Your account is suspended</h1>
+                    <p>Please talk to your library administrator to find out more.</p>
+                    <Button variant="primary" icon="signout" onClick={logout}>Sign out</Button>
                 </div>
             </div>
         );
     }
 
+    const isAdmin = user.role === 'ADMIN' || user.role === 'SUPER_ADMIN';
+
     return (
         <div className="page-container" style={{ overflow: 'auto' }}>
-            <header className="page-header">
-                <div className="page-header-left">
-                    <img src="/images/logo.svg" alt="Public AI" className="header-logo" />
-                </div>
-                <div className="page-header-right">
-                    <CreditBadge renewAt={user.creditsRenewAt}>{user.credits} Credits</CreditBadge>
-                    {isGuest && <span className="credit-badge" style={{ background: 'rgba(255,77,0,0.1)', color: 'var(--accent-orange)' }}>Guest</span>}
-                    {!isGuest && (
-                        <button className="back-btn" onClick={() => router.push('/account')}>
-                            My Account
-                        </button>
-                    )}
-                    <ThemeToggle />
-                    <button className="back-btn" onClick={logout}>{isGuest ? 'Exit' : 'Sign Out'}</button>
-                </div>
-            </header>
+            <Header showBack={false} />
 
-            <main className="dashboard">
-                <div className="dashboard-header">
-                    <h1 className="dashboard-title">Explore Services</h1>
-                    <div style={{ color: 'var(--text-muted)', fontWeight: 'bold', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                        {isGuest ? 'Guest Session' : `Welcome, ${user.username}`}
-                    </div>
-                </div>
+            <main className="lk-home">
+                <h1 className="lk-display">
+                    {isGuest ? 'What would you like to do today?' : `Hi ${user.username}, what would you like to do today?`}
+                </h1>
 
-                {isGuest && (
-                    <div style={{
-                        marginBottom: '24px',
-                        padding: '16px 20px',
-                        backgroundColor: 'rgba(255, 165, 0, 0.08)',
-                        border: '1px solid rgba(255, 165, 0, 0.2)',
-                        borderRadius: '8px',
-                        color: 'var(--text-secondary)',
-                        fontSize: '0.95rem',
-                        lineHeight: '1.5',
-                    }}>
-                        <strong style={{ color: 'var(--text-primary)' }}>Guest Session</strong> — You have full access to all services, but your work won&apos;t be saved after you exit.{' '}
-                        <button
-                            type="button"
-                            onClick={logout}
-                            style={{ color: 'var(--accent-orange)', fontWeight: '500', textDecoration: 'none', background: 'none', border: 0, padding: 0, font: 'inherit', cursor: 'pointer' }}
-                        >
-                            Sign in or create an account
-                        </button>{' '}
-                        to save your creations and build your portfolio.
-                    </div>
-                )}
-
-                <div className="dashboard-grid">
-                    {modes.map((mode) => (
-                        <a
-                            key={mode.key}
-                            className="mode-card"
-                            style={{ gridColumn: mode.span }}
-                            href={mode.href}
-                            onClick={(e) => {
-                                e.preventDefault();
-                                router.push(mode.href);
-                            }}
-                        >
-                            <div className="mode-label">{mode.label}</div>
-                            <div className="mode-description">{mode.description}</div>
-                        </a>
+                <div className="lk-home__grid">
+                    {modes.map((mode, i) => (
+                        <div key={mode.tool} className={i === 0 ? 'lk-home__tile lk-home__tile--hero' : 'lk-home__tile'}>
+                            <ModeCard
+                                hero={i === 0}
+                                tool={mode.tool}
+                                title={mode.title}
+                                description={mode.description}
+                                cost={formatModeCost(mode.tool)}
+                                href={mode.href}
+                                onClick={go(mode.href)}
+                            />
+                        </div>
                     ))}
+                </div>
 
-                    {/* Admin dashboard card */}
-                    {(user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') && (
-                        <a
-                            className="mode-card full"
-                            href="/admin"
-                            onClick={(e) => {
-                                e.preventDefault();
-                                router.push('/admin');
-                            }}
+                <div className="lk-home__section">
+                    {isGuest ? (
+                        <Notice
+                            tone="info"
+                            title="You are using a guest session"
+                            action={<Button variant="secondary" icon="user" onClick={logout}>Sign in or sign up</Button>}
                         >
-                            <div className="mode-label">Admin Dashboard</div>
-                            <div className="mode-description">Manage accounts, approve users, and view usage.</div>
-                        </a>
-                    )}
-
-                    {/* Super admin dashboard card */}
-                    {user.role === 'SUPER_ADMIN' && (
-                        <a
-                            className="mode-card full"
-                            href="/admin/superadmin"
-                            onClick={(e) => {
-                                e.preventDefault();
-                                router.push('/admin/superadmin');
-                            }}
-                            style={{ borderColor: 'var(--accent-orange)' }}
+                            You can use every tool, but your work is not saved when you leave.
+                            Sign in or create an account to keep what you make.
+                        </Notice>
+                    ) : (
+                        <Notice
+                            tone="info"
+                            title="New here?"
+                            action={<ButtonLink variant="secondary" icon="help" href="/getting-started">Get started</ButtonLink>}
                         >
-                            <div className="mode-label">👑 Super Admin Dashboard</div>
-                            <div className="mode-description">View usage across all libraries, manage global settings, and track system-wide activity.</div>
-                        </a>
+                            A short guide shows how each tool works.
+                        </Notice>
                     )}
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'center', gap: '24px', marginTop: '40px', fontSize: '0.85rem', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    <a href="/resources" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Resources</a>
-                    <a href="/faqs" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>FAQs</a>
-                </div>
+                {isAdmin && (
+                    <section className="lk-home__section" aria-labelledby="library-tools">
+                        <h2 id="library-tools" className="lk-heading">Library tools</h2>
+                        <div className="lk-home__actions">
+                            <ButtonLink variant="secondary" icon="user" href="/admin" onClick={go('/admin')}>
+                                Admin dashboard
+                            </ButtonLink>
+                            {user.role === 'SUPER_ADMIN' && (
+                                <ButtonLink variant="secondary" icon="credits" href="/admin/superadmin" onClick={go('/admin/superadmin')}>
+                                    Super admin dashboard
+                                </ButtonLink>
+                            )}
+                        </div>
+                    </section>
+                )}
             </main>
 
-            <footer style={{ padding: '40px', borderTop: '1px solid var(--border-color)', textAlign: 'center', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                <img src="/images/logo.svg" alt="Public AI" style={{ height: '24px', marginBottom: '12px', opacity: 0.5 }} /><br />
-                &copy; 2026 Public AI Libraries Project
+            <footer className="lk-home__footer">
+                <span>&copy; 2026 Public AI Libraries Project</span>
+                <nav aria-label="Help">
+                    <ButtonLink variant="quiet" href="/getting-started">Get started</ButtonLink>
+                    <ButtonLink variant="quiet" href="/resources">Resources</ButtonLink>
+                    <ButtonLink variant="quiet" href="/faqs">FAQs</ButtonLink>
+                </nav>
             </footer>
         </div>
     );

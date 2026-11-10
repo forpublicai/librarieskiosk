@@ -1,0 +1,54 @@
+<!-- @dsCard height=288 -->
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Libraries Kiosk cover</title>
+<style>
+  html, body { margin: 0; background: var(--surface); }
+  .cover { position: relative; width: 960px; height: 288px; overflow: hidden; background: var(--surface); font-family: var(--font-sans); }
+  .cover > svg { position: absolute; inset: 0; }
+  .red { fill: var(--red); }
+  .sun { fill: var(--sun); }
+  .cobalt { fill: var(--cobalt); }
+  .pink { fill: var(--pink); }
+  .ink { fill: var(--ink); }
+  .cut { fill: var(--surface); }
+  .ring { fill: none; stroke: var(--surface); stroke-width: 16; }
+  .text { position: absolute; left: 40px; bottom: 40px; max-width: 440px; }
+  .name { margin: 0; font-weight: 900; font-size: 80px; line-height: 0.95; letter-spacing: -0.015em; color: var(--ink); }
+  .tag { margin: 16px 0 0; font-size: 14px; line-height: 20px; color: var(--ink-muted); }
+</style>
+</head>
+<body>
+<div class="cover">
+  <svg width="960" height="288" viewBox="0 0 960 288" aria-hidden="true">
+    <!-- blocks: red 224x176, sun 240x120, cobalt 240x168, pink 144x112 (tool colors), set flush like the Home tile grid, bleeding top, right and bottom -->
+    <!-- pattern: the literal tool shapes (speech bubble, sun over hill, sound rings, play triangle) cut out of each block in the ground color, running off the edges; chosen because each tool owns one color and one shape -->
+    <!-- steps: block sides from space-8 multiples and 16px (space-4) offsets; ring stroke space-4; corners square like the logo square -->
+    <!-- colors: red, sun, cobalt, pink, ink (the hill) on surface -->
+    <svg x="496" y="0" width="224" height="176">
+      <rect class="red" width="224" height="176"/>
+      <path class="cut" d="M56 40h112a20 20 0 0 1 20 20v64a20 20 0 0 1-20 20H104l-40 34V144h-8a20 20 0 0 1-20-20V60a20 20 0 0 1 20-20z"/>
+    </svg>
+    <svg x="720" y="0" width="240" height="120">
+      <rect class="sun" width="240" height="120"/>
+      <circle class="cut" cx="168" cy="44" r="26"/>
+      <path class="ink" d="M24 120a72 72 0 0 1 144 0z"/>
+    </svg>
+    <svg x="720" y="120" width="240" height="168">
+      <rect class="cobalt" width="240" height="168"/>
+      <path class="cut" d="M92 48L170 96L92 144Z" stroke="var(--surface)" stroke-width="20" stroke-linejoin="round"/>
+    </svg>
+    <svg x="576" y="176" width="144" height="112">
+      <rect class="pink" width="144" height="112"/>
+      <circle class="cut" cx="0" cy="112" r="28"/>
+      <circle class="ring" cx="0" cy="112" r="60"/>
+      <circle class="ring" cx="0" cy="112" r="96"/>
+    </svg>
+  </svg>
+  <div class="text">
+    <h1 class="name">Libraries<br>Kiosk</h1>
+    <p class="tag">Bold, friendly AI tools for every library patron.</p>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,13 @@
+<!-- @dsCard group="Actions" height=90 -->
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>IconButton preview</title></head>
+<body style="margin:0">
+<div id="root" class="lk-app" style="padding:16px"></div>
+<script>
+  var K = window.Kiosk, h = React.createElement;
+  
+  ReactDOM.createRoot(document.getElementById('root')).render(h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' } }, h(K.IconButton, { icon: 'menu', label: 'Open conversations' }), h(K.IconButton, { icon: 'close', label: 'Close' }), h(K.IconButton, { icon: 'send', label: 'Send message', variant: 'primary', size: 'lg' }), h(K.IconButton, { icon: 'stop', label: 'Stop', variant: 'primary', size: 'lg' })));
+</script>
+</body>
+</html>

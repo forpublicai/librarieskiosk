@@ -1,11 +1,16 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, FormEvent } from 'react';
+import { useEffect, useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
 import { SECURITY_QUESTIONS } from '@/lib/security';
+import AuthLogo from '@/components/AuthLogo';
 import FloatingThemeToggle from '@/components/FloatingThemeToggle';
+import Button from '@/components/ui/Button';
+import Notice from '@/components/ui/Notice';
+import SelectField from '@/components/ui/SelectField';
+import TextField from '@/components/ui/TextField';
 
 const LIBRARIES = [
     'Pottsboro, TX',
@@ -33,32 +38,33 @@ export default function SignupPage() {
     const { user, login } = useAuth();
     const router = useRouter();
 
-    if (user) {
-        router.push('/dashboard');
-        return null;
-    }
+    useEffect(() => {
+        if (user) router.push('/dashboard');
+    }, [user, router]);
+
+    if (user) return null;
 
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
         setError('');
 
         if (password !== confirmPassword) {
-            setError('PASSWORDS DO NOT MATCH');
+            setError('The two passwords do not match.');
             return;
         }
 
         if (!library) {
-            setError('PLEASE SELECT A LIBRARY');
+            setError('Please choose your library.');
             return;
         }
 
         if (!securityQuestion) {
-            setError('PLEASE SELECT A SECURITY QUESTION');
+            setError('Please choose a security question.');
             return;
         }
 
         if (!securityAnswer.trim()) {
-            setError('PLEASE PROVIDE A SECURITY ANSWER');
+            setError('Please answer your security question.');
             return;
         }
 
@@ -80,152 +86,108 @@ export default function SignupPage() {
             const data = await res.json();
 
             if (!res.ok) {
-                throw new Error(data.error || 'SIGN UP FAILED');
+                throw new Error(data.error || 'Sign up failed');
             }
 
             await login(username.trim().toLowerCase(), password);
             router.push('/dashboard');
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'SIGN UP FAILED');
+            setError(err instanceof Error ? err.message : 'Sign up failed');
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <div className="login-container">
+        <div className="lk-auth-single">
             <FloatingThemeToggle />
-            <div className="login-card">
-                <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-                    <img src="/images/logo.svg" alt="Public AI" className="login-logo-img" />
-                    <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', textTransform: 'uppercase' }}>JOIN THE NETWORK</h1>
+            <div className="lk-auth-single__inner">
+                <AuthLogo />
+                <div>
+                    <h1 className="lk-title">Create an account</h1>
+                    <p className="lk-fine" style={{ marginTop: 'var(--space-2)' }}>
+                        A library administrator approves each new account before you can use it.
+                    </p>
                 </div>
 
-                <form className="login-form" onSubmit={handleSubmit}>
-                    {error && <div className="login-error" style={{ marginBottom: '20px' }}>{error}</div>}
+                {error && <Notice tone="danger" title="Your account was not created">{error}</Notice>}
 
-                    <div className="form-group">
-                        <label className="form-label" htmlFor="signup-library">LIBRARY LOCATION</label>
-                        <select
-                            id="signup-library"
-                            className="input"
-                            value={library}
-                            onChange={(e) => setLibrary(e.target.value)}
-                            required
-                        >
-                            <option value="">SELECT YOUR LIBRARY...</option>
-                            {LIBRARIES.map((lib) => (
-                                <option key={lib} value={lib}>{lib.toUpperCase()}</option>
-                            ))}
-                        </select>
-                    </div>
-
-                    <div className="form-group">
-                        <label className="form-label" htmlFor="signup-username">USERNAME</label>
-                        <input
-                            id="signup-username"
-                            className="input"
-                            type="text"
-                            value={username}
-                            onChange={(e) => setUsername(e.target.value)}
-                            placeholder="CHOOSE A USERNAME"
-                            required
-                            minLength={3}
-                            maxLength={30}
-                        />
-                    </div>
-
-                    <div className="form-group">
-                        <label className="form-label" htmlFor="signup-password">PASSWORD</label>
-                        <input
-                            id="signup-password"
-                            className="input"
-                            type="password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            placeholder="MIN 6 CHARACTERS"
-                            required
-                            minLength={6}
-                        />
-                    </div>
-
-                    <div className="form-group">
-                        <label className="form-label" htmlFor="signup-confirm">CONFIRM PASSWORD</label>
-                        <input
-                            id="signup-confirm"
-                            className="input"
-                            type="password"
-                            value={confirmPassword}
-                            onChange={(e) => setConfirmPassword(e.target.value)}
-                            placeholder="RE-ENTER PASSWORD"
-                            required
-                            minLength={6}
-                        />
-                    </div>
-
-                    <div className="form-group">
-                        <label className="form-label" htmlFor="signup-question">SECURITY QUESTION</label>
-                        <select
-                            id="signup-question"
-                            className="input"
-                            value={securityQuestion}
-                            onChange={(e) => setSecurityQuestion(e.target.value)}
-                            required
-                        >
-                            <option value="">SELECT A QUESTION...</option>
-                            {SECURITY_QUESTIONS.map((q) => (
-                                <option key={q} value={q}>{q.toUpperCase()}</option>
-                            ))}
-                        </select>
-                    </div>
-
-                    <div className="form-group" style={{ marginBottom: '40px' }}>
-                        <label className="form-label" htmlFor="signup-answer">SECURITY ANSWER</label>
-                        <input
-                            id="signup-answer"
-                            className="input"
-                            type="text"
-                            value={securityAnswer}
-                            onChange={(e) => setSecurityAnswer(e.target.value)}
-                            placeholder="YOUR ANSWER"
-                            autoComplete="off"
-                            required
-                        />
-                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
-                            USED TO RECOVER YOUR PASSWORD. NOT CASE-SENSITIVE.
-                        </span>
-                    </div>
-
-                    <button
-                        className="btn btn-primary btn-lg"
+                <form className="lk-form" onSubmit={handleSubmit}>
+                    <SelectField
+                        id="signup-library"
+                        label="Your library"
+                        placeholder="Choose your library"
+                        options={LIBRARIES}
+                        value={library}
+                        onChange={(e) => setLibrary(e.target.value)}
+                        required
+                    />
+                    <TextField
+                        id="signup-username"
+                        label="Username"
+                        hint="3 to 30 characters."
+                        type="text"
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                        autoComplete="username"
+                        required
+                        minLength={3}
+                        maxLength={30}
+                    />
+                    <TextField
+                        id="signup-password"
+                        label="Password"
+                        hint="At least 6 characters."
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        autoComplete="new-password"
+                        required
+                        minLength={6}
+                    />
+                    <TextField
+                        id="signup-confirm"
+                        label="Type the password again"
+                        type="password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        autoComplete="new-password"
+                        required
+                        minLength={6}
+                    />
+                    <SelectField
+                        id="signup-question"
+                        label="Security question"
+                        placeholder="Choose a question"
+                        options={SECURITY_QUESTIONS}
+                        value={securityQuestion}
+                        onChange={(e) => setSecurityQuestion(e.target.value)}
+                        required
+                    />
+                    <TextField
+                        id="signup-answer"
+                        label="Your answer"
+                        hint="You use this to reset your password. Capital letters do not matter."
+                        type="text"
+                        value={securityAnswer}
+                        onChange={(e) => setSecurityAnswer(e.target.value)}
+                        autoComplete="off"
+                        required
+                    />
+                    <Button
+                        variant="primary"
+                        size="lg"
+                        block
                         type="submit"
                         disabled={loading || !username || !password || !confirmPassword || !library || !securityQuestion || !securityAnswer}
-                        style={{ padding: '20px' }}
                     >
-                        {loading ? 'CREATING...' : 'REQUEST ACCESS'}
-                    </button>
-
-                    <p style={{
-                        textAlign: 'center',
-                        fontSize: '0.8rem',
-                        fontWeight: 'bold',
-                        color: 'var(--text-muted)',
-                        marginTop: '20px'
-                    }}>
-                        ACCOUNTS REQUIRE ADMINISTRATOR APPROVAL.
-                    </p>
-
-                    <p style={{
-                        textAlign: 'center',
-                        fontSize: '1rem',
-                        fontWeight: 'bold',
-                        marginTop: '32px'
-                    }}>
-                        <Link href="/" style={{ textDecoration: 'underline' }}>
-                            GO TO LOGIN
-                        </Link>
-                    </p>
+                        {loading ? 'Creating your account…' : 'Create account'}
+                    </Button>
                 </form>
+
+                <p>
+                    Already have an account? <Link className="lk-link" href="/">Sign in</Link>
+                </p>
             </div>
         </div>
     );

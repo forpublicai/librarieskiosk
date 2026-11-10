@@ -1,0 +1,13 @@
+<!-- @dsCard group="Feedback" height=430 -->
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Notice preview</title></head>
+<body style="margin:0">
+<div id="root" class="lk-app" style="padding:16px"></div>
+<script>
+  var K = window.Kiosk, h = React.createElement;
+  
+  ReactDOM.createRoot(document.getElementById('root')).render(h('div', { style: { display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 560 } }, h(K.Notice, { tone: 'info', title: 'Your session ends after 10 minutes of no activity' }, 'This keeps your chats private on a shared computer.'), h(K.Notice, { tone: 'success', title: 'Request sent' }, 'The library will review your request for more credits.'), h(K.Notice, { tone: 'warning', title: '3 credits left' }, 'Credits renew Monday at midnight.'), h(K.Notice, { tone: 'danger', title: 'You are out of credits' }, 'They renew Monday at midnight, or you can ask the library for more.')));
+</script>
+</body>
+</html>
